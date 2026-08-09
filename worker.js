@@ -1,5 +1,5 @@
 // URL of the deployed Mini App (same Worker serving the static assets)
-const WEBAPP_URL = "minerxrealm.zekobusiness0.workers.dev";
+const WEBAPP_URL = "https://minerxrealm.zekobusiness0.workers.dev/";
 
 export default {
   async fetch(request, env) {
