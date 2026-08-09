@@ -1,0 +1,14 @@
+name = "minerxrealm"
+main = "worker.js"
+compatibility_date = "2026-08-08"
+workers_dev = true
+
+[assets]
+directory = "./frontend"
+binding = "ASSETS"
+run_worker_first = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "minerxrealm"
+database_id = "9ebdd2c5-85f9-45d2-8d3b-0eb0f86ab0d3"
