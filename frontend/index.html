@@ -659,6 +659,13 @@ img,svg{ display:block; }
   background:var(--c-streakcard-claim-bg); color:var(--c-streakcard-claim-text);
   font-weight:700; font-size:11px;
 }
+/* -- حالة "جاهز للاستلام": تدرّج ذهبي rgba شفاف (نفس أسلوب أزرار Upgrade لكن ذهبي) -- */
+.streak-chest__claim.is-ready{
+  background:linear-gradient(155deg, rgba(240,193,75,.45), rgba(227,165,66,.22), rgba(240,193,75,.36));
+  border:1px solid rgba(240,193,75,.55);
+  color:#fff6df;
+  box-shadow:0 0 10px -2px rgba(240,193,75,.5), inset 0 1px 0 rgba(255,255,255,.2);
+}
 
 /* /////كود بطاقة كود الخصم (Promo)///// */
 .tasks-top-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:6px 2px 16px; }
@@ -2690,31 +2697,31 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
             <svg viewBox="0 0 24 24" fill="var(--c-streakcard-flame)" stroke="none"><path d="M12 2c1 3-2 4-2 7a4 4 0 0 0 8 0c0-1-.5-2-1-3 2 1 3 3.5 3 6a6 6 0 0 1-12 0c0-4 2-6 4-10z"/></svg>
             <span>Daily Rewards</span>
           </div>
-          <span class="streak-card__day-badge">Day 1 of 7</span>
+          <span class="streak-card__day-badge" id="streak-day-badge">Day 1 of 7</span>
         </div>
 
         <div class="streak-days">
-          <div class="streak-days__day is-active"><div class="d-val">50</div></div>
-          <div class="streak-days__day"><div class="d-val">100</div></div>
-          <div class="streak-days__day"><div class="d-val">150</div></div>
-          <div class="streak-days__day"><div class="d-val">200</div></div>
-          <div class="streak-days__day"><div class="d-val">250</div></div>
-          <div class="streak-days__day"><div class="d-val">300</div></div>
-          <div class="streak-days__day"><div class="d-val">500</div></div>
+          <div class="streak-days__day is-active" data-day="1"><div class="d-val">50</div></div>
+          <div class="streak-days__day" data-day="2"><div class="d-val">100</div></div>
+          <div class="streak-days__day" data-day="3"><div class="d-val">150</div></div>
+          <div class="streak-days__day" data-day="4"><div class="d-val">200</div></div>
+          <div class="streak-days__day" data-day="5"><div class="d-val">250</div></div>
+          <div class="streak-days__day" data-day="6"><div class="d-val">300</div></div>
+          <div class="streak-days__day" data-day="7"><div class="d-val">500</div></div>
         </div>
 
         <div class="streak-chest">
           <div class="streak-chest__left">
             <img class="streak-chest__icon" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/cc0ac6de33faf82ed7fae32bbda97030d525f6da/frontend/Daily%20Chest%20.svg" alt="Daily Chest">
             <div>
-              <div class="streak-chest__label">Next Claim in</div>
+              <div class="streak-chest__label" id="streak-timer-label">Next Claim in</div>
               <div class="streak-chest__timer">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
-                00:00:00
+                <span id="streak-timer-val">00:00:00</span>
               </div>
             </div>
           </div>
-          <span class="streak-chest__claim">Claimed</span>
+          <button class="streak-chest__claim" id="streak-claim-btn" onclick="onStreakClaimClick()">Claim</button>
         </div>
       </div>
 
@@ -4529,6 +4536,11 @@ function fetchUserData(){
       cycles_max: data.user.mining_cycles_max,
       cycle_duration_seconds: data.user.mining_cycle_duration_seconds
     });
+    applyStreakState({
+      display_day: data.user.streak_display_day,
+      claimed_today: data.user.streak_claimed_today,
+      next_reset_utc: data.user.streak_next_reset_utc
+    });
   })
   .catch(function(err){
     console.error('fetchUserData failed:', err);
@@ -4677,6 +4689,119 @@ function onMiningButtonClick(){
   })
   .finally(function(){
     miningBusy = false;
+  });
+}
+
+/* =====================================================================
+   كود بطاقة Daily Streak. السيرفر هو من يقرر أي يوم القادم وهل استُلمت
+   مكافأة اليوم بالفعل — هذا الكود فقط يعرض الحالة ويستدعي
+   /api/streak/claim، ولا يحسب أي مكافأة أو تسلسل بنفسه.
+   ===================================================================== */
+var streakState = {
+  displayDay: 1,
+  claimedToday: false,
+  nextResetUtc: null
+};
+var streakTickTimer = null;
+var streakBusy = false;
+
+function renderStreakDayBadge(){
+  var badge = document.getElementById('streak-day-badge');
+  if (badge) badge.textContent = 'Day ' + streakState.displayDay + ' of 7';
+
+  document.querySelectorAll('.streak-days__day').forEach(function(dayEl){
+    var isActive = parseInt(dayEl.getAttribute('data-day'), 10) === streakState.displayDay;
+    dayEl.classList.toggle('is-active', isActive);
+  });
+}
+
+function renderStreakButton(){
+  var btn = document.getElementById('streak-claim-btn');
+  var label = document.getElementById('streak-timer-label');
+  if (!btn) return;
+
+  if (streakState.claimedToday){
+    btn.textContent = 'Claimed';
+    btn.disabled = true;
+    btn.classList.remove('is-ready');
+    if (label) label.textContent = 'Next Claim in';
+  } else {
+    btn.textContent = 'Claim';
+    btn.disabled = false;
+    btn.classList.add('is-ready');
+    if (label) label.textContent = 'Claim before';
+  }
+}
+
+function renderStreakTimer(){
+  var timerEl = document.getElementById('streak-timer-val');
+  if (!timerEl || !streakState.nextResetUtc) return;
+
+  var remainingMs = new Date(streakState.nextResetUtc).getTime() - Date.now();
+  if (remainingMs <= 0){
+    timerEl.textContent = '00:00:00';
+    fetchUserData(); // اليوم الجديد بدأ (00:00 UTC) — أعد المزامنة مع السيرفر
+    return;
+  }
+
+  var totalSec = Math.floor(remainingMs / 1000);
+  var hh = String(Math.floor(totalSec / 3600)).padStart(2, '0');
+  var mm = String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0');
+  var ss = String(totalSec % 60).padStart(2, '0');
+  timerEl.textContent = hh + ':' + mm + ':' + ss;
+}
+
+function applyStreakState(data){
+  streakState.displayDay = data.display_day || 1;
+  streakState.claimedToday = !!data.claimed_today;
+  streakState.nextResetUtc = data.next_reset_utc || null;
+
+  renderStreakDayBadge();
+  renderStreakButton();
+  renderStreakTimer();
+
+  clearInterval(streakTickTimer);
+  streakTickTimer = setInterval(renderStreakTimer, 1000);
+}
+
+function onStreakClaimClick(){
+  if (streakBusy || streakState.claimedToday) return;
+
+  var initData = getTelegramInitData();
+  if (!initData){
+    alert('Open this app from Telegram to claim.');
+    return;
+  }
+
+  streakBusy = true;
+  fetch('/api/streak/claim', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: initData })
+  })
+  .then(function(res){ return res.json().then(function(data){ return { status: res.status, data: data }; }); })
+  .then(function(result){
+    var data = result.data;
+    if (data.error){
+      if (data.error === 'already_claimed_today'){
+        applyStreakState({ display_day: data.claimed_day, claimed_today: true, next_reset_utc: data.next_reset_utc });
+      } else {
+        console.error('streak claim error:', data.error);
+      }
+      return;
+    }
+
+    if (typeof data.coins === 'number'){
+      var gramEl = document.getElementById('display-gram-wallet');
+      updateBalanceDisplay({ coins: data.coins, gram: gramEl ? Number(gramEl.textContent) : 0 });
+    }
+    applyStreakState({ display_day: data.day_claimed, claimed_today: true, next_reset_utc: data.next_reset_utc });
+  })
+  .catch(function(err){
+    console.error('streak claim request failed:', err);
+  })
+  .finally(function(){
+    streakBusy = false;
   });
 }
 

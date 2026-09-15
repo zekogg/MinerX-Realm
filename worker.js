@@ -9,6 +9,13 @@ const MINING_CYCLE_SECONDS = 60 * 60; // 60 دقيقة لكل دورة
 const MINING_REWARD_COINS = 75;       // مكافأة كل دورة كاملة
 const MINING_DAILY_LIMIT = 7;         // أقصى عدد دورات باليوم (يُصفَّر 00:00 UTC)
 
+// =====================================================================
+// إعدادات Daily Streak: دورة أسبوعية متكررة (بعد اليوم 7 يرجع لليوم 1)،
+// وأي انقطاع يوم كامل بدون Claim يُعيد التسلسل لليوم 1 (عقوبة انقطاع).
+// المكافآت ثابتة هنا فقط وتطابق ما هو معروض بالواجهة.
+// =====================================================================
+const STREAK_REWARDS = [50, 100, 150, 200, 250, 300, 500]; // index 0 = اليوم 1
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -31,6 +38,10 @@ export default {
       return handleMineClaim(request, env);
     }
 
+    if (url.pathname === "/api/streak/claim" && request.method === "POST") {
+      return handleStreakClaim(request, env);
+    }
+
     // Everything else -> serve the Mini App static files
     return env.ASSETS.fetch(request);
   }
@@ -49,7 +60,7 @@ async function handleGetUser(request, env) {
 
   // موجود أصلاً؟ رجّع بياناته الحالية
   let user = await env.DB.prepare(
-    "SELECT telegram_id, username, coins, gram, total_speed, total_mined, is_admin, mining_started_at, mining_cycles_today, mining_cycle_date FROM users WHERE telegram_id = ?"
+    "SELECT telegram_id, username, coins, gram, total_speed, total_mined, is_admin, mining_started_at, mining_cycles_today, mining_cycle_date, streak_day, streak_last_claim_date FROM users WHERE telegram_id = ?"
   ).bind(telegramId).first();
 
   if (!user) {
@@ -66,11 +77,11 @@ async function handleGetUser(request, env) {
     }
 
     user = await env.DB.prepare(
-      "SELECT telegram_id, username, coins, gram, total_speed, total_mined, is_admin, mining_started_at, mining_cycles_today, mining_cycle_date FROM users WHERE telegram_id = ?"
+      "SELECT telegram_id, username, coins, gram, total_speed, total_mined, is_admin, mining_started_at, mining_cycles_today, mining_cycle_date, streak_day, streak_last_claim_date FROM users WHERE telegram_id = ?"
     ).bind(telegramId).first();
   }
 
-  return jsonResponse({ user: withMiningView(user) });
+  return jsonResponse({ user: withStreakView(withMiningView(user)) });
 }
 
 // =====================================================================
@@ -184,6 +195,109 @@ async function handleMineClaim(request, env) {
     cycles_today: newCyclesToday,
     cycles_max: MINING_DAILY_LIMIT
   });
+}
+
+// =====================================================================
+// نقطة /api/streak/claim — استلام مكافأة اليوم من Daily Streak.
+// كل الحساب من السيرفر: أي يوم في التسلسل الحالي، هل انقطع التسلسل،
+// وهل تم الاستلام اليوم بالفعل. لا شيء يُستقبل من المتصفح سوى initData.
+// =====================================================================
+async function handleStreakClaim(request, env) {
+  const auth = await authenticateRequest(request, env);
+  if (!auth.ok) return auth.response;
+  const { telegramId } = auth;
+
+  const row = await env.DB.prepare(
+    "SELECT coins, streak_day, streak_last_claim_date FROM users WHERE telegram_id = ?"
+  ).bind(telegramId).first();
+  if (!row) return jsonResponse({ error: "user_not_found" }, 404);
+
+  const state = computeStreakState(row);
+  if (state.alreadyClaimedToday) {
+    return jsonResponse({
+      error: "already_claimed_today",
+      claimed_day: state.claimedDay,
+      next_reset_utc: nextUtcMidnightIso()
+    }, 409);
+  }
+
+  const dayToClaim = state.pendingDay;
+  const reward = STREAK_REWARDS[dayToClaim - 1];
+  const nextStreakDay = dayToClaim === 7 ? 1 : dayToClaim + 1;
+
+  // شرط CAS يمنع استلام مكافأتين لنفس اليوم حتى لو تكرر نفس الطلب بسرعة
+  const updateStmt = env.DB.prepare(
+    `UPDATE users SET coins = coins + ?, streak_day = ?, streak_last_claim_date = ?
+     WHERE telegram_id = ? AND (streak_last_claim_date IS NULL OR streak_last_claim_date <> ?)`
+  ).bind(reward, nextStreakDay, state.today, telegramId, state.today);
+
+  const txnStmt = env.DB.prepare(
+    "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'daily_streak', ?, 'coins')"
+  ).bind(telegramId, reward);
+
+  const [updateResult] = await env.DB.batch([updateStmt, txnStmt]);
+  if (!updateResult.meta || updateResult.meta.changes === 0) {
+    return jsonResponse({ error: "already_claimed_today" }, 409);
+  }
+
+  return jsonResponse({
+    day_claimed: dayToClaim,
+    reward,
+    next_day: nextStreakDay,
+    coins: row.coins + reward,
+    next_reset_utc: nextUtcMidnightIso()
+  });
+}
+
+// يحسب حالة التسلسل الحالية (أي يوم القادم؟ هل انقطع؟ هل استُلم اليوم؟)
+// بدون أي كتابة لقاعدة البيانات — يُستخدم للعرض في /api/user وللتحقق
+// قبل الكتابة الفعلية في /api/streak/claim.
+function computeStreakState(user) {
+  const today = todayUTC();
+  const yesterday = shiftUTCDate(today, -1);
+  const lastClaim = user.streak_last_claim_date;
+  const storedDay = user.streak_day || 1;
+
+  if (lastClaim === today) {
+    const claimedDay = storedDay === 1 ? 7 : storedDay - 1;
+    return { today, alreadyClaimedToday: true, claimedDay, pendingDay: storedDay };
+  }
+
+  let pendingDay;
+  if (!lastClaim) {
+    pendingDay = 1; // أول مرة على الإطلاق
+  } else if (lastClaim === yesterday) {
+    pendingDay = storedDay; // استمرار طبيعي للتسلسل
+  } else {
+    pendingDay = 1; // انقطاع يوم كامل على الأقل — عقوبة إعادة من اليوم الأول
+  }
+
+  return { today, alreadyClaimedToday: false, pendingDay };
+}
+
+function withStreakView(user) {
+  const state = computeStreakState(user);
+  return {
+    ...user,
+    streak_display_day: state.alreadyClaimedToday ? state.claimedDay : state.pendingDay,
+    streak_claimed_today: state.alreadyClaimedToday,
+    streak_next_reset_utc: nextUtcMidnightIso()
+  };
+}
+
+// تاريخ الغد بتوقيت UTC الساعة 00:00 بالضبط — لحظة انتهاء صلاحية Claim الحالي
+// وبداية اليوم التالي في كل من التعدين والـ Daily Streak.
+function nextUtcMidnightIso() {
+  const now = new Date();
+  const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0));
+  return next.toISOString();
+}
+
+// يزيح تاريخ UTC (بصيغة YYYY-MM-DD) بعدد أيام (موجب أو سالب)
+function shiftUTCDate(dateStr, deltaDays) {
+  const d = new Date(dateStr + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + deltaDays);
+  return d.toISOString().slice(0, 10);
 }
 
 // تاريخ اليوم الحالي بتوقيت UTC بصيغة YYYY-MM-DD (لتصفير عداد الدورات كل 00:00 UTC)
