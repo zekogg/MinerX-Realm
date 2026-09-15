@@ -49,7 +49,7 @@ async function handleGetUser(request, env) {
 
   // موجود أصلاً؟ رجّع بياناته الحالية
   let user = await env.DB.prepare(
-    "SELECT telegram_id, username, coins, gram, total_speed, is_admin, mining_started_at, mining_cycles_today, mining_cycle_date FROM users WHERE telegram_id = ?"
+    "SELECT telegram_id, username, coins, gram, total_speed, total_mined, is_admin, mining_started_at, mining_cycles_today, mining_cycle_date FROM users WHERE telegram_id = ?"
   ).bind(telegramId).first();
 
   if (!user) {
@@ -66,7 +66,7 @@ async function handleGetUser(request, env) {
     }
 
     user = await env.DB.prepare(
-      "SELECT telegram_id, username, coins, gram, total_speed, is_admin, mining_started_at, mining_cycles_today, mining_cycle_date FROM users WHERE telegram_id = ?"
+      "SELECT telegram_id, username, coins, gram, total_speed, total_mined, is_admin, mining_started_at, mining_cycles_today, mining_cycle_date FROM users WHERE telegram_id = ?"
     ).bind(telegramId).first();
   }
 
@@ -137,7 +137,7 @@ async function handleMineClaim(request, env) {
   const { telegramId } = auth;
 
   const row = await env.DB.prepare(
-    "SELECT coins, mining_started_at, mining_cycles_today, mining_cycle_date FROM users WHERE telegram_id = ?"
+    "SELECT coins, total_mined, mining_started_at, mining_cycles_today, mining_cycle_date FROM users WHERE telegram_id = ?"
   ).bind(telegramId).first();
   if (!row) return jsonResponse({ error: "user_not_found" }, 404);
 
@@ -163,9 +163,9 @@ async function handleMineClaim(request, env) {
   const newCyclesToday = cyclesToday + 1;
 
   const updateStmt = env.DB.prepare(
-    `UPDATE users SET coins = coins + ?, mining_started_at = NULL, mining_cycles_today = ?, mining_cycle_date = ?
+    `UPDATE users SET coins = coins + ?, total_mined = total_mined + ?, mining_started_at = NULL, mining_cycles_today = ?, mining_cycle_date = ?
      WHERE telegram_id = ? AND mining_started_at = ?`
-  ).bind(MINING_REWARD_COINS, newCyclesToday, today, telegramId, row.mining_started_at);
+  ).bind(MINING_REWARD_COINS, MINING_REWARD_COINS, newCyclesToday, today, telegramId, row.mining_started_at);
 
   const txnStmt = env.DB.prepare(
     "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'mining_claim', ?, 'coins')"
@@ -180,6 +180,7 @@ async function handleMineClaim(request, env) {
 
   return jsonResponse({
     coins: row.coins + MINING_REWARD_COINS,
+    total_mined: (row.total_mined || 0) + MINING_REWARD_COINS,
     cycles_today: newCyclesToday,
     cycles_max: MINING_DAILY_LIMIT
   });

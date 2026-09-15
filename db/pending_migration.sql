@@ -13,3 +13,8 @@
 ALTER TABLE users ADD COLUMN mining_started_at TEXT;
 ALTER TABLE users ADD COLUMN mining_cycles_today INTEGER DEFAULT 0;
 ALTER TABLE users ADD COLUMN mining_cycle_date TEXT;
+
+-- ملاحظة: العمود التالي أُضيف يدوياً على D1 الحي بالفعل (وليس عبر هذا الملف).
+-- مُدرَج هنا فقط للتوثيق حتى لا يُعاد إضافته بالخطأ عند بناء migration نهائي
+-- شامل لاحقاً (وإلا سيفشل ALTER TABLE بخطأ "duplicate column").
+-- ALTER TABLE users ADD COLUMN total_mined REAL DEFAULT 0;  -- تم تطبيقه يدوياً بالفعل
