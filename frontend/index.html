@@ -2589,7 +2589,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
           <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:28px;height:28px;">
         </div>
         <div class="topbar-coin-card__text">
-          <span class="topbar-coin-card__num">0.0000</span>
+          <span class="topbar-coin-card__num" id="display-coins-topbar">0.0000</span>
           <div class="topbar-coin-card__gram">≈ $0,000 Gram</div>
         </div>
       </div>
@@ -2600,7 +2600,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         <div class="topbar-badge__icon-wrap">
           <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:24px;height:24px;">
         </div>
-        <span class="topbar-badge__num">0.00</span>
+        <span class="topbar-badge__num" id="display-gram-topbar">0.00</span>
       </div>
 
       <div class="lang-selector">
@@ -3242,14 +3242,14 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
             <div class="wallet-icon-wrap">
               <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:42px;height:42px;">
             </div>
-            <span class="wb-num">0,000</span>
+            <span class="wb-num" id="display-coins-wallet">0,000</span>
             <span class="wb-label">Coins</span>
           </div>
           <div class="wallet-balances__item">
             <div class="wallet-icon-wrap">
               <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:36px;height:36px;">
             </div>
-            <span class="wb-num">0,000</span>
+            <span class="wb-num" id="display-gram-wallet">0,000</span>
             <span class="wb-label">Gram</span>
           </div>
         </div>
@@ -3290,7 +3290,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         </div>
         <div class="storage-card__info">
           <div class="storage-card__label">Storage</div>
-          <div class="storage-card__val">0.00000</div>
+          <div class="storage-card__val" id="display-storage-val">0.00000</div>
           <div class="storage-card__timer">Full in 06:00:00</div>
         </div>
         <button class="storage-card__boost" aria-label="Boost" onclick="openStorageUpgradeModal()">
@@ -4451,7 +4451,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 
 <script>
 /* /////كود وضع الصيانة — فقط الأدمن (معرّف تيليجرام أدناه) يستطيع الدخول أثناء الصيانة///// */
-var MAINTENANCE_MODE = true;   // غيّرها إلى true لتفعيل وضع الصيانة لكل المستخدمين عدا الأدمن
+var MAINTENANCE_MODE = false;   // غيّرها إلى true لتفعيل وضع الصيانة لكل المستخدمين عدا الأدمن
 var MAINTENANCE_ADMIN_ID = 1018495986;   // معرّف تيليجرام (Telegram user ID) للأدمن المسموح له بالعبور
 
 (function(){
@@ -4466,6 +4466,52 @@ var MAINTENANCE_ADMIN_ID = 1018495986;   // معرّف تيليجرام (Telegra
     document.getElementById('maintenance-screen').classList.add('is-active');
   }
 })();
+
+/* /////كود جلب رصيد المستخدم الحقيقي من الـWorker عند فتح التطبيق///// */
+function fetchUserData(){
+  var initData = '';
+  try{
+    if (window.Telegram && window.Telegram.WebApp){
+      initData = window.Telegram.WebApp.initData;
+    }
+  }catch(e){}
+
+  if (!initData){
+    return; // تشغيل خارج تيليجرام — يبقى على الأرقام الافتراضية بالواجهة
+  }
+
+  fetch('/api/user', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: initData })
+  })
+  .then(function(res){ return res.json(); })
+  .then(function(data){
+    if (!data.user) return;
+    var u = data.user;
+
+    var coinsText = Number(u.coins).toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+    var coinsWhole = Number(u.coins).toLocaleString('en-US', { maximumFractionDigits: 0 });
+    var gramText = Number(u.gram).toFixed(2);
+    var gramWhole = Number(u.gram).toLocaleString('en-US', { maximumFractionDigits: 0 });
+
+    var elTopbarCoins = document.getElementById('display-coins-topbar');
+    if (elTopbarCoins) elTopbarCoins.textContent = coinsText;
+
+    var elTopbarGram = document.getElementById('display-gram-topbar');
+    if (elTopbarGram) elTopbarGram.textContent = gramText;
+
+    var elWalletCoins = document.getElementById('display-coins-wallet');
+    if (elWalletCoins) elWalletCoins.textContent = coinsWhole;
+
+    var elWalletGram = document.getElementById('display-gram-wallet');
+    if (elWalletGram) elWalletGram.textContent = gramWhole;
+  })
+  .catch(function(err){
+    console.error('fetchUserData failed:', err);
+  });
+}
+fetchUserData();
 
 /* /////كود زر Start Mining — تعدين تجريبي بدون منطق أرباح حقيقي، يبدّل شخصية char-slot بين النوم والتعدين///// */
 var isMining = false;
