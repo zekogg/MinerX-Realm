@@ -2623,7 +2623,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
           <!-- عمود فارغ يحافظ على محاذاة الشبكة (كان فيه شريط Coin سابقاً، انتقل للشريط العلوي) -->
           <div class="earn-top-row-spacer"></div>
 
-          <!-- CHARACTER MOUNT — يحتوي شخصيتي Doge (نائم/يعدّن)، تتبدّل عبر toggleMining().
+          <!-- CHARACTER MOUNT — يحتوي شخصيتي Doge (نائم/يعدّن)، تتبدّل عبر setCharacterMining().
                Size is 160px (5% smaller than the original 168px). -->
           <div class="char-slot-wrap">
             <div class="char-slot" id="char-slot">
@@ -2659,19 +2659,19 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
           </div>
           <div class="stat-box">
             <div class="stat-box__label">Session time</div>
-            <div class="stat-box__val">00:00</div>
+            <div class="stat-box__val" id="mining-session-time">00:00</div>
           </div>
         </div>
 
         <div class="progress-wrap">
-          <div class="progress-wrap__labels"><span>Active session</span><span>64%</span></div>
-          <div class="progress-track"><div class="progress-fill"></div></div>
+          <div class="progress-wrap__labels"><span>Active session</span><span id="mining-progress-pct">0%</span></div>
+          <div class="progress-track"><div class="progress-fill" id="mining-progress-fill" style="width:0%"></div></div>
         </div>
 
         <!-- الصف يحل محل زر "Start Mining" وحده: 70% تعدين + بطاقة تقدم بجانبه -->
         <div class="btn-row">
-          <button class="btn-primary" id="btn-start-mining" onclick="toggleMining()">Start Mining</button>
-          <div class="mining-progress-card"><span class="mining-progress-card__text">(0/7) ⛏️</span></div>
+          <button class="btn-primary" id="btn-start-mining" onclick="onMiningButtonClick()">Start Mining</button>
+          <div class="mining-progress-card"><span class="mining-progress-card__text" id="mining-cycles-counter">(0/7) ⛏️</span></div>
         </div>
       </div>
 
@@ -4468,14 +4468,36 @@ var MAINTENANCE_ADMIN_ID = 1018495986;   // معرّف تيليجرام (Telegra
 })();
 
 /* /////كود جلب رصيد المستخدم الحقيقي من الـWorker عند فتح التطبيق///// */
-function fetchUserData(){
-  var initData = '';
+function getTelegramInitData(){
   try{
     if (window.Telegram && window.Telegram.WebApp){
-      initData = window.Telegram.WebApp.initData;
+      return window.Telegram.WebApp.initData || '';
     }
   }catch(e){}
+  return '';
+}
 
+function updateBalanceDisplay(u){
+  var coinsText = Number(u.coins).toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+  var coinsWhole = Number(u.coins).toLocaleString('en-US', { maximumFractionDigits: 0 });
+  var gramText = Number(u.gram).toFixed(2);
+  var gramWhole = Number(u.gram).toLocaleString('en-US', { maximumFractionDigits: 0 });
+
+  var elTopbarCoins = document.getElementById('display-coins-topbar');
+  if (elTopbarCoins) elTopbarCoins.textContent = coinsText;
+
+  var elTopbarGram = document.getElementById('display-gram-topbar');
+  if (elTopbarGram) elTopbarGram.textContent = gramText;
+
+  var elWalletCoins = document.getElementById('display-coins-wallet');
+  if (elWalletCoins) elWalletCoins.textContent = coinsWhole;
+
+  var elWalletGram = document.getElementById('display-gram-wallet');
+  if (elWalletGram) elWalletGram.textContent = gramWhole;
+}
+
+function fetchUserData(){
+  var initData = getTelegramInitData();
   if (!initData){
     return; // تشغيل خارج تيليجرام — يبقى على الأرقام الافتراضية بالواجهة
   }
@@ -4488,41 +4510,164 @@ function fetchUserData(){
   .then(function(res){ return res.json(); })
   .then(function(data){
     if (!data.user) return;
-    var u = data.user;
-
-    var coinsText = Number(u.coins).toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
-    var coinsWhole = Number(u.coins).toLocaleString('en-US', { maximumFractionDigits: 0 });
-    var gramText = Number(u.gram).toFixed(2);
-    var gramWhole = Number(u.gram).toLocaleString('en-US', { maximumFractionDigits: 0 });
-
-    var elTopbarCoins = document.getElementById('display-coins-topbar');
-    if (elTopbarCoins) elTopbarCoins.textContent = coinsText;
-
-    var elTopbarGram = document.getElementById('display-gram-topbar');
-    if (elTopbarGram) elTopbarGram.textContent = gramText;
-
-    var elWalletCoins = document.getElementById('display-coins-wallet');
-    if (elWalletCoins) elWalletCoins.textContent = coinsWhole;
-
-    var elWalletGram = document.getElementById('display-gram-wallet');
-    if (elWalletGram) elWalletGram.textContent = gramWhole;
+    updateBalanceDisplay(data.user);
+    applyMiningState({
+      mining_started_at: data.user.mining_started_at,
+      cycles_today: data.user.mining_cycles_today,
+      cycles_max: data.user.mining_cycles_max,
+      cycle_duration_seconds: data.user.mining_cycle_duration_seconds
+    });
   })
   .catch(function(err){
     console.error('fetchUserData failed:', err);
   });
 }
-fetchUserData();
 
-/* /////كود زر Start Mining — تعدين تجريبي بدون منطق أرباح حقيقي، يبدّل شخصية char-slot بين النوم والتعدين///// */
-var isMining = false;
-function toggleMining(){
-  isMining = !isMining;
-  document.querySelector('.char-slot__art--idle').classList.toggle('is-visible', !isMining);
-  document.querySelector('.char-slot__art--mining').classList.toggle('is-visible', isMining);
+/* =====================================================================
+   كود دورة "Start Mining" الحقيقية (شخصية Doge). كل قرار (هل الدورة
+   جاهزة؟ كم المكافأة؟) يُحسم من السيرفر فقط — هذا الكود يعرض الحالة
+   ويستدعي /api/mine/start و /api/mine/claim، ولا يحسب أي مكافأة بنفسه.
+   ===================================================================== */
+var miningState = {
+  startedAt: null,      // Date أو null
+  cycleDurationSec: 3600,
+  cyclesToday: 0,
+  cyclesMax: 7
+};
+var miningTickTimer = null;
+var miningBusy = false; // يمنع ضغط الزر أثناء انتظار رد السيرفر
+
+function setMiningButton(text, opts){
+  opts = opts || {};
   var btn = document.getElementById('btn-start-mining');
-  btn.textContent = isMining ? 'Mining in Progress' : 'Start Mining';
-  btn.classList.toggle('is-mining', isMining);
+  btn.textContent = text;
+  btn.classList.toggle('is-mining', !!opts.mining);
+  btn.disabled = !!opts.disabled;
 }
+
+function renderMiningCounter(){
+  var el = document.getElementById('mining-cycles-counter');
+  if (el) el.textContent = '(' + miningState.cyclesToday + '/' + miningState.cyclesMax + ') ⛏️';
+}
+
+function renderMiningProgress(elapsedSec){
+  var pct = Math.max(0, Math.min(100, Math.round((elapsedSec / miningState.cycleDurationSec) * 100)));
+  var fill = document.getElementById('mining-progress-fill');
+  var pctLabel = document.getElementById('mining-progress-pct');
+  if (fill) fill.style.width = pct + '%';
+  if (pctLabel) pctLabel.textContent = pct + '%';
+
+  var remaining = Math.max(0, miningState.cycleDurationSec - elapsedSec);
+  var mm = String(Math.floor(remaining / 60)).padStart(2, '0');
+  var ss = String(Math.floor(remaining % 60)).padStart(2, '0');
+  var timeEl = document.getElementById('mining-session-time');
+  if (timeEl) timeEl.textContent = mm + ':' + ss;
+}
+
+function setCharacterMining(isMining){
+  var idleArt = document.querySelector('.char-slot__art--idle');
+  var miningArt = document.querySelector('.char-slot__art--mining');
+  if (idleArt) idleArt.classList.toggle('is-visible', !isMining);
+  if (miningArt) miningArt.classList.toggle('is-visible', isMining);
+}
+
+function applyMiningState(data){
+  miningState.cyclesToday = data.cycles_today || 0;
+  miningState.cyclesMax = data.cycles_max || miningState.cyclesMax;
+  miningState.cycleDurationSec = data.cycle_duration_seconds || miningState.cycleDurationSec;
+  miningState.startedAt = data.mining_started_at ? new Date(data.mining_started_at) : null;
+
+  renderMiningCounter();
+  clearInterval(miningTickTimer);
+
+  if (!miningState.startedAt){
+    setCharacterMining(false);
+    var reachedLimit = miningState.cyclesToday >= miningState.cyclesMax;
+    setMiningButton(reachedLimit ? 'Come back tomorrow' : 'Start Mining', { disabled: reachedLimit });
+    renderMiningProgress(0);
+    return;
+  }
+
+  setCharacterMining(true);
+  miningTick();
+  miningTickTimer = setInterval(miningTick, 1000);
+}
+
+function miningTick(){
+  var elapsedSec = (Date.now() - miningState.startedAt.getTime()) / 1000;
+  if (elapsedSec >= miningState.cycleDurationSec){
+    renderMiningProgress(miningState.cycleDurationSec);
+    setMiningButton('Claim Reward', { mining: true });
+    clearInterval(miningTickTimer);
+    return;
+  }
+  renderMiningProgress(elapsedSec);
+  setMiningButton('Mining in Progress', { mining: true });
+}
+
+function callMiningApi(path){
+  var initData = getTelegramInitData();
+  if (!initData){
+    alert('Open this app from Telegram to mine.');
+    return Promise.reject(new Error('no_init_data'));
+  }
+  return fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: initData })
+  }).then(function(res){
+    return res.json().then(function(data){ return { status: res.status, data: data }; });
+  });
+}
+
+function onMiningButtonClick(){
+  if (miningBusy) return;
+
+  var isReadyToClaim = miningState.startedAt &&
+    (Date.now() - miningState.startedAt.getTime()) / 1000 >= miningState.cycleDurationSec;
+
+  miningBusy = true;
+  var request = isReadyToClaim ? callMiningApi('/api/mine/claim') : callMiningApi('/api/mine/start');
+
+  request.then(function(result){
+    var data = result.data;
+    if (data.error){
+      if (data.error === 'cycle_not_finished'){
+        // تحديث بسيط لإعادة المزامنة مع السيرفر بدون إزعاج المستخدم
+        miningTick();
+        return;
+      }
+      if (data.error === 'daily_limit_reached'){
+        applyMiningState({ mining_started_at: null, cycles_today: data.cycles_today, cycles_max: data.cycles_max });
+        return;
+      }
+      if (data.error === 'already_mining' || data.error === 'already_claimed'){
+        fetchUserData();
+        return;
+      }
+      console.error('mining api error:', data.error);
+      return;
+    }
+
+    if (isReadyToClaim){
+      if (typeof data.coins === 'number'){
+        var gramEl = document.getElementById('display-gram-wallet');
+        updateBalanceDisplay({ coins: data.coins, gram: gramEl ? Number(gramEl.textContent) : 0 });
+      }
+      applyMiningState({ mining_started_at: null, cycles_today: data.cycles_today, cycles_max: data.cycles_max, cycle_duration_seconds: miningState.cycleDurationSec });
+    } else {
+      applyMiningState(data);
+    }
+  })
+  .catch(function(err){
+    if (err.message !== 'no_init_data') console.error('mining request failed:', err);
+  })
+  .finally(function(){
+    miningBusy = false;
+  });
+}
+
+fetchUserData();
 
 /* /////كود التنقل بين الصفحات (JavaScript)///// */
 /* للتنقل فقط — بدون أي منطق أرباح حقيقي، جاهز للربط لاحقاً. */
