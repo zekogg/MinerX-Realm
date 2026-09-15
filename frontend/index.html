@@ -581,6 +581,14 @@ img,svg{ display:block; }
   box-shadow:0 0 16px -2px rgba(74,158,255,.5), inset 0 0 10px rgba(74,158,255,.12);
   text-shadow:0 0 8px rgba(74,158,255,.45);
 }
+/* -- حالة "Claim Reward": نفس أسلوب تدرج أزرار Upgrade (rgba شفاف) لكن بلون أخضر مائي -- */
+.btn-primary.is-claim-ready{
+  border-color:rgba(63,191,174,.55);
+  background:linear-gradient(155deg, rgba(63,191,174,.4), rgba(33,211,237,.2), rgba(63,191,174,.32));
+  box-shadow:0 0 16px -2px rgba(63,191,174,.5), inset 0 1px 0 rgba(255,255,255,.2);
+  color:#eafffb;
+  text-shadow:none;
+}
 
 .mining-progress-card{
   position:relative;
@@ -2589,7 +2597,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
           <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:28px;height:28px;">
         </div>
         <div class="topbar-coin-card__text">
-          <span class="topbar-coin-card__num" id="display-coins-topbar">0.0000</span>
+          <span class="topbar-coin-card__num" id="display-coins-topbar">00</span>
           <div class="topbar-coin-card__gram">≈ $0,000 Gram</div>
         </div>
       </div>
@@ -2655,7 +2663,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         <div class="stat-row">
           <div class="stat-box">
             <div class="stat-box__label">Total mined</div>
-            <div class="stat-box__val">0</div>
+            <div class="stat-box__val" id="stat-total-mined">0</div>
           </div>
           <div class="stat-box">
             <div class="stat-box__label">Session time</div>
@@ -4478,13 +4486,12 @@ function getTelegramInitData(){
 }
 
 function updateBalanceDisplay(u){
-  var coinsText = Number(u.coins).toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
   var coinsWhole = Number(u.coins).toLocaleString('en-US', { maximumFractionDigits: 0 });
   var gramText = Number(u.gram).toFixed(2);
   var gramWhole = Number(u.gram).toLocaleString('en-US', { maximumFractionDigits: 0 });
 
   var elTopbarCoins = document.getElementById('display-coins-topbar');
-  if (elTopbarCoins) elTopbarCoins.textContent = coinsText;
+  if (elTopbarCoins) elTopbarCoins.textContent = coinsWhole;
 
   var elTopbarGram = document.getElementById('display-gram-topbar');
   if (elTopbarGram) elTopbarGram.textContent = gramText;
@@ -4494,6 +4501,11 @@ function updateBalanceDisplay(u){
 
   var elWalletGram = document.getElementById('display-gram-wallet');
   if (elWalletGram) elWalletGram.textContent = gramWhole;
+
+  if (typeof u.total_mined === 'number'){
+    var elTotalMined = document.getElementById('stat-total-mined');
+    if (elTotalMined) elTotalMined.textContent = Number(u.total_mined).toLocaleString('en-US', { maximumFractionDigits: 0 });
+  }
 }
 
 function fetchUserData(){
@@ -4542,6 +4554,7 @@ function setMiningButton(text, opts){
   var btn = document.getElementById('btn-start-mining');
   btn.textContent = text;
   btn.classList.toggle('is-mining', !!opts.mining);
+  btn.classList.toggle('is-claim-ready', !!opts.claimReady);
   btn.disabled = !!opts.disabled;
 }
 
@@ -4597,7 +4610,7 @@ function miningTick(){
   var elapsedSec = (Date.now() - miningState.startedAt.getTime()) / 1000;
   if (elapsedSec >= miningState.cycleDurationSec){
     renderMiningProgress(miningState.cycleDurationSec);
-    setMiningButton('Claim Reward', { mining: true });
+    setMiningButton('Claim Reward', { claimReady: true });
     clearInterval(miningTickTimer);
     return;
   }
@@ -4652,7 +4665,7 @@ function onMiningButtonClick(){
     if (isReadyToClaim){
       if (typeof data.coins === 'number'){
         var gramEl = document.getElementById('display-gram-wallet');
-        updateBalanceDisplay({ coins: data.coins, gram: gramEl ? Number(gramEl.textContent) : 0 });
+        updateBalanceDisplay({ coins: data.coins, gram: gramEl ? Number(gramEl.textContent) : 0, total_mined: data.total_mined });
       }
       applyMiningState({ mining_started_at: null, cycles_today: data.cycles_today, cycles_max: data.cycles_max, cycle_duration_seconds: miningState.cycleDurationSec });
     } else {
