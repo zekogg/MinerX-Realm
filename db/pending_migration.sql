@@ -18,3 +18,18 @@ ALTER TABLE users ADD COLUMN mining_cycle_date TEXT;
 -- مُدرَج هنا فقط للتوثيق حتى لا يُعاد إضافته بالخطأ عند بناء migration نهائي
 -- شامل لاحقاً (وإلا سيفشل ALTER TABLE بخطأ "duplicate column").
 -- ALTER TABLE users ADD COLUMN total_mined REAL DEFAULT 0;  -- تم تطبيقه يدوياً بالفعل
+
+-- -- Daily Streak (دورة أسبوعية متكررة 1-7، تُعاد لليوم 1 عند أي انقطاع) --
+-- streak_day             : اليوم القادم المستحق (1-7). يلتف لـ1 بعد اكتمال اليوم 7.
+-- streak_last_claim_date : تاريخ آخر Claim ناجح بتوقيت UTC — يُقارَن به لتحديد
+--                          هل استمر التسلسل، انقطع (يرجع لليوم 1)، أو استُلم اليوم بالفعل.
+ALTER TABLE users ADD COLUMN streak_day INTEGER DEFAULT 1;
+ALTER TABLE users ADD COLUMN streak_last_claim_date TEXT;
+
+-- ملاحظة تصميم مهمة: جدول daily_streak_claims المُنشأ مسبقاً بمفتاح أساسي
+-- (telegram_id, day_number) لا يصلح لهذه الدورة الأسبوعية المتكررة — نفس
+-- (telegram_id, day_number) سيتكرر كل أسبوع ويسبب تعارض INSERT. لذلك لم
+-- نستخدم هذا الجدول إطلاقاً؛ سجل كل Claim يُحفظ بدلاً منه في جدول
+-- transactions (type = 'daily_streak') كأرشيف تاريخي بدون قيد تكرار.
+-- إذا رغبت مستقبلاً بجدول تاريخي مخصص، الأفضل مفتاح (telegram_id, claimed_at)
+-- بدل (telegram_id, day_number).
