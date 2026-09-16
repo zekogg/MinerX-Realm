@@ -41,22 +41,38 @@ const SPIN_SEGMENTS = [
 const EXCHANGE_RATE_COIN_TO_GRAM = 0.00001;
 
 // =====================================================================
-// إعدادات شخصية The Duck + Storage.
-// - السرعة عند الشراء (Lv.1) = DUCK_BASE_SPEED، وكل مستوى يضيف 10% من
-//   هذه القيمة الأساسية بشكل ثابت (وليس من السرعة المحدَّثة)، حتى Lv.30.
-// - تكلفة الترقية ثابتة لكل مستوى (30,000 = 10% من سعر الشراء 300,000).
-// - Storage: يبدأ بالتراكم فور شراء أول شخصية، يمتلئ خلال 6 ساعات حسب
-//   Total Speed، وله حد أدنى للاستلام (10 عملات) حتى لا يُستنزف بمبالغ
-//   ضئيلة جداً.
+// إعدادات حيوانات Realm القابلة للشراء + Storage. نفس القاعدة لكل
+// الحيوانات الستة (مطابقة لما طُبِّق على The Duck):
+// - السرعة عند الشراء (Lv.1) = basespeed الخاص بالحيوان، وكل مستوى يضيف
+//   10% من هذه القيمة الأساسية بشكل ثابت (وليس من السرعة المحدَّثة)،
+//   حتى الحد الأقصى PET_MAX_LEVEL (30) لكل الحيوانات.
+// - تكلفة الترقية ثابتة لكل مستوى = 10% من سعر الشراء (نفس نسبة Duck).
+// - Storage: يبدأ بالتراكم فور شراء أول حيوان (أي حيوان)، يمتلئ حسب
+//   Total Speed الكلي (مجموع كل الحيوانات المملوكة معاً)، وله حد أدنى
+//   للاستلام (10 عملات) حتى لا يُستنزف بمبالغ ضئيلة جداً.
 // =====================================================================
-const DUCK_PET_ID = "duck";
-const DUCK_BASE_SPEED = 114;              // Coins/hr عند Lv.1
-const DUCK_PRICE_COINS = 300000;
-const DUCK_MAX_LEVEL = 30;
-const DUCK_UPGRADE_COST_COINS = 30000;    // ثابت لكل مستوى
-const DUCK_SPEED_INCREMENT = DUCK_BASE_SPEED * 0.10; // 11.4 Coins/hr لكل مستوى
+const PETS = {
+  duck:         { basespeed: 114,   price: 300000 },
+  polar_bear:   { basespeed: 191,   price: 500000 },
+  scorpion:     { basespeed: 379,   price: 1000000 },
+  penguin:      { basespeed: 1894,  price: 5000000 },
+  dancing_bear: { basespeed: 3788,  price: 10000000 },
+  the_cat:      { basespeed: 18940, price: 50000000 }
+};
+const PET_MAX_LEVEL = 30;
+const PET_SPEED_INCREMENT_RATIO = 0.10;
+const PET_UPGRADE_COST_RATIO = 0.10;
 const STORAGE_DEFAULT_CAPACITY_HOURS = 6;
 const STORAGE_MIN_CLAIM_COINS = 10;
+
+function petSpeedForLevel(petId, level) {
+  const pet = PETS[petId];
+  return pet.basespeed + (level - 1) * (pet.basespeed * PET_SPEED_INCREMENT_RATIO);
+}
+
+function petUpgradeCost(petId) {
+  return Math.round(PETS[petId].price * PET_UPGRADE_COST_RATIO);
+}
 
 // مستويات مدة التخزين (Storage) بالساعات — الفهرس 0 = Lv.1 (الافتراضي عند
 // أول شراء لأي شخصية). كل ترقية تكلّف نفس المبلغ الثابت (300,000، مطابق
@@ -65,10 +81,6 @@ const STORAGE_MIN_CLAIM_COINS = 10;
 const STORAGE_LEVELS = [6, 8, 12, 16, 24];
 const STORAGE_MAX_LEVEL = STORAGE_LEVELS.length;
 const STORAGE_UPGRADE_COST_COINS = 300000;
-
-function duckSpeedForLevel(level) {
-  return DUCK_BASE_SPEED + (level - 1) * DUCK_SPEED_INCREMENT;
-}
 
 function storageLevelForCapacityHours(capacityHours) {
   const index = STORAGE_LEVELS.indexOf(capacityHours);
@@ -113,12 +125,12 @@ export default {
       return handleGiftPickClaim(request, env);
     }
 
-    if (url.pathname === "/api/duck/buy" && request.method === "POST") {
-      return handleDuckBuy(request, env);
-    }
-
-    if (url.pathname === "/api/duck/upgrade" && request.method === "POST") {
-      return handleDuckUpgrade(request, env);
+    // شراء/ترقية أي حيوان: /api/pet/<pet_id>/buy أو /api/pet/<pet_id>/upgrade
+    const petMatch = request.method === "POST" && url.pathname.match(/^\/api\/pet\/([a-z_]+)\/(buy|upgrade)$/);
+    if (petMatch) {
+      const [, petId, action] = petMatch;
+      if (!PETS[petId]) return jsonResponse({ error: "unknown_pet" }, 400);
+      return action === "buy" ? handlePetBuy(request, env, petId) : handlePetUpgrade(request, env, petId);
     }
 
     if (url.pathname === "/api/storage/claim" && request.method === "POST") {
@@ -150,16 +162,14 @@ async function handleGetUser(request, env) {
            u.mining_started_at, u.mining_cycles_today, u.mining_cycle_date,
            u.streak_day, u.streak_last_claim_date,
            u.last_spin_date, u.last_chest_date, u.last_giftpick_date,
-           s.capacity_hours AS storage_capacity_hours, s.last_claim_at AS storage_last_claim_at,
-           p.level AS duck_level, p.current_speed AS duck_speed
+           s.capacity_hours AS storage_capacity_hours, s.last_claim_at AS storage_last_claim_at
     FROM users u
     LEFT JOIN user_storage s ON s.telegram_id = u.telegram_id
-    LEFT JOIN user_pets p ON p.telegram_id = u.telegram_id AND p.pet_id = ?
     WHERE u.telegram_id = ?
   `;
 
   // موجود أصلاً؟ رجّع بياناته الحالية
-  let user = await env.DB.prepare(userQuery).bind(DUCK_PET_ID, telegramId).first();
+  let user = await env.DB.prepare(userQuery).bind(telegramId).first();
 
   if (!user) {
     // أول مرة يفتح التطبيق — أنشئ له صف جديد
@@ -174,8 +184,19 @@ async function handleGetUser(request, env) {
       ).bind(referredBy, telegramId).run();
     }
 
-    user = await env.DB.prepare(userQuery).bind(DUCK_PET_ID, telegramId).first();
+    user = await env.DB.prepare(userQuery).bind(telegramId).first();
   }
+
+  // كل الحيوانات المملوكة (قد يكون أكثر من واحد الآن) — استعلام منفصل
+  // لأن LEFT JOIN مع .first() لا يصلح إذا كان هناك أكثر من صف مطابق.
+  const petsResult = await env.DB.prepare(
+    "SELECT pet_id, level, current_speed FROM user_pets WHERE telegram_id = ?"
+  ).bind(telegramId).all();
+  const pets = {};
+  for (const row of (petsResult.results || [])) {
+    pets[row.pet_id] = { level: row.level, speed: row.current_speed };
+  }
+  user.pets = pets;
 
   let view = withMiningView(user);
   view = withStreakView(view);
@@ -461,24 +482,25 @@ function withDailyPrizeView(user, dateColumn, claimedKey, resetKey) {
 }
 
 // =====================================================================
-// نقطة /api/duck/buy — شراء شخصية The Duck (أول شخصية تعدين حقيقية).
-// تخصم السعر بشرط توفر الرصيد (CAS)، ثم تنشئ صف user_pets عند Lv.1
-// وتبدأ Storage بالتراكم فوراً (last_claim_at = الآن).
+// نقطة /api/pet/<pet_id>/buy — شراء أي حيوان من PETS. تخصم السعر بشرط
+// توفر الرصيد (CAS)، ثم تنشئ صف user_pets عند Lv.1، وتبدأ Storage
+// بالتراكم فوراً إن لم تكن قد بدأت من حيوان سابق (INSERT OR IGNORE).
 // =====================================================================
-async function handleDuckBuy(request, env) {
+async function handlePetBuy(request, env, petId) {
   const auth = await authenticateRequest(request, env);
   if (!auth.ok) return auth.response;
   const { telegramId } = auth;
+  const pet = PETS[petId];
 
   const existing = await env.DB.prepare(
     "SELECT 1 FROM user_pets WHERE telegram_id = ? AND pet_id = ?"
-  ).bind(telegramId, DUCK_PET_ID).first();
+  ).bind(telegramId, petId).first();
   if (existing) return jsonResponse({ error: "already_owned" }, 409);
 
   const deductResult = await env.DB.prepare(
     `UPDATE users SET coins = coins - ?, total_speed = total_speed + ?
      WHERE telegram_id = ? AND coins >= ?`
-  ).bind(DUCK_PRICE_COINS, DUCK_BASE_SPEED, telegramId, DUCK_PRICE_COINS).run();
+  ).bind(pet.price, pet.basespeed, telegramId, pet.price).run();
 
   if (!deductResult.meta || deductResult.meta.changes === 0) {
     return jsonResponse({ error: "insufficient_funds" }, 400);
@@ -487,13 +509,13 @@ async function handleDuckBuy(request, env) {
   const nowIso = new Date().toISOString();
   const insertPetStmt = env.DB.prepare(
     "INSERT INTO user_pets (telegram_id, pet_id, level, current_speed) VALUES (?, ?, 1, ?)"
-  ).bind(telegramId, DUCK_PET_ID, DUCK_BASE_SPEED);
+  ).bind(telegramId, petId, pet.basespeed);
   const insertStorageStmt = env.DB.prepare(
     "INSERT OR IGNORE INTO user_storage (telegram_id, capacity_hours, last_claim_at) VALUES (?, ?, ?)"
   ).bind(telegramId, STORAGE_DEFAULT_CAPACITY_HOURS, nowIso);
   const txnStmt = env.DB.prepare(
     "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'pet_purchase', ?, 'coins')"
-  ).bind(telegramId, -DUCK_PRICE_COINS);
+  ).bind(telegramId, -pet.price);
 
   try {
     await env.DB.batch([insertPetStmt, insertStorageStmt, txnStmt]);
@@ -501,7 +523,7 @@ async function handleDuckBuy(request, env) {
     // نادر جداً: طلب شراء متزامن سبقه بجزء من الثانية — نُرجع العملات والسرعة
     await env.DB.prepare(
       "UPDATE users SET coins = coins + ?, total_speed = total_speed - ? WHERE telegram_id = ?"
-    ).bind(DUCK_PRICE_COINS, DUCK_BASE_SPEED, telegramId).run();
+    ).bind(pet.price, pet.basespeed, telegramId).run();
     return jsonResponse({ error: "already_owned" }, 409);
   }
 
@@ -510,53 +532,59 @@ async function handleDuckBuy(request, env) {
   ).bind(telegramId).first();
 
   return jsonResponse({
+    pet_id: petId,
     level: 1,
-    speed: DUCK_BASE_SPEED,
+    speed: pet.basespeed,
     total_speed: updatedUser.total_speed,
     coins: updatedUser.coins
   });
 }
 
 // =====================================================================
-// نقطة /api/duck/upgrade — ترقية The Duck مستوى واحد. التكلفة ثابتة
-// (30,000)، والسرعة الجديدة تُحسب دائماً من السرعة الأساسية + 10% لكل
-// مستوى (وليس تراكمياً فوق السرعة الحالية).
+// نقطة /api/pet/<pet_id>/upgrade — ترقية أي حيوان مستوى واحد. التكلفة
+// ثابتة (10% من سعر الشراء)، والسرعة الجديدة تُحسب دائماً من السرعة
+// الأساسية + 10% لكل مستوى (وليس تراكمياً فوق السرعة الحالية).
 // =====================================================================
-async function handleDuckUpgrade(request, env) {
+async function handlePetUpgrade(request, env, petId) {
   const auth = await authenticateRequest(request, env);
   if (!auth.ok) return auth.response;
   const { telegramId } = auth;
 
-  const pet = await env.DB.prepare(
-    `SELECT p.level, p.current_speed, s.capacity_hours, s.last_claim_at
+  // ملاحظة مهمة: نجلب total_speed *الكلي* من users (وليس سرعة هذا الحيوان
+  // فقط) لأن أكثر من حيوان قد يساهم بنفس Storage في آن واحد — إن استخدمنا
+  // سرعة الحيوان المُرقّى فقط لحساب ما تراكم فسنُغفل مساهمة الحيوانات الأخرى.
+  const row = await env.DB.prepare(
+    `SELECT p.level, p.current_speed, u.total_speed, s.capacity_hours, s.last_claim_at
      FROM user_pets p
+     JOIN users u ON u.telegram_id = p.telegram_id
      LEFT JOIN user_storage s ON s.telegram_id = p.telegram_id
      WHERE p.telegram_id = ? AND p.pet_id = ?`
-  ).bind(telegramId, DUCK_PET_ID).first();
-  if (!pet) return jsonResponse({ error: "not_owned" }, 400);
+  ).bind(telegramId, petId).first();
+  if (!row) return jsonResponse({ error: "not_owned" }, 400);
 
-  if (pet.level >= DUCK_MAX_LEVEL) {
-    return jsonResponse({ error: "max_level_reached", level: pet.level }, 400);
+  if (row.level >= PET_MAX_LEVEL) {
+    return jsonResponse({ error: "max_level_reached", level: row.level }, 400);
   }
 
-  const newLevel = pet.level + 1;
-  const newSpeed = duckSpeedForLevel(newLevel);
-  const speedDelta = newSpeed - pet.current_speed;
+  const newLevel = row.level + 1;
+  const newSpeed = petSpeedForLevel(petId, newLevel);
+  const speedDelta = newSpeed - row.current_speed;
+  const upgradeCost = petUpgradeCost(petId);
 
-  // نُصفّي (checkpoint) ما تراكم في Storage بالسرعة القديمة *قبل* رفع
-  // السرعة — وإلا فإن كل الوقت المنقضي منذ آخر Claim سيُحتسب لاحقاً
-  // بالسرعة الجديدة الأعلى، فتقفز قيمة Storage فجأة بشكل غير صحيح.
-  const capacitySeconds = (pet.capacity_hours || STORAGE_DEFAULT_CAPACITY_HOURS) * 3600;
+  // نُصفّي (checkpoint) ما تراكم في Storage بالسرعة الكلية القديمة *قبل*
+  // رفع سرعة هذا الحيوان — وإلا فإن كل الوقت المنقضي منذ آخر Claim سيُحتسب
+  // لاحقاً بالسرعة الكلية الجديدة الأعلى، فتقفز قيمة Storage فجأة بشكل خاطئ.
+  const capacitySeconds = (row.capacity_hours || STORAGE_DEFAULT_CAPACITY_HOURS) * 3600;
   let preUpgradeAccrued = 0;
-  if (pet.last_claim_at) {
-    const elapsedSeconds = Math.max(0, (Date.now() - Date.parse(pet.last_claim_at)) / 1000);
-    preUpgradeAccrued = Math.min(elapsedSeconds, capacitySeconds) * (pet.current_speed / 3600);
+  if (row.last_claim_at) {
+    const elapsedSeconds = Math.max(0, (Date.now() - Date.parse(row.last_claim_at)) / 1000);
+    preUpgradeAccrued = Math.min(elapsedSeconds, capacitySeconds) * ((row.total_speed || 0) / 3600);
   }
 
   const deductResult = await env.DB.prepare(
     `UPDATE users SET coins = coins - ? + ?, total_speed = total_speed + ?
      WHERE telegram_id = ? AND coins >= ?`
-  ).bind(DUCK_UPGRADE_COST_COINS, preUpgradeAccrued, speedDelta, telegramId, DUCK_UPGRADE_COST_COINS).run();
+  ).bind(upgradeCost, preUpgradeAccrued, speedDelta, telegramId, upgradeCost).run();
 
   if (!deductResult.meta || deductResult.meta.changes === 0) {
     return jsonResponse({ error: "insufficient_funds" }, 400);
@@ -564,11 +592,11 @@ async function handleDuckUpgrade(request, env) {
 
   const nowIso = new Date().toISOString();
 
-  // شرط "level = المستوى القديم" يمنع تطبيق ترقيتين متزامنتين على نفس الشخصية
+  // شرط "level = المستوى القديم" يمنع تطبيق ترقيتين متزامنتين على نفس الحيوان
   const updatePetStmt = env.DB.prepare(
     `UPDATE user_pets SET level = ?, current_speed = ?
      WHERE telegram_id = ? AND pet_id = ? AND level = ?`
-  ).bind(newLevel, newSpeed, telegramId, DUCK_PET_ID, pet.level);
+  ).bind(newLevel, newSpeed, telegramId, petId, row.level);
 
   // تصفير نقطة بداية التراكم الآن — السرعة الجديدة تُحسب من هذه اللحظة فقط
   const resetStorageStmt = env.DB.prepare(
@@ -577,7 +605,7 @@ async function handleDuckUpgrade(request, env) {
 
   const txnStmt = env.DB.prepare(
     "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'pet_upgrade', ?, 'coins')"
-  ).bind(telegramId, -DUCK_UPGRADE_COST_COINS);
+  ).bind(telegramId, -upgradeCost);
 
   const stmts = [updatePetStmt, resetStorageStmt, txnStmt];
   if (preUpgradeAccrued > 0) {
@@ -592,7 +620,7 @@ async function handleDuckUpgrade(request, env) {
     // نادر: طلب ترقية متزامن سبقه — نُرجع العملات (بما فيها ما صُفِّي من Storage) والسرعة
     await env.DB.prepare(
       "UPDATE users SET coins = coins + ? - ?, total_speed = total_speed - ? WHERE telegram_id = ?"
-    ).bind(DUCK_UPGRADE_COST_COINS, preUpgradeAccrued, speedDelta, telegramId).run();
+    ).bind(upgradeCost, preUpgradeAccrued, speedDelta, telegramId).run();
     return jsonResponse({ error: "level_changed" }, 409);
   }
 
@@ -601,12 +629,13 @@ async function handleDuckUpgrade(request, env) {
   ).bind(telegramId).first();
 
   return jsonResponse({
+    pet_id: petId,
     level: newLevel,
     speed: newSpeed,
     total_speed: updatedUser.total_speed,
     coins: updatedUser.coins,
     storage_credited: preUpgradeAccrued,
-    is_max_level: newLevel >= DUCK_MAX_LEVEL
+    is_max_level: newLevel >= PET_MAX_LEVEL
   });
 }
 
@@ -766,7 +795,7 @@ async function handleStorageUpgrade(request, env) {
 // يحسب حالة Storage الحالية (كم تراكم؟ هل امتلأ؟ كم تبقّى؟) بدون أي
 // كتابة لقاعدة البيانات — يُستخدم فقط للعرض في /api/user.
 function withStorageView(user) {
-  const hasPet = !!user.duck_level; // فقط The Duck مفعّلة حالياً؛ تُوسَّع لاحقاً لبقية الحيوانات
+  const hasPet = !!(user.pets && Object.keys(user.pets).length > 0);
   const capacityHours = user.storage_capacity_hours || STORAGE_DEFAULT_CAPACITY_HOURS;
   const capacitySeconds = capacityHours * 3600;
   const perSecondRate = (user.total_speed || 0) / 3600;
@@ -785,8 +814,6 @@ function withStorageView(user) {
 
   return {
     ...user,
-    duck_level: user.duck_level || 0,
-    duck_speed: user.duck_speed || 0,
     storage_has_pet: hasPet,
     storage_accrued: accrued,
     storage_capacity_hours: capacityHours,

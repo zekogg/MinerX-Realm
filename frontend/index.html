@@ -1800,7 +1800,10 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   box-shadow:0 0 8px rgba(74,158,255,.3), inset 0 1px 0 rgba(255,255,255,.2);
 }
 .pet-card__upgrade-btn svg{ width:12px; height:12px; flex-shrink:0; }
-.pet-card__upgrade-btn:disabled{ opacity:.4; pointer-events:none; }
+.pet-card__upgrade-btn:disabled,
+.db-action-btn--upgrade:disabled,
+.tc-action-btn--upgrade:disabled,
+.storage-card__boost:disabled{ opacity:.4; pointer-events:none; }
 .pet-card__btn{
   width:48%; padding:6px; border-radius:9px;   /* صُغّر 20% إضافية من اليمين واليسار (كان 60%) */
   background:linear-gradient(155deg, rgba(74,222,128,.92), rgba(34,197,94,.88) 45%, rgba(21,128,61,.92));   /* أخضر يناسب ندرة Common */
@@ -1811,20 +1814,24 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   display:flex; align-items:center; justify-content:center; gap:4px;
 }
 .pet-card__btn svg{ width:11px; height:11px; }
-.pet-card__btn.is-success{
-  background:var(--c-streakcard-claim-bg);
-  border-color:rgba(111,191,115,.4);
-  color:var(--c-streakcard-claim-text);
-  box-shadow:none;
-  opacity:1;
-}
 /* -- حالة "Owned" الدائمة بعد الشراء: أخضر شفاف متدرج (نفس أسلوب Claim Reward) -- */
-.pet-card__btn.is-owned{
+.pet-card__btn.is-owned,
+.db-action-btn--buy.is-owned,
+.tc-action-btn--buy.is-owned{
   background:linear-gradient(155deg, rgba(111,191,115,.4), rgba(74,222,128,.2), rgba(111,191,115,.32));
   border-color:rgba(111,191,115,.5);
   color:#eafdec;
   box-shadow:none;
   text-shadow:none;
+  opacity:1;
+}
+.pet-card__btn.is-success,
+.db-action-btn--buy.is-success,
+.tc-action-btn--buy.is-success{
+  background:var(--c-streakcard-claim-bg);
+  border-color:rgba(111,191,115,.4);
+  color:var(--c-streakcard-claim-text);
+  box-shadow:none;
   opacity:1;
 }
 .pet-card__btn-check{ width:17px; height:17px; }
@@ -3466,7 +3473,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
           <div class="storage-card__val" id="display-storage-val">0.00000</div>
           <div class="storage-card__timer" id="storage-timer" style="display:none;">Full in 06:00:00</div>
         </div>
-        <button class="storage-card__boost" aria-label="Boost" onclick="openStorageUpgradeModal()">
+        <button class="storage-card__boost" id="storage-boost-btn" aria-label="Boost" onclick="openStorageUpgradeModal()" disabled>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/><path d="M6 20l6-6 6 6"/></svg>
         </button>
         <button class="storage-card__claim" id="storage-claim-btn" onclick="onStorageClaimClick()">Claim</button>
@@ -3477,7 +3484,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         <div class="pet-card-wrap" style="position:relative;">
           <span class="realm-label realm-label--shine"><span>The Polar Bear</span></span>
           <div class="pet-card pet-card--rare" id="pet-card-bear">
-            <span class="pet-card__lv">Lv.0</span>
+            <span class="pet-card__lv" id="bear-lv-badge">Lv.0</span>
             <span class="pet-card__rarity pet-card__rarity--rare">Rare</span>
             <div class="pet-card__art-wrap" onclick="tiltPetImage(event, this)">
               <img class="pet-card__art" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/The%20Polar%20Bear%20.webp" alt="The Polar Bear">
@@ -3487,7 +3494,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
             <div class="pet-info-card__row">
               <div class="pet-card__rate">
                 <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
-                <span>+191/hr</span>
+                <span id="bear-rate-text">+191/hr</span>
               </div>
               <span class="pet-info-card__divider"></span>
               <div class="pet-card__price" id="pet-card-price-bear" onclick="togglePriceTooltip('price-tooltip-bear')">
@@ -3497,11 +3504,11 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
               </div>
             </div>
             <div class="pet-info-card__actions">
-              <button class="pet-card__upgrade-btn">
+              <button class="pet-card__upgrade-btn" id="bear-upgrade-btn" onclick="openUpgradePetModal('polar_bear')" disabled>
                 <span>Upgrade</span>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/><path d="M6 20l6-6 6 6"/></svg>
               </button>
-              <button class="pet-card__btn pet-card__btn--rare">Buy</button>
+              <button class="pet-card__btn pet-card__btn--rare" id="bear-buy-btn" onclick="onPetBuyClick('polar_bear', this)">Buy</button>
             </div>
           </div>
         </div>
@@ -3529,11 +3536,11 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
               </div>
             </div>
             <div class="pet-info-card__actions">
-              <button class="pet-card__upgrade-btn" id="duck-upgrade-btn" onclick="openUpgradeDuckModal()" disabled>
+              <button class="pet-card__upgrade-btn" id="duck-upgrade-btn" onclick="openUpgradePetModal('duck')" disabled>
                 <span>Upgrade</span>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/><path d="M6 20l6-6 6 6"/></svg>
               </button>
-              <button class="pet-card__btn" id="pet-card-btn" onclick="onDuckBuyClick(this)">Buy</button>
+              <button class="pet-card__btn" id="pet-card-btn" onclick="onPetBuyClick('duck', this)">Buy</button>
             </div>
           </div>
         </div>
@@ -3541,7 +3548,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         <div class="pet-card-wrap" style="position:relative;">
           <span class="realm-label realm-label--shine"><span>The Penguin</span></span>
           <div class="pet-card pet-card--legendary" id="pet-card-penguin">
-            <span class="pet-card__lv">Lv.0</span>
+            <span class="pet-card__lv" id="penguin-lv-badge">Lv.0</span>
             <span class="pet-card__rarity pet-card__rarity--legendary">Legendary</span>
             <div class="pet-card__art-wrap" onclick="tiltPetImage(event, this)">
               <img class="pet-card__art" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/The%20Penguin.webp" alt="The Penguin">
@@ -3551,7 +3558,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
             <div class="pet-info-card__row">
               <div class="pet-card__rate">
                 <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
-                <span>+1,894/hr</span>
+                <span id="penguin-rate-text">+1,894/hr</span>
               </div>
               <span class="pet-info-card__divider"></span>
               <div class="pet-card__price" id="pet-card-price-penguin" onclick="togglePriceTooltip('price-tooltip-penguin')">
@@ -3561,11 +3568,11 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
               </div>
             </div>
             <div class="pet-info-card__actions">
-              <button class="pet-card__upgrade-btn">
+              <button class="pet-card__upgrade-btn" id="penguin-upgrade-btn" onclick="openUpgradePetModal('penguin')" disabled>
                 <span>Upgrade</span>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/><path d="M6 20l6-6 6 6"/></svg>
               </button>
-              <button class="pet-card__btn pet-card__btn--legendary">Buy</button>
+              <button class="pet-card__btn pet-card__btn--legendary" id="penguin-buy-btn" onclick="onPetBuyClick('penguin', this)">Buy</button>
             </div>
           </div>
         </div>
@@ -3573,7 +3580,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         <div class="pet-card-wrap" style="position:relative;">
           <span class="realm-label realm-label--shine"><span>The Scorpion</span></span>
           <div class="pet-card pet-card--epic" id="pet-card-scorpion">
-            <span class="pet-card__lv">Lv.0</span>
+            <span class="pet-card__lv" id="scorpion-lv-badge">Lv.0</span>
             <span class="pet-card__rarity pet-card__rarity--epic">Epic</span>
             <div class="pet-card__art-wrap" onclick="tiltPetImage(event, this)">
               <img class="pet-card__art" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/The%20Scorpion%20.webp" alt="The Scorpion">
@@ -3583,7 +3590,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
             <div class="pet-info-card__row">
               <div class="pet-card__rate">
                 <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
-                <span>+379/hr</span>
+                <span id="scorpion-rate-text">+379/hr</span>
               </div>
               <span class="pet-info-card__divider"></span>
               <div class="pet-card__price" id="pet-card-price-scorpion" onclick="togglePriceTooltip('price-tooltip-scorpion')">
@@ -3593,11 +3600,11 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
               </div>
             </div>
             <div class="pet-info-card__actions">
-              <button class="pet-card__upgrade-btn">
+              <button class="pet-card__upgrade-btn" id="scorpion-upgrade-btn" onclick="openUpgradePetModal('scorpion')" disabled>
                 <span>Upgrade</span>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/><path d="M6 20l6-6 6 6"/></svg>
               </button>
-              <button class="pet-card__btn pet-card__btn--epic">Buy</button>
+              <button class="pet-card__btn pet-card__btn--epic" id="scorpion-buy-btn" onclick="onPetBuyClick('scorpion', this)">Buy</button>
             </div>
           </div>
         </div>
@@ -3619,22 +3626,22 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
             <span class="db-growth-badge" onclick="toggleGrowthTooltip()">
               <span>+0.5%/Day</span>
             </span>
-            <span class="db-lv-badge">Lv.0</span>
-            <button class="db-action-btn db-action-btn--upgrade">
+            <span class="db-lv-badge" id="dancing_bear-lv-badge">Lv.0</span>
+            <button class="db-action-btn db-action-btn--upgrade" id="dancing_bear-upgrade-btn" onclick="openUpgradePetModal('dancing_bear')" disabled>
               <span>Upgrade</span>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/><path d="M6 20l6-6 6 6"/></svg>
             </button>
             <div class="db-right-stack">
               <div class="db-speed">
                 <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:11px;height:11px;flex-shrink:0;vertical-align:middle;">
-                <span>3788/hr</span>
+                <span id="dancing_bear-rate-text">3788/hr</span>
               </div>
               <span class="db-right-stack__divider"></span>
               <div class="db-price" id="pet-card-price-db">
                 <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:11px;height:11px;flex-shrink:0;vertical-align:middle;">
                 <span>10M</span>
               </div>
-              <button class="db-action-btn db-action-btn--buy">Buy</button>
+              <button class="db-action-btn db-action-btn--buy" id="dancing_bear-buy-btn" onclick="onPetBuyClick('dancing_bear', this)">Buy</button>
             </div>
             <div class="pet-slot--exclusive__backdrop"></div>
             <img class="pet-slot--exclusive__art" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/ed9ceea42346d7809e7d8db349a0a9e0d72e9aa4/frontend/Dancing%20Bear.svg" alt="Dancing Bear">
@@ -3651,22 +3658,22 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
             <span class="tc-growth-badge" onclick="toggleGrowthTooltipTC()">
               <span>+1%/Day</span>
             </span>
-            <span class="tc-lv-badge">Lv.0</span>
-            <button class="tc-action-btn tc-action-btn--upgrade">
+            <span class="tc-lv-badge" id="the_cat-lv-badge">Lv.0</span>
+            <button class="tc-action-btn tc-action-btn--upgrade" id="the_cat-upgrade-btn" onclick="openUpgradePetModal('the_cat')" disabled>
               <span>Upgrade</span>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/><path d="M6 20l6-6 6 6"/></svg>
             </button>
             <div class="tc-right-stack">
               <div class="tc-speed">
                 <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:11px;height:11px;flex-shrink:0;vertical-align:middle;">
-                <span>18940/hr</span>
+                <span id="the_cat-rate-text">18940/hr</span>
               </div>
               <span class="tc-right-stack__divider"></span>
               <div class="tc-price" id="pet-card-price-tc">
                 <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:11px;height:11px;flex-shrink:0;vertical-align:middle;">
                 <span>50M</span>
               </div>
-              <button class="tc-action-btn tc-action-btn--buy">Buy</button>
+              <button class="tc-action-btn tc-action-btn--buy" id="the_cat-buy-btn" onclick="onPetBuyClick('the_cat', this)">Buy</button>
             </div>
             <div class="pet-slot--exclusive__backdrop"></div>
             <img class="pet-slot--exclusive__art" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/882f7bf5c55a528db062aa4e7ff46109146af9fb/frontend/Cat%20fishing%20on%20moon.svg" alt="The Cat">
@@ -3924,30 +3931,30 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
     </div>
   </div>
 
-  <div class="modal-overlay" id="modal-upgrade-duck">
+  <div class="modal-overlay" id="modal-upgrade-pet">
     <div class="modal-sheet upgrade-sheet">
       <div class="modal-head">
         <div class="modal-head__title-wrap">
           <svg viewBox="0 0 24 24" fill="none" stroke="#f0d878" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/><path d="M6 20l6-6 6 6"/></svg>
           <div>
-            <div class="modal-head__title">Upgrade The Duck</div>
+            <div class="modal-head__title" id="pet-upgrade-title">Upgrade The Duck</div>
             <div class="modal-head__sub">Boost your mining speed</div>
           </div>
         </div>
-        <button class="modal-close" onclick="closeModal('modal-upgrade-duck')">✕</button>
+        <button class="modal-close" onclick="closeModal('modal-upgrade-pet')">✕</button>
       </div>
 
-      <div class="upgrade-level-badge">Lv.<span id="duck-upgrade-lv-current">1</span> <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg> Lv.<span id="duck-upgrade-lv-new">2</span></div>
+      <div class="upgrade-level-badge">Lv.<span id="pet-upgrade-lv-current">1</span> <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg> Lv.<span id="pet-upgrade-lv-new">2</span></div>
 
       <div class="upgrade-speed-row">
         <div class="upgrade-speed-box">
           <span class="upgrade-speed-box__label">Current Speed</span>
-          <span class="upgrade-speed-box__val" id="duck-upgrade-speed-current">114/hr</span>
+          <span class="upgrade-speed-box__val" id="pet-upgrade-speed-current">114/hr</span>
         </div>
         <svg class="upgrade-speed-arrow" viewBox="0 0 24 24" fill="none" stroke="#f0d878" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
         <div class="upgrade-speed-box upgrade-speed-box--new">
           <span class="upgrade-speed-box__label">New Speed</span>
-          <span class="upgrade-speed-box__val" id="duck-upgrade-speed-new">125/hr</span>
+          <span class="upgrade-speed-box__val" id="pet-upgrade-speed-new">125/hr</span>
         </div>
       </div>
 
@@ -3957,11 +3964,11 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         <span class="upgrade-cost-row__label">Upgrade Cost</span>
         <span class="upgrade-cost-row__val">
           <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:16px;height:16px;flex-shrink:0;vertical-align:middle;">
-          30K Coins
+          <span id="pet-upgrade-cost">30K Coins</span>
         </span>
       </div>
 
-      <button class="upgrade-confirm-btn" id="duck-upgrade-confirm-btn" onclick="onDuckUpgradeConfirm()">Confirm Upgrade</button>
+      <button class="upgrade-confirm-btn" id="pet-upgrade-confirm-btn" onclick="onPetUpgradeConfirm()">Confirm Upgrade</button>
     </div>
   </div>
 
@@ -4752,10 +4759,7 @@ function fetchUserData(){
       claimed_today: data.user.giftpick_claimed_today,
       next_reset_utc: data.user.giftpick_next_reset_utc
     });
-    applyDuckState({
-      duck_level: data.user.duck_level,
-      duck_speed: data.user.duck_speed
-    });
+    applyPetsState(data.user.pets);
     applyStorageState({
       storage_has_pet: data.user.storage_has_pet,
       total_speed: data.user.total_speed,
@@ -5349,35 +5353,50 @@ function onGiftOpenClick(){
    يُحسب ويُتحقق منه في السيرفر فقط؛ هذا الكود يعرض الحالة القادمة منه
    ويستدعي /api/duck/buy، /api/duck/upgrade، و/api/storage/claim.
    ===================================================================== */
-var DUCK_BASE_SPEED = 114;   // سرعة Lv.1 عند الشراء (Coins/hr)
-var DUCK_MAX_LEVEL = 30;     // للعرض فقط — نفس الحد الأقصى المطبَّق بالسيرفر
+// نفس القيم المستخدمة بالسيرفر بالضبط (pet_id -> {basespeed, price}) —
+// تُستخدم هنا فقط لعرض معاينة صحيحة في نافذة الترقية قبل إرسال الطلب؛
+// القرار والتحقق الفعليان يبقيان بالكامل من طرف السيرفر.
+var PET_MAX_LEVEL = 30; // نفس الحد الأقصى لكل الحيوانات
+var PET_DEFS = [
+  { id: 'duck',         basespeed: 114,   price: 300000,   name: 'The Duck',       lvId: 'duck-lv-badge',         rateId: 'duck-rate-text',         buyBtnId: 'pet-card-btn',         upgradeBtnId: 'duck-upgrade-btn' },
+  { id: 'polar_bear',   basespeed: 191,   price: 500000,   name: 'The Polar Bear', lvId: 'bear-lv-badge',         rateId: 'bear-rate-text',         buyBtnId: 'bear-buy-btn',         upgradeBtnId: 'bear-upgrade-btn' },
+  { id: 'scorpion',     basespeed: 379,   price: 1000000,  name: 'The Scorpion',   lvId: 'scorpion-lv-badge',     rateId: 'scorpion-rate-text',     buyBtnId: 'scorpion-buy-btn',     upgradeBtnId: 'scorpion-upgrade-btn' },
+  { id: 'penguin',      basespeed: 1894,  price: 5000000,  name: 'The Penguin',    lvId: 'penguin-lv-badge',      rateId: 'penguin-rate-text',      buyBtnId: 'penguin-buy-btn',      upgradeBtnId: 'penguin-upgrade-btn' },
+  { id: 'dancing_bear', basespeed: 3788,  price: 10000000, name: 'Dancing Bear',   lvId: 'dancing_bear-lv-badge', rateId: 'dancing_bear-rate-text', buyBtnId: 'dancing_bear-buy-btn', upgradeBtnId: 'dancing_bear-upgrade-btn' },
+  { id: 'the_cat',      basespeed: 18940, price: 50000000, name: 'The Cat',        lvId: 'the_cat-lv-badge',      rateId: 'the_cat-rate-text',      buyBtnId: 'the_cat-buy-btn',      upgradeBtnId: 'the_cat-upgrade-btn' }
+];
+var PET_DEFS_BY_ID = {};
+PET_DEFS.forEach(function(def){ PET_DEFS_BY_ID[def.id] = def; });
 
-var duckState = { level: 0, speed: 0 };
-var duckBuyBusy = false;
-var duckUpgradeBusy = false;
+var petStates = {};   // pet_id -> { level, speed }
+var petBuyBusy = {};  // pet_id -> bool
+var petUpgradeBusy = false;
+var activeUpgradePetId = null;
 
 // نفس صيغة السيرفر بالضبط: كل مستوى يضيف 10% من السرعة الأساسية (ثابتة،
-// وليست من السرعة المحدَّثة) — نُعيد حسابها هنا فقط لعرض معاينة صحيحة
-// داخل نافذة الترقية قبل إرسال الطلب.
-function duckSpeedForLevel(level){
-  return DUCK_BASE_SPEED + (level - 1) * (DUCK_BASE_SPEED * 0.10);
+// وليست من السرعة المحدَّثة) — نُعيد حسابها هنا فقط لعرض معاينة صحيحة.
+function petSpeedForLevel(petId, level){
+  var def = PET_DEFS_BY_ID[petId];
+  return def.basespeed + (level - 1) * (def.basespeed * 0.10);
 }
 
-function renderDuckCard(){
-  var lvBadge = document.getElementById('duck-lv-badge');
-  if (lvBadge) lvBadge.textContent = 'Lv.' + duckState.level;
+function renderPetCard(def){
+  var state = petStates[def.id] || { level: 0, speed: 0 };
 
-  var rateText = document.getElementById('duck-rate-text');
+  var lvBadge = document.getElementById(def.lvId);
+  if (lvBadge) lvBadge.textContent = 'Lv.' + state.level;
+
+  var rateText = document.getElementById(def.rateId);
   // قبل الشراء نعرض السرعة الأساسية المتوقعة (Lv.1) بدل 0 الفعلية غير المملوكة بعد
-  var displaySpeed = duckState.level > 0 ? duckState.speed : DUCK_BASE_SPEED;
+  var displaySpeed = state.level > 0 ? state.speed : def.basespeed;
   if (rateText) rateText.textContent = '+' + Math.round(displaySpeed) + '/hr';
 
-  var upgradeBtn = document.getElementById('duck-upgrade-btn');
-  if (upgradeBtn) upgradeBtn.disabled = duckState.level <= 0 || duckState.level >= DUCK_MAX_LEVEL;
+  var upgradeBtn = document.getElementById(def.upgradeBtnId);
+  if (upgradeBtn) upgradeBtn.disabled = state.level <= 0 || state.level >= PET_MAX_LEVEL;
 
-  var buyBtn = document.getElementById('pet-card-btn');
+  var buyBtn = document.getElementById(def.buyBtnId);
   if (buyBtn && !buyBtn.classList.contains('is-success')){
-    if (duckState.level > 0){
+    if (state.level > 0){
       buyBtn.textContent = 'Owned';
       buyBtn.disabled = true;
       buyBtn.classList.add('is-owned');
@@ -5389,14 +5408,31 @@ function renderDuckCard(){
   }
 }
 
-function applyDuckState(data){
-  duckState.level = data.duck_level || 0;
-  duckState.speed = data.duck_speed || 0;
-  renderDuckCard();
+// تُستدعى بعد نجاح شراء أي حيوان: علامة صح مؤقتة 4 ثوانٍ، ثم يبقى الزر
+// "Owned" ومعطّلاً دائماً (نفس منطق showBuySuccessDuck سابقاً، معمَّم).
+function showBuySuccessGeneric(btn){
+  if (!btn || btn.classList.contains('is-success')) return;
+  btn.classList.add('is-success');
+  btn.innerHTML = '<svg class="pet-card__btn-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+  setTimeout(function(){
+    btn.classList.remove('is-success');
+    btn.classList.add('is-owned');
+    btn.textContent = 'Owned';
+  }, 4000);
 }
 
-function onDuckBuyClick(btn){
-  if (duckBuyBusy || duckState.level > 0) return;
+function applyPetsState(petsData){
+  PET_DEFS.forEach(function(def){
+    var p = (petsData && petsData[def.id]) || {};
+    petStates[def.id] = { level: p.level || 0, speed: p.speed || 0 };
+    renderPetCard(def);
+  });
+}
+
+function onPetBuyClick(petId, btn){
+  var def = PET_DEFS_BY_ID[petId];
+  var state = petStates[petId] || { level: 0 };
+  if (!def || petBuyBusy[petId] || state.level > 0) return;
 
   var initData = getTelegramInitData();
   if (!initData){
@@ -5404,8 +5440,8 @@ function onDuckBuyClick(btn){
     return;
   }
 
-  duckBuyBusy = true;
-  fetch('/api/duck/buy', {
+  petBuyBusy[petId] = true;
+  fetch('/api/pet/' + petId + '/buy', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ initData: initData })
@@ -5419,34 +5455,38 @@ function onDuckBuyClick(btn){
       } else if (data.error === 'already_owned'){
         fetchUserData();
       } else {
-        console.error('duck buy error:', data.error);
+        console.error('pet buy error:', data.error);
       }
       return;
     }
 
-    applyDuckState({ duck_level: data.level, duck_speed: data.speed });
+    petStates[petId] = { level: data.level, speed: data.speed };
+    renderPetCard(def);
     var gramEl = document.getElementById('display-gram-wallet');
     updateBalanceDisplay({ coins: data.coins, gram: gramEl ? Number(gramEl.textContent) : 0 });
     applyStorageState({
       storage_has_pet: true,
       total_speed: data.total_speed,
+      storage_level: storageState.level || 1,
       storage_capacity_seconds: storageState.capacitySeconds,
-      storage_remaining_seconds: storageState.capacitySeconds, // تخزين جديد يبدأ ممتلئاً من الصفر عند أول شراء
+      storage_remaining_seconds: storageState.capacitySeconds, // أول شراء يبدأ Storage من الصفر
       storage_min_claim: storageState.minClaim
     });
-    showBuySuccessDuck(btn);
-    showPurchaseToast('The Duck', 'Lv.1');
+    showBuySuccessGeneric(btn);
+    showPurchaseToast(def.name, 'Lv.1');
   })
   .catch(function(err){
-    console.error('duck buy request failed:', err);
+    console.error('pet buy request failed:', err);
   })
   .finally(function(){
-    duckBuyBusy = false;
+    petBuyBusy[petId] = false;
   });
 }
 
-function onDuckUpgradeConfirm(){
-  if (duckUpgradeBusy) return;
+function onPetUpgradeConfirm(){
+  var petId = activeUpgradePetId;
+  var def = PET_DEFS_BY_ID[petId];
+  if (!def || petUpgradeBusy) return;
 
   var initData = getTelegramInitData();
   if (!initData){
@@ -5454,8 +5494,8 @@ function onDuckUpgradeConfirm(){
     return;
   }
 
-  duckUpgradeBusy = true;
-  fetch('/api/duck/upgrade', {
+  petUpgradeBusy = true;
+  fetch('/api/pet/' + petId + '/upgrade', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ initData: initData })
@@ -5469,32 +5509,33 @@ function onDuckUpgradeConfirm(){
       } else if (data.error === 'max_level_reached' || data.error === 'not_owned' || data.error === 'level_changed'){
         fetchUserData();
       } else {
-        console.error('duck upgrade error:', data.error);
+        console.error('pet upgrade error:', data.error);
       }
       return;
     }
 
-    closeModal('modal-upgrade-duck');
-    applyDuckState({ duck_level: data.level, duck_speed: data.speed });
+    closeModal('modal-upgrade-pet');
+    petStates[petId] = { level: data.level, speed: data.speed };
+    renderPetCard(def);
     var gramEl = document.getElementById('display-gram-wallet');
     updateBalanceDisplay({ coins: data.coins, gram: gramEl ? Number(gramEl.textContent) : 0 });
     // السيرفر يصفّر لحظة بداية تراكم Storage عند كل ترقية (لمنع احتساب
-    // الوقت الماضي بالسرعة الجديدة الأعلى) — نطابق نفس التصفير هنا محلياً
+    // الوقت الماضي بالسرعة الكلية الجديدة الأعلى) — نطابق نفس التصفير هنا محلياً
     applyStorageState({
       storage_has_pet: true,
       total_speed: data.total_speed,
-      storage_level: storageState.level, // ترقية The Duck لا تغيّر مستوى Storage نفسه
+      storage_level: storageState.level, // ترقية أي حيوان لا تغيّر مستوى Storage نفسه
       storage_capacity_seconds: storageState.capacitySeconds,
       storage_remaining_seconds: storageState.capacitySeconds,
       storage_min_claim: storageState.minClaim
     });
-    showUpgradeToast('The Duck', 'Lv.' + data.level);
+    showUpgradeToast(def.name, 'Lv.' + data.level);
   })
   .catch(function(err){
-    console.error('duck upgrade request failed:', err);
+    console.error('pet upgrade request failed:', err);
   })
   .finally(function(){
-    duckUpgradeBusy = false;
+    petUpgradeBusy = false;
   });
 }
 
@@ -5533,6 +5574,11 @@ function applyStorageState(data){
   var remainingSeconds = (data.storage_remaining_seconds != null) ? data.storage_remaining_seconds : storageState.capacitySeconds;
   storageState.elapsedAtSync = Math.max(0, storageState.capacitySeconds - remainingSeconds);
   storageState.syncedAtMs = Date.now();
+
+  // زر Upgrade الخاص بـ Storage يظهر بنفس شكل زر Upgrade المعطّل لأي حيوان
+  // (باهت) طالما المستخدم لا يملك أي حيوان بعد — لا فائدة من ترقية تخزين فارغ
+  var boostBtn = document.getElementById('storage-boost-btn');
+  if (boostBtn) boostBtn.disabled = !storageState.hasPet;
 
   renderTotalSpeedBadge();
   clearInterval(storageTickTimer);
@@ -5726,22 +5772,30 @@ function openWithdrawReqModal(){
   openModal('modal-withdraw-req');
 }
 
-function openUpgradeDuckModal(){
-  if (duckState.level <= 0 || duckState.level >= DUCK_MAX_LEVEL) return;
+function openUpgradePetModal(petId){
+  var def = PET_DEFS_BY_ID[petId];
+  var state = petStates[petId];
+  if (!def || !state || state.level <= 0 || state.level >= PET_MAX_LEVEL) return;
 
-  var newLevel = duckState.level + 1;
-  var newSpeed = duckSpeedForLevel(newLevel);
+  activeUpgradePetId = petId;
+  var newLevel = state.level + 1;
+  var newSpeed = petSpeedForLevel(petId, newLevel);
+  var upgradeCost = Math.round(def.price * 0.10);
 
-  var lvCurrent = document.getElementById('duck-upgrade-lv-current');
-  var lvNew = document.getElementById('duck-upgrade-lv-new');
-  var speedCurrent = document.getElementById('duck-upgrade-speed-current');
-  var speedNew = document.getElementById('duck-upgrade-speed-new');
-  if (lvCurrent) lvCurrent.textContent = duckState.level;
+  var titleEl = document.getElementById('pet-upgrade-title');
+  var lvCurrent = document.getElementById('pet-upgrade-lv-current');
+  var lvNew = document.getElementById('pet-upgrade-lv-new');
+  var speedCurrent = document.getElementById('pet-upgrade-speed-current');
+  var speedNew = document.getElementById('pet-upgrade-speed-new');
+  var costEl = document.getElementById('pet-upgrade-cost');
+  if (titleEl) titleEl.textContent = 'Upgrade ' + def.name;
+  if (lvCurrent) lvCurrent.textContent = state.level;
   if (lvNew) lvNew.textContent = newLevel;
-  if (speedCurrent) speedCurrent.textContent = Math.round(duckState.speed) + '/hr';
+  if (speedCurrent) speedCurrent.textContent = Math.round(state.speed) + '/hr';
   if (speedNew) speedNew.textContent = Math.round(newSpeed) + '/hr';
+  if (costEl) costEl.textContent = formatCoinsK(upgradeCost) + ' Coins';
 
-  openModal('modal-upgrade-duck');
+  openModal('modal-upgrade-pet');
 }
 
 function openStorageUpgradeModal(){
@@ -5841,18 +5895,6 @@ function claimMilestone(btn){
 // تُستدعى بعد نجاح شراء The Duck فعلياً من السيرفر (وليس عند مجرد الضغط):
 // علامة صح مؤقتة 4 ثوانٍ، ثم يبقى الزر "Owned" ومعطّلاً دائماً (الشخصية
 // مملوكة بالفعل ولا يمكن إعادة شرائها).
-function showBuySuccessDuck(btn){
-  if (btn.classList.contains('is-success')) return;
-  btn.classList.add('is-success');
-  btn.disabled = true;
-  btn.innerHTML = '<svg class="pet-card__btn-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
-  setTimeout(function(){
-    btn.classList.remove('is-success');
-    btn.classList.add('is-owned');
-    btn.textContent = 'Owned';
-  }, 4000);
-}
-
 /* -- تلميح "300,000" الكامل فوق سعر الشخصية عند الضغط -- */
 function togglePriceTooltip(tipId){
   var tip = document.getElementById(tipId || 'price-tooltip');
