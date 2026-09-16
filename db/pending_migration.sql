@@ -39,3 +39,10 @@ ALTER TABLE users ADD COLUMN streak_last_claim_date TEXT;
 --                  اليوم الحالي لتحديد هل تبقّت دورة مجانية اليوم (بدون أي
 --                  مهمة مجدولة، نفس أسلوب Start Mining وDaily Streak).
 ALTER TABLE users ADD COLUMN last_spin_date TEXT;
+
+-- -- Chest وGift Pick (نفس جدول جوائز واحتمالات Spin بالضبط، محاولة يومية
+--    مستقلة لكل ميزة) --------------------------------------------------
+-- last_chest_date    : تاريخ آخر فتح صندوق ناجح بتوقيت UTC
+-- last_giftpick_date : تاريخ آخر فتح هدية ناجح بتوقيت UTC
+ALTER TABLE users ADD COLUMN last_chest_date TEXT;
+ALTER TABLE users ADD COLUMN last_giftpick_date TEXT;

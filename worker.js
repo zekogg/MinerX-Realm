@@ -66,6 +66,14 @@ export default {
       return handleSpinClaim(request, env);
     }
 
+    if (url.pathname === "/api/chest/claim" && request.method === "POST") {
+      return handleChestClaim(request, env);
+    }
+
+    if (url.pathname === "/api/giftpick/claim" && request.method === "POST") {
+      return handleGiftPickClaim(request, env);
+    }
+
     // Everything else -> serve the Mini App static files
     return env.ASSETS.fetch(request);
   }
@@ -84,7 +92,7 @@ async function handleGetUser(request, env) {
 
   // موجود أصلاً؟ رجّع بياناته الحالية
   let user = await env.DB.prepare(
-    "SELECT telegram_id, username, coins, gram, total_speed, total_mined, is_admin, mining_started_at, mining_cycles_today, mining_cycle_date, streak_day, streak_last_claim_date, last_spin_date FROM users WHERE telegram_id = ?"
+    "SELECT telegram_id, username, coins, gram, total_speed, total_mined, is_admin, mining_started_at, mining_cycles_today, mining_cycle_date, streak_day, streak_last_claim_date, last_spin_date, last_chest_date, last_giftpick_date FROM users WHERE telegram_id = ?"
   ).bind(telegramId).first();
 
   if (!user) {
@@ -101,11 +109,17 @@ async function handleGetUser(request, env) {
     }
 
     user = await env.DB.prepare(
-      "SELECT telegram_id, username, coins, gram, total_speed, total_mined, is_admin, mining_started_at, mining_cycles_today, mining_cycle_date, streak_day, streak_last_claim_date, last_spin_date FROM users WHERE telegram_id = ?"
+      "SELECT telegram_id, username, coins, gram, total_speed, total_mined, is_admin, mining_started_at, mining_cycles_today, mining_cycle_date, streak_day, streak_last_claim_date, last_spin_date, last_chest_date, last_giftpick_date FROM users WHERE telegram_id = ?"
     ).bind(telegramId).first();
   }
 
-  return jsonResponse({ user: withSpinView(withStreakView(withMiningView(user))) });
+  let view = withMiningView(user);
+  view = withStreakView(view);
+  view = withDailyPrizeView(view, "last_spin_date", "spin_claimed_today", "spin_next_reset_utc");
+  view = withDailyPrizeView(view, "last_chest_date", "chest_claimed_today", "chest_next_reset_utc");
+  view = withDailyPrizeView(view, "last_giftpick_date", "giftpick_claimed_today", "giftpick_next_reset_utc");
+
+  return jsonResponse({ user: view });
 }
 
 // =====================================================================
@@ -275,41 +289,72 @@ async function handleStreakClaim(request, env) {
 
 // =====================================================================
 // نقطة /api/spin/claim — تنفيذ دورة الحظ المجانية اليومية.
+// نقطة /api/chest/claim — فتح الصندوق المجاني اليومي.
+// نقطة /api/giftpick/claim — فتح إحدى الهدايا الثلاث المجانية يومياً.
+// الثلاثة تستخدم بالضبط نفس جدول الجوائز والاحتمالات (SPIN_SEGMENTS)،
+// وكل واحدة منفصلة تماماً عن الأخرى (محاولة يومية مستقلة لكل ميزة).
 // الاختيار عشوائي مرجّح بالكامل من السيرفر (crypto.getRandomValues)؛
 // المتصفح لا يرسل ولا يقرر أي شيء سوى تشغيل الأنيميشن بعد استلام النتيجة.
 // =====================================================================
 async function handleSpinClaim(request, env) {
+  return handleDailyPrizeClaim(request, env, {
+    dateColumn: "last_spin_date",
+    errorCode: "already_spun_today",
+    transactionType: "spin"
+  });
+}
+
+async function handleChestClaim(request, env) {
+  return handleDailyPrizeClaim(request, env, {
+    dateColumn: "last_chest_date",
+    errorCode: "already_claimed_today",
+    transactionType: "chest_open"
+  });
+}
+
+async function handleGiftPickClaim(request, env) {
+  return handleDailyPrizeClaim(request, env, {
+    dateColumn: "last_giftpick_date",
+    errorCode: "already_claimed_today",
+    transactionType: "gift_pick"
+  });
+}
+
+// المنطق العام المشترك بين Spin وChest وGift Pick: محاولة مجانية واحدة
+// باليوم (تُصفَّر 00:00 UTC)، جائزة عشوائية مرجّحة من نفس SPIN_SEGMENTS،
+// وتحديث ذري (Compare-And-Swap) يمنع استلام مكافأتين لنفس اليوم حتى لو
+// تكرر نفس الطلب بسرعة.
+async function handleDailyPrizeClaim(request, env, { dateColumn, errorCode, transactionType }) {
   const auth = await authenticateRequest(request, env);
   if (!auth.ok) return auth.response;
   const { telegramId } = auth;
 
   const row = await env.DB.prepare(
-    "SELECT coins, gram, last_spin_date FROM users WHERE telegram_id = ?"
+    `SELECT coins, gram, ${dateColumn} AS last_date FROM users WHERE telegram_id = ?`
   ).bind(telegramId).first();
   if (!row) return jsonResponse({ error: "user_not_found" }, 404);
 
   const today = todayUTC();
-  if (row.last_spin_date === today) {
-    return jsonResponse({ error: "already_spun_today", next_reset_utc: nextUtcMidnightIso() }, 409);
+  if (row.last_date === today) {
+    return jsonResponse({ error: errorCode, next_reset_utc: nextUtcMidnightIso() }, 409);
   }
 
   const index = pickWeightedSpinIndex();
   const prize = SPIN_SEGMENTS[index];
   const column = prize.type === "coins" ? "coins" : "gram";
 
-  // شرط CAS يمنع دورتين لنفس اليوم حتى لو تكرر نفس الطلب بسرعة
   const updateStmt = env.DB.prepare(
-    `UPDATE users SET ${column} = ${column} + ?, last_spin_date = ?
-     WHERE telegram_id = ? AND (last_spin_date IS NULL OR last_spin_date <> ?)`
+    `UPDATE users SET ${column} = ${column} + ?, ${dateColumn} = ?
+     WHERE telegram_id = ? AND (${dateColumn} IS NULL OR ${dateColumn} <> ?)`
   ).bind(prize.amount, today, telegramId, today);
 
   const txnStmt = env.DB.prepare(
-    "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'spin', ?, ?)"
-  ).bind(telegramId, prize.amount, prize.type);
+    "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, ?, ?, ?)"
+  ).bind(telegramId, transactionType, prize.amount, prize.type);
 
   const [updateResult] = await env.DB.batch([updateStmt, txnStmt]);
   if (!updateResult.meta || updateResult.meta.changes === 0) {
-    return jsonResponse({ error: "already_spun_today" }, 409);
+    return jsonResponse({ error: errorCode }, 409);
   }
 
   return jsonResponse({
@@ -338,11 +383,13 @@ function pickWeightedSpinIndex() {
   return SPIN_SEGMENTS.length - 1;
 }
 
-function withSpinView(user) {
+// يضيف حقلي "هل استُلمت المحاولة اليومية اليوم؟" و"موعد التصفير القادم"
+// لأي ميزة يومية (Spin/Chest/Gift Pick) بدون أي كتابة لقاعدة البيانات.
+function withDailyPrizeView(user, dateColumn, claimedKey, resetKey) {
   return {
     ...user,
-    spin_claimed_today: user.last_spin_date === todayUTC(),
-    spin_next_reset_utc: nextUtcMidnightIso()
+    [claimedKey]: user[dateColumn] === todayUTC(),
+    [resetKey]: nextUtcMidnightIso()
   };
 }
 
