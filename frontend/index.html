@@ -5368,16 +5368,24 @@ function renderDuckCard(){
   if (lvBadge) lvBadge.textContent = 'Lv.' + duckState.level;
 
   var rateText = document.getElementById('duck-rate-text');
-  if (rateText) rateText.textContent = '+' + Math.round(duckState.speed) + '/hr';
+  // قبل الشراء نعرض السرعة الأساسية المتوقعة (Lv.1) بدل 0 الفعلية غير المملوكة بعد
+  var displaySpeed = duckState.level > 0 ? duckState.speed : DUCK_BASE_SPEED;
+  if (rateText) rateText.textContent = '+' + Math.round(displaySpeed) + '/hr';
 
   var upgradeBtn = document.getElementById('duck-upgrade-btn');
   if (upgradeBtn) upgradeBtn.disabled = duckState.level <= 0 || duckState.level >= DUCK_MAX_LEVEL;
 
   var buyBtn = document.getElementById('pet-card-btn');
-  if (buyBtn && duckState.level > 0 && !buyBtn.classList.contains('is-success')){
-    buyBtn.textContent = 'Owned';
-    buyBtn.disabled = true;
-    buyBtn.classList.add('is-owned');
+  if (buyBtn && !buyBtn.classList.contains('is-success')){
+    if (duckState.level > 0){
+      buyBtn.textContent = 'Owned';
+      buyBtn.disabled = true;
+      buyBtn.classList.add('is-owned');
+    } else {
+      buyBtn.textContent = 'Buy';
+      buyBtn.disabled = false;
+      buyBtn.classList.remove('is-owned');
+    }
   }
 }
 
