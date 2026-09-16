@@ -1845,6 +1845,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   border-top:4px solid rgba(227,165,66,.55);
 }
 .price-tooltip.is-visible{ opacity:1; }
+.price-tooltip--wide{ width:150px; white-space:normal; line-height:1.5; text-align:center; }
 
 /* -- ميلان 3D بسيط لصورة الشخصية عند الضغط -- */
 .pet-card{ perspective:600px; }
@@ -2737,6 +2738,9 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 
       <!-- /////كود بطاقة Spin (عجلة الحظ)///// -->
       <div class="card spin-card">
+        <span class="chest-card__help" style="cursor:pointer;" onclick="togglePriceTooltip('spin-help-tooltip')">?
+          <span class="price-tooltip price-tooltip--wide" id="spin-help-tooltip">You get 1 free spin every day, resetting at 00:00 UTC.</span>
+        </span>
         <div class="spin-wheel-wrap">
           <div class="spin-wheel__pointer"></div>
           <div class="spin-wheel-ring"></div>
@@ -2794,7 +2798,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
           </div>
           </div>
         </div>
-        <button class="spin-btn" id="btn-spin">Spin 0</button>
+        <button class="spin-btn" id="btn-spin" onclick="onSpinButtonClick()">Spin (1)</button>
       </div>
 
       <!-- /////كود بطاقة Scratch (الكشط)///// -->
@@ -4541,6 +4545,10 @@ function fetchUserData(){
       claimed_today: data.user.streak_claimed_today,
       next_reset_utc: data.user.streak_next_reset_utc
     });
+    applySpinState({
+      claimed_today: data.user.spin_claimed_today,
+      next_reset_utc: data.user.spin_next_reset_utc
+    });
   })
   .catch(function(err){
     console.error('fetchUserData failed:', err);
@@ -4802,6 +4810,93 @@ function onStreakClaimClick(){
   })
   .finally(function(){
     streakBusy = false;
+  });
+}
+
+/* =====================================================================
+   كود عجلة الحظ (Spin). النتيجة (segment_index) تأتي من السيرفر فقط —
+   هذا الكود يستقبلها ويشغّل الأنيميشن، ولا يقرر الفائز بنفسه إطلاقاً.
+   دوران الشريحة 0 يبدأ من الأعلى (حيث المؤشر) وباتجاه عقارب الساعة،
+   كل شريحة 45 درجة (8 شرائح)، مطابق تماماً لترتيب SPIN_SEGMENTS بالسيرفر.
+   ===================================================================== */
+var spinState = { claimedToday: false, nextResetUtc: null };
+var spinBusy = false;
+var spinWheelRotation = 0;
+
+function renderSpinButton(){
+  var btn = document.getElementById('btn-spin');
+  if (!btn) return;
+  btn.textContent = spinState.claimedToday ? 'Spin (0)' : 'Spin (1)';
+  btn.disabled = spinState.claimedToday;
+}
+
+function applySpinState(data){
+  spinState.claimedToday = !!data.claimed_today;
+  spinState.nextResetUtc = data.next_reset_utc || null;
+  renderSpinButton();
+}
+
+function rotateSpinWheelToSegment(index){
+  var wheelEl = document.querySelector('.spin-wheel');
+  if (!wheelEl) return;
+
+  var segmentAngle = 45; // 360 / 8 شرائح
+  var jitter = (Math.random() * 30) - 15; // ±15° تنويع طبيعي داخل حدود الشريحة بأمان (نصف الشريحة 22.5°)
+  var targetMod = (360 - (index * segmentAngle)) % 360;
+  var currentMod = ((spinWheelRotation % 360) + 360) % 360;
+  var deltaToTarget = ((targetMod - currentMod) + 360) % 360;
+  var fullSpins = 5 * 360; // دورات كاملة إضافية لإحساس واقعي بالدوران
+
+  spinWheelRotation += deltaToTarget + fullSpins + jitter;
+
+  // تفتر سريعة في البداية وتتباطأ تدريجياً حتى التوقف، خلال ~4 ثوانٍ بالضبط
+  wheelEl.style.transition = 'transform 4s cubic-bezier(0.12, 0.67, 0.14, 0.99)';
+  wheelEl.style.transform = 'rotate(' + spinWheelRotation + 'deg)';
+}
+
+function onSpinButtonClick(){
+  if (spinBusy || spinState.claimedToday) return;
+
+  var initData = getTelegramInitData();
+  if (!initData){
+    alert('Open this app from Telegram to spin.');
+    return;
+  }
+
+  var btn = document.getElementById('btn-spin');
+  spinBusy = true;
+  if (btn) btn.disabled = true;
+
+  fetch('/api/spin/claim', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: initData })
+  })
+  .then(function(res){ return res.json().then(function(data){ return { status: res.status, data: data }; }); })
+  .then(function(result){
+    var data = result.data;
+    if (data.error){
+      if (data.error === 'already_spun_today'){
+        applySpinState({ claimed_today: true, next_reset_utc: data.next_reset_utc });
+      } else {
+        console.error('spin claim error:', data.error);
+        if (btn) btn.disabled = false;
+      }
+      return;
+    }
+
+    rotateSpinWheelToSegment(data.segment_index);
+    setTimeout(function(){
+      updateBalanceDisplay({ coins: data.coins, gram: data.gram });
+      applySpinState({ claimed_today: true, next_reset_utc: data.next_reset_utc });
+    }, 4000); // نفس مدة أنيميشن الدوران — الرصيد يتحدث بعد توقف العجلة تماماً
+  })
+  .catch(function(err){
+    console.error('spin request failed:', err);
+    if (btn) btn.disabled = false;
+  })
+  .finally(function(){
+    spinBusy = false;
   });
 }
 

@@ -33,3 +33,9 @@ ALTER TABLE users ADD COLUMN streak_last_claim_date TEXT;
 -- transactions (type = 'daily_streak') كأرشيف تاريخي بدون قيد تكرار.
 -- إذا رغبت مستقبلاً بجدول تاريخي مخصص، الأفضل مفتاح (telegram_id, claimed_at)
 -- بدل (telegram_id, day_number).
+
+-- -- Spin (عجلة الحظ اليومية المجانية) ------------------------------------
+-- last_spin_date : تاريخ آخر دورة مجانية ناجحة بتوقيت UTC — يُقارَن بتاريخ
+--                  اليوم الحالي لتحديد هل تبقّت دورة مجانية اليوم (بدون أي
+--                  مهمة مجدولة، نفس أسلوب Start Mining وDaily Streak).
+ALTER TABLE users ADD COLUMN last_spin_date TEXT;

@@ -16,6 +16,26 @@ const MINING_DAILY_LIMIT = 7;         // أقصى عدد دورات باليوم
 // =====================================================================
 const STREAK_REWARDS = [50, 100, 150, 200, 250, 300, 500]; // index 0 = اليوم 1
 
+// =====================================================================
+// إعدادات عجلة الحظ (Spin): دورة واحدة مجانية باليوم، تُصفَّر 00:00 UTC.
+// الترتيب هنا يطابق تماماً ترتيب الشرائح الثمانية بالواجهة (كل شريحة 45
+// درجة، بدءاً من الأعلى وباتجاه عقارب الساعة). الاختيار عشوائي مرجّح
+// (weighted random) من السيرفر فقط — لا شيء يُستقبل من المتصفح سوى initData.
+// وزن كل جائزة من 10000 (يساوي نسبتها المئوية × 100):
+//   50 عملة = 78% ، 100 = 10% ، 250 = 10% ، 1000 = 1%  (المجموع 99%)
+//   كل جوائز Gram الأربع تتقاسم الـ1% المتبقي بالتساوي (0.25% لكل واحدة)
+// =====================================================================
+const SPIN_SEGMENTS = [
+  { type: "coins", amount: 100,    weight: 1000 }, // 0°   (10%)
+  { type: "gram",  amount: 0.0025, weight: 25   }, // 45°  (0.25%)
+  { type: "coins", amount: 1000,   weight: 100  }, // 90°  (1%)
+  { type: "gram",  amount: 0.005,  weight: 25   }, // 135° (0.25%)
+  { type: "coins", amount: 250,    weight: 1000 }, // 180° (10%)
+  { type: "gram",  amount: 0.001,  weight: 25   }, // 225° (0.25%)
+  { type: "coins", amount: 50,     weight: 7800 }, // 270° (78%)
+  { type: "gram",  amount: 0.01,   weight: 25   }  // 315° (0.25%)
+];
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -42,6 +62,10 @@ export default {
       return handleStreakClaim(request, env);
     }
 
+    if (url.pathname === "/api/spin/claim" && request.method === "POST") {
+      return handleSpinClaim(request, env);
+    }
+
     // Everything else -> serve the Mini App static files
     return env.ASSETS.fetch(request);
   }
@@ -60,7 +84,7 @@ async function handleGetUser(request, env) {
 
   // موجود أصلاً؟ رجّع بياناته الحالية
   let user = await env.DB.prepare(
-    "SELECT telegram_id, username, coins, gram, total_speed, total_mined, is_admin, mining_started_at, mining_cycles_today, mining_cycle_date, streak_day, streak_last_claim_date FROM users WHERE telegram_id = ?"
+    "SELECT telegram_id, username, coins, gram, total_speed, total_mined, is_admin, mining_started_at, mining_cycles_today, mining_cycle_date, streak_day, streak_last_claim_date, last_spin_date FROM users WHERE telegram_id = ?"
   ).bind(telegramId).first();
 
   if (!user) {
@@ -77,11 +101,11 @@ async function handleGetUser(request, env) {
     }
 
     user = await env.DB.prepare(
-      "SELECT telegram_id, username, coins, gram, total_speed, total_mined, is_admin, mining_started_at, mining_cycles_today, mining_cycle_date, streak_day, streak_last_claim_date FROM users WHERE telegram_id = ?"
+      "SELECT telegram_id, username, coins, gram, total_speed, total_mined, is_admin, mining_started_at, mining_cycles_today, mining_cycle_date, streak_day, streak_last_claim_date, last_spin_date FROM users WHERE telegram_id = ?"
     ).bind(telegramId).first();
   }
 
-  return jsonResponse({ user: withStreakView(withMiningView(user)) });
+  return jsonResponse({ user: withSpinView(withStreakView(withMiningView(user))) });
 }
 
 // =====================================================================
@@ -247,6 +271,79 @@ async function handleStreakClaim(request, env) {
     coins: row.coins + reward,
     next_reset_utc: nextUtcMidnightIso()
   });
+}
+
+// =====================================================================
+// نقطة /api/spin/claim — تنفيذ دورة الحظ المجانية اليومية.
+// الاختيار عشوائي مرجّح بالكامل من السيرفر (crypto.getRandomValues)؛
+// المتصفح لا يرسل ولا يقرر أي شيء سوى تشغيل الأنيميشن بعد استلام النتيجة.
+// =====================================================================
+async function handleSpinClaim(request, env) {
+  const auth = await authenticateRequest(request, env);
+  if (!auth.ok) return auth.response;
+  const { telegramId } = auth;
+
+  const row = await env.DB.prepare(
+    "SELECT coins, gram, last_spin_date FROM users WHERE telegram_id = ?"
+  ).bind(telegramId).first();
+  if (!row) return jsonResponse({ error: "user_not_found" }, 404);
+
+  const today = todayUTC();
+  if (row.last_spin_date === today) {
+    return jsonResponse({ error: "already_spun_today", next_reset_utc: nextUtcMidnightIso() }, 409);
+  }
+
+  const index = pickWeightedSpinIndex();
+  const prize = SPIN_SEGMENTS[index];
+  const column = prize.type === "coins" ? "coins" : "gram";
+
+  // شرط CAS يمنع دورتين لنفس اليوم حتى لو تكرر نفس الطلب بسرعة
+  const updateStmt = env.DB.prepare(
+    `UPDATE users SET ${column} = ${column} + ?, last_spin_date = ?
+     WHERE telegram_id = ? AND (last_spin_date IS NULL OR last_spin_date <> ?)`
+  ).bind(prize.amount, today, telegramId, today);
+
+  const txnStmt = env.DB.prepare(
+    "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'spin', ?, ?)"
+  ).bind(telegramId, prize.amount, prize.type);
+
+  const [updateResult] = await env.DB.batch([updateStmt, txnStmt]);
+  if (!updateResult.meta || updateResult.meta.changes === 0) {
+    return jsonResponse({ error: "already_spun_today" }, 409);
+  }
+
+  return jsonResponse({
+    segment_index: index,
+    prize_type: prize.type,
+    prize_amount: prize.amount,
+    coins: prize.type === "coins" ? row.coins + prize.amount : row.coins,
+    gram: prize.type === "gram" ? row.gram + prize.amount : row.gram,
+    next_reset_utc: nextUtcMidnightIso()
+  });
+}
+
+// اختيار عشوائي مرجّح (weighted random) من SPIN_SEGMENTS باستخدام
+// Web Crypto بدل Math.random لعشوائية أفضل تناسب جائزة حقيقية.
+function pickWeightedSpinIndex() {
+  const totalWeight = SPIN_SEGMENTS.reduce((sum, p) => sum + p.weight, 0);
+  const buf = new Uint32Array(1);
+  crypto.getRandomValues(buf);
+  const roll = buf[0] % totalWeight;
+
+  let acc = 0;
+  for (let i = 0; i < SPIN_SEGMENTS.length; i++) {
+    acc += SPIN_SEGMENTS[i].weight;
+    if (roll < acc) return i;
+  }
+  return SPIN_SEGMENTS.length - 1;
+}
+
+function withSpinView(user) {
+  return {
+    ...user,
+    spin_claimed_today: user.last_spin_date === todayUTC(),
+    spin_next_reset_utc: nextUtcMidnightIso()
+  };
 }
 
 // يحسب حالة التسلسل الحالية (أي يوم القادم؟ هل انقطع؟ هل استُلم اليوم؟)
