@@ -5475,6 +5475,7 @@ function onDuckUpgradeConfirm(){
     applyStorageState({
       storage_has_pet: true,
       total_speed: data.total_speed,
+      storage_level: storageState.level, // ترقية The Duck لا تغيّر مستوى Storage نفسه
       storage_capacity_seconds: storageState.capacitySeconds,
       storage_remaining_seconds: storageState.capacitySeconds,
       storage_min_claim: storageState.minClaim
@@ -5599,6 +5600,7 @@ function onStorageClaimClick(){
     applyStorageState({
       storage_has_pet: true,
       total_speed: storageState.totalSpeed,
+      storage_level: storageState.level, // استلام Storage لا يغيّر مستواه
       storage_capacity_seconds: data.capacity_seconds || storageState.capacitySeconds,
       storage_remaining_seconds: data.capacity_seconds || storageState.capacitySeconds,
       storage_min_claim: storageState.minClaim
