@@ -254,8 +254,8 @@ img,svg{ display:block; }
 
 /* /////كود توست الجوائز (Prize Toast)///// */
 .prize-toast{
-  position:fixed; top:50%; left:50%;
-  transform:translate(-50%,-50%) scale(.7);
+  position:fixed; top:calc(var(--safe-t) + 74px); left:50%;
+  transform:translate(-50%,-14px) scale(.9);
   z-index:800;
   display:flex; align-items:center; gap:10px;
   padding:12px 20px 12px 12px; border-radius:999px;
@@ -266,7 +266,7 @@ img,svg{ display:block; }
   transition:opacity .25s ease, transform .35s cubic-bezier(.34,1.56,.64,1);
 }
 .prize-toast.is-visible{
-  opacity:1; transform:translate(-50%,-50%) scale(1);
+  opacity:1; transform:translate(-50%,0) scale(1);
 }
 .prize-toast__icon-wrap{
   width:34px; height:34px; border-radius:50%; flex-shrink:0;
@@ -810,7 +810,31 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   font-family:var(--font-display);
 }
 .chest-card__row{ display:flex; align-items:center; gap:14px; }
+.chest-card__icon-wrap{ position:relative; flex-shrink:0; }
 .chest-card__icon-art{ width:91px; height:91px; object-fit:contain; flex-shrink:0; }
+/* -- اهتزاز الصندوق + ومضة توهج ذهبية عند الضغط على Open (لا صورة "مفتوح" متوفرة،
+      فالإحساس بالفتح يأتي من الحركة والضوء فقط) -- */
+@keyframes chest-shake{
+  0%,100%{ transform:translateX(0) rotate(0deg); }
+  15%{ transform:translateX(-4px) rotate(-4deg); }
+  30%{ transform:translateX(4px) rotate(4deg); }
+  45%{ transform:translateX(-4px) rotate(-3deg); }
+  60%{ transform:translateX(4px) rotate(3deg); }
+  75%{ transform:translateX(-2px) rotate(-2deg); }
+  90%{ transform:translateX(2px) rotate(1deg); }
+}
+@keyframes chest-burst-pop{
+  0%{ transform:scale(.3); opacity:0; }
+  40%{ opacity:.9; }
+  100%{ transform:scale(1.7); opacity:0; }
+}
+.chest-card__icon-wrap.is-opening .chest-card__icon-art{ animation:chest-shake .5s ease; }
+.chest-card__icon-wrap.is-opening::after{
+  content:""; position:absolute; inset:-16px; border-radius:50%;
+  background:radial-gradient(circle, rgba(255,215,106,.6), transparent 70%);
+  animation:chest-burst-pop .6s ease-out;
+  pointer-events:none;
+}
 .chest-card__open{
   padding:8.4px 16.8px; border-radius:9.6px;   /* +20% عن النسخة السابقة */
   background:linear-gradient(135deg, var(--c-chest-open-1), var(--c-chest-open-2));
@@ -921,7 +945,8 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   background:var(--stone-2); border:2px solid var(--stone-border-2);
   display:flex; align-items:center; justify-content:center;
   color:var(--c-ad-watch-1);
-  transition:border-color .15s ease, background .15s ease, transform .15s ease;
+  perspective:600px;
+  transition:border-color .15s ease, background .15s ease, transform .15s ease, opacity .3s ease;
 }
 .gift-pick-box__art{ width:80%; height:80%; object-fit:contain; }
 .gift-pick-box.is-selected{
@@ -931,6 +956,26 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   transform:scale(1.06);
   box-shadow:0 0 14px rgba(227,165,66,.4);
 }
+/* -- الهديتان غير المختارتين تتلاشيان عند الضغط على Open -- */
+.gift-pick-box.is-fading{ opacity:.25; transform:scale(.9); pointer-events:none; }
+/* -- قلب ثلاثي الأبعاد للهدية المختارة يكشف الجائزة على وجهه الخلفي -- */
+.gift-pick-box__flip{
+  position:relative; width:100%; height:100%;
+  transform-style:preserve-3d;
+  transition:transform .6s cubic-bezier(.34,1.56,.64,1);
+}
+.gift-pick-box.is-revealed .gift-pick-box__flip{ transform:rotateY(180deg); }
+.gift-pick-box__face{
+  position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:center;
+  backface-visibility:hidden; -webkit-backface-visibility:hidden;
+}
+.gift-pick-box__face--back{
+  flex-direction:column; gap:2px;
+  transform:rotateY(180deg);
+}
+.gift-pick-box__prize-icon{ width:34%; height:34%; object-fit:contain; }
+.gift-pick-box__prize-amount{ font-family:var(--font-display); font-weight:800; font-size:10px; color:#e3a542; }
 .gift-pick-open-btn{
   width:60%; margin:0 auto; padding:7px; border-radius:var(--radius-md);   /* نفس صندوق زر Spin تماماً: العرض والعرض التلقائي */
   background:linear-gradient(135deg, var(--c-spin-btn-1), var(--c-spin-btn-2));
@@ -1879,12 +1924,17 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 }
 .price-tooltip.is-visible{ opacity:1; }
 .price-tooltip--wide{ width:150px; white-space:normal; line-height:1.5; text-align:center; }
+/* -- حاوية مرجعية لأي شارة "؟" ثابتة الموضع (position:static) بحيث يتموضع
+      التلميح المنبثق بداخلها بشكل صحيح دون التأثير على تخطيط الشارة نفسها -- */
+.help-tooltip-anchor{ position:relative; display:inline-flex; }
+.prize-tooltip-icons{ display:flex; align-items:center; justify-content:center; gap:4px; margin-top:4px; font-weight:700; }
 /* -- تلميح بطاقة Spin: يُثبَّت من جهة اليمين بدل التمركز، لأن شارة "؟" قريبة
       من الحافة اليمنى للبطاقة والتمركز كان يدفع عرض الصفحة للخارج ويسبب
       تمريراً أفقياً غير مرغوب حتى أثناء اختفاء التلميح (opacity:0 لا يلغي
       مساحته من حساب overflow) -- */
 #spin-help-tooltip{ left:auto; right:0; transform:translateY(-6px); }
 #spin-help-tooltip::after{ left:auto; right:10px; transform:none; }
+#gift-help-tooltip::after{ left:auto; right:10px; transform:none; }
 
 /* -- ميلان 3D بسيط لصورة الشخصية عند الضغط -- */
 .pet-card{ perspective:600px; }
@@ -2767,10 +2817,21 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 
       <!-- /////كود بطاقة Chest///// -->
       <div class="card chest-card">
-        <span class="chest-card__help">?</span>
+        <span class="chest-card__help" style="cursor:pointer;" onclick="togglePriceTooltip('chest-help-tooltip')">?
+          <span class="price-tooltip price-tooltip--wide" id="chest-help-tooltip">
+            You get 1 free try every day, resetting at 00:00 UTC.
+            <span class="prize-tooltip-icons">
+              <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" style="width:13px;height:13px;">Coins
+              &amp;
+              <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" style="width:11px;height:11px;">Gram
+            </span>
+          </span>
+        </span>
         <div class="chest-card__row">
-          <img class="chest-card__icon-art" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/74339362a9afb6b9cc3c9159fd5913c1220933b0/frontend/The%20Chest.svg" alt="Chest">
-          <button class="chest-card__open">Open Chest&nbsp; 0</button>
+          <span class="chest-card__icon-wrap" id="chest-icon-wrap">
+            <img class="chest-card__icon-art" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/74339362a9afb6b9cc3c9159fd5913c1220933b0/frontend/The%20Chest.svg" alt="Chest">
+          </span>
+          <button class="chest-card__open" id="btn-open-chest" onclick="onChestOpenClick()">Open Chest&nbsp;&nbsp;(1)</button>
         </div>
         <div class="chest-card__caption">Open chests to find your prize.</div>
       </div>
@@ -2844,20 +2905,54 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
       <div class="card gift-pick-card">
         <div class="gift-pick-card__title-row">
           <div class="gift-pick-card__title">Pick 1 Of The 3 Gifts</div>
-          <span class="chest-card__help" style="position:static; width:20px; height:20px; font-size:9px;">?</span>
+          <span class="help-tooltip-anchor">
+            <span class="chest-card__help" style="position:static; width:20px; height:20px; font-size:9px; cursor:pointer;" onclick="togglePriceTooltip('gift-help-tooltip')">?</span>
+            <span class="price-tooltip price-tooltip--wide" id="gift-help-tooltip" style="left:auto; right:0; bottom:100%; transform:translateY(-6px);">
+              You get 1 free try every day, resetting at 00:00 UTC.
+              <span class="prize-tooltip-icons">
+                <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" style="width:13px;height:13px;">Coins
+                &amp;
+                <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" style="width:11px;height:11px;">Gram
+              </span>
+            </span>
+          </span>
         </div>
         <div class="gift-pick-card__grid">
           <button class="gift-pick-box" data-gift="1">
-            <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/3ffa2eead4190f8d42f414f1e20860a8dd4a4889/frontend/Pick%20A%20Gift%20.svg" alt="Gift" class="gift-pick-box__art">
+            <div class="gift-pick-box__flip">
+              <div class="gift-pick-box__face gift-pick-box__face--front">
+                <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/3ffa2eead4190f8d42f414f1e20860a8dd4a4889/frontend/Pick%20A%20Gift%20.svg" alt="Gift" class="gift-pick-box__art">
+              </div>
+              <div class="gift-pick-box__face gift-pick-box__face--back">
+                <img class="gift-pick-box__prize-icon" src="" alt="">
+                <span class="gift-pick-box__prize-amount"></span>
+              </div>
+            </div>
           </button>
           <button class="gift-pick-box" data-gift="2">
-            <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/3ffa2eead4190f8d42f414f1e20860a8dd4a4889/frontend/Pick%20A%20Gift%20.svg" alt="Gift" class="gift-pick-box__art">
+            <div class="gift-pick-box__flip">
+              <div class="gift-pick-box__face gift-pick-box__face--front">
+                <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/3ffa2eead4190f8d42f414f1e20860a8dd4a4889/frontend/Pick%20A%20Gift%20.svg" alt="Gift" class="gift-pick-box__art">
+              </div>
+              <div class="gift-pick-box__face gift-pick-box__face--back">
+                <img class="gift-pick-box__prize-icon" src="" alt="">
+                <span class="gift-pick-box__prize-amount"></span>
+              </div>
+            </div>
           </button>
           <button class="gift-pick-box" data-gift="3">
-            <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/3ffa2eead4190f8d42f414f1e20860a8dd4a4889/frontend/Pick%20A%20Gift%20.svg" alt="Gift" class="gift-pick-box__art">
+            <div class="gift-pick-box__flip">
+              <div class="gift-pick-box__face gift-pick-box__face--front">
+                <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/3ffa2eead4190f8d42f414f1e20860a8dd4a4889/frontend/Pick%20A%20Gift%20.svg" alt="Gift" class="gift-pick-box__art">
+              </div>
+              <div class="gift-pick-box__face gift-pick-box__face--back">
+                <img class="gift-pick-box__prize-icon" src="" alt="">
+                <span class="gift-pick-box__prize-amount"></span>
+              </div>
+            </div>
           </button>
         </div>
-        <button class="gift-pick-open-btn" id="btn-gift-open">Open&nbsp; 0</button>
+        <button class="gift-pick-open-btn" id="btn-gift-open" onclick="onGiftOpenClick()">Open&nbsp;&nbsp;(1)</button>
       </div>
 
       <!-- /////كود صف Quick Actions///// -->
@@ -4597,6 +4692,14 @@ function fetchUserData(){
       claimed_today: data.user.spin_claimed_today,
       next_reset_utc: data.user.spin_next_reset_utc
     });
+    applyChestState({
+      claimed_today: data.user.chest_claimed_today,
+      next_reset_utc: data.user.chest_next_reset_utc
+    });
+    applyGiftPickState({
+      claimed_today: data.user.giftpick_claimed_today,
+      next_reset_utc: data.user.giftpick_next_reset_utc
+    });
   })
   .catch(function(err){
     console.error('fetchUserData failed:', err);
@@ -4972,6 +5075,163 @@ function onSpinButtonClick(){
   })
   .finally(function(){
     spinBusy = false;
+  });
+}
+
+/* =====================================================================
+   كود بطاقة Chest. نفس جدول جوائز واحتمالات عجلة الحظ، محاولة مجانية
+   واحدة باليوم. لا يوجد صورة "صندوق مفتوح"، فالإحساس بالفتح يأتي من
+   اهتزاز الصندوق + ومضة توهج فقط (CSS)، ثم يظهر توست الجائزة.
+   ===================================================================== */
+var chestState = { claimedToday: false, nextResetUtc: null };
+var chestBusy = false;
+
+function renderChestButton(){
+  var btn = document.getElementById('btn-open-chest');
+  if (!btn) return;
+  btn.innerHTML = chestState.claimedToday ? 'Open Chest&nbsp;&nbsp;(0)' : 'Open Chest&nbsp;&nbsp;(1)';
+  btn.disabled = chestState.claimedToday;
+}
+
+function applyChestState(data){
+  chestState.claimedToday = !!data.claimed_today;
+  chestState.nextResetUtc = data.next_reset_utc || null;
+  renderChestButton();
+}
+
+function onChestOpenClick(){
+  if (chestBusy || chestState.claimedToday) return;
+
+  var initData = getTelegramInitData();
+  if (!initData){
+    alert('Open this app from Telegram to open the chest.');
+    return;
+  }
+
+  chestBusy = true;
+  var btn = document.getElementById('btn-open-chest');
+  if (btn) btn.disabled = true;
+
+  var iconWrap = document.getElementById('chest-icon-wrap');
+  if (iconWrap) iconWrap.classList.add('is-opening');
+
+  fetch('/api/chest/claim', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: initData })
+  })
+  .then(function(res){ return res.json().then(function(data){ return { status: res.status, data: data }; }); })
+  .then(function(result){
+    var data = result.data;
+    setTimeout(function(){ if (iconWrap) iconWrap.classList.remove('is-opening'); }, 650);
+
+    if (data.error){
+      if (data.error === 'already_claimed_today'){
+        applyChestState({ claimed_today: true, next_reset_utc: data.next_reset_utc });
+      } else {
+        console.error('chest claim error:', data.error);
+        if (btn) btn.disabled = false;
+      }
+      return;
+    }
+
+    setTimeout(function(){
+      updateBalanceDisplay({ coins: data.coins, gram: data.gram });
+      applyChestState({ claimed_today: true, next_reset_utc: data.next_reset_utc });
+      showPrizeToast(data.prize_type, data.prize_amount);
+    }, 650); // بعد انتهاء الاهتزاز والومضة تماماً
+  })
+  .catch(function(err){
+    console.error('chest request failed:', err);
+    if (btn) btn.disabled = false;
+  })
+  .finally(function(){
+    chestBusy = false;
+  });
+}
+
+/* =====================================================================
+   كود بطاقة Pick 1 Of The 3 Gifts. نفس جدول جوائز واحتمالات عجلة الحظ،
+   محاولة مجانية واحدة باليوم. اختيار الهدية شكلي بالكامل (لا يؤثر على
+   النتيجة، السيرفر يقرر الجائزة بغض النظر عن أي صندوق اختاره المستخدم) —
+   الهدية المختارة "تنقلب" لتكشف الجائزة، والأخريان تتلاشيان.
+   ===================================================================== */
+var giftPickState = { claimedToday: false, nextResetUtc: null };
+var giftPickBusy = false;
+
+function renderGiftOpenButton(){
+  var btn = document.getElementById('btn-gift-open');
+  if (!btn) return;
+  btn.innerHTML = giftPickState.claimedToday ? 'Open&nbsp;&nbsp;(0)' : 'Open&nbsp;&nbsp;(1)';
+  btn.disabled = giftPickState.claimedToday;
+}
+
+function applyGiftPickState(data){
+  giftPickState.claimedToday = !!data.claimed_today;
+  giftPickState.nextResetUtc = data.next_reset_utc || null;
+  renderGiftOpenButton();
+}
+
+function onGiftOpenClick(){
+  if (giftPickBusy || giftPickState.claimedToday) return;
+
+  var selectedBox = document.querySelector('.gift-pick-box.is-selected');
+  if (!selectedBox){
+    alert('Pick one of the 3 gifts first.');
+    return;
+  }
+
+  var initData = getTelegramInitData();
+  if (!initData){
+    alert('Open this app from Telegram to open a gift.');
+    return;
+  }
+
+  giftPickBusy = true;
+  var btn = document.getElementById('btn-gift-open');
+  if (btn) btn.disabled = true;
+
+  fetch('/api/giftpick/claim', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: initData })
+  })
+  .then(function(res){ return res.json().then(function(data){ return { status: res.status, data: data }; }); })
+  .then(function(result){
+    var data = result.data;
+    if (data.error){
+      if (data.error === 'already_claimed_today'){
+        applyGiftPickState({ claimed_today: true, next_reset_utc: data.next_reset_utc });
+      } else {
+        console.error('gift pick claim error:', data.error);
+        if (btn) btn.disabled = false;
+      }
+      return;
+    }
+
+    document.querySelectorAll('.gift-pick-box').forEach(function(box){
+      if (box !== selectedBox) box.classList.add('is-fading');
+    });
+
+    var iconEl = selectedBox.querySelector('.gift-pick-box__prize-icon');
+    var amountEl = selectedBox.querySelector('.gift-pick-box__prize-amount');
+    if (iconEl) iconEl.src = PRIZE_ICON_URLS[data.prize_type] || PRIZE_ICON_URLS.coins;
+    if (amountEl) amountEl.textContent = data.prize_amount + (data.prize_type === 'gram' ? ' Gram' : '');
+
+    selectedBox.classList.add('is-revealed');
+
+    setTimeout(function(){
+      updateBalanceDisplay({ coins: data.coins, gram: data.gram });
+      applyGiftPickState({ claimed_today: true, next_reset_utc: data.next_reset_utc });
+      showPrizeToast(data.prize_type, data.prize_amount);
+    }, 700); // بعد انتهاء أنيميشن القلب تماماً
+  })
+  .catch(function(err){
+    console.error('gift pick request failed:', err);
+    if (btn) btn.disabled = false;
+  })
+  .finally(function(){
+    giftPickBusy = false;
   });
 }
 
