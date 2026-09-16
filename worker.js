@@ -511,7 +511,10 @@ async function handleDuckUpgrade(request, env) {
   const { telegramId } = auth;
 
   const pet = await env.DB.prepare(
-    "SELECT level, current_speed FROM user_pets WHERE telegram_id = ? AND pet_id = ?"
+    `SELECT p.level, p.current_speed, s.capacity_hours, s.last_claim_at
+     FROM user_pets p
+     LEFT JOIN user_storage s ON s.telegram_id = p.telegram_id
+     WHERE p.telegram_id = ? AND p.pet_id = ?`
   ).bind(telegramId, DUCK_PET_ID).first();
   if (!pet) return jsonResponse({ error: "not_owned" }, 400);
 
@@ -523,14 +526,26 @@ async function handleDuckUpgrade(request, env) {
   const newSpeed = duckSpeedForLevel(newLevel);
   const speedDelta = newSpeed - pet.current_speed;
 
+  // نُصفّي (checkpoint) ما تراكم في Storage بالسرعة القديمة *قبل* رفع
+  // السرعة — وإلا فإن كل الوقت المنقضي منذ آخر Claim سيُحتسب لاحقاً
+  // بالسرعة الجديدة الأعلى، فتقفز قيمة Storage فجأة بشكل غير صحيح.
+  const capacitySeconds = (pet.capacity_hours || STORAGE_DEFAULT_CAPACITY_HOURS) * 3600;
+  let preUpgradeAccrued = 0;
+  if (pet.last_claim_at) {
+    const elapsedSeconds = Math.max(0, (Date.now() - Date.parse(pet.last_claim_at)) / 1000);
+    preUpgradeAccrued = Math.min(elapsedSeconds, capacitySeconds) * (pet.current_speed / 3600);
+  }
+
   const deductResult = await env.DB.prepare(
-    `UPDATE users SET coins = coins - ?, total_speed = total_speed + ?
+    `UPDATE users SET coins = coins - ? + ?, total_speed = total_speed + ?
      WHERE telegram_id = ? AND coins >= ?`
-  ).bind(DUCK_UPGRADE_COST_COINS, speedDelta, telegramId, DUCK_UPGRADE_COST_COINS).run();
+  ).bind(DUCK_UPGRADE_COST_COINS, preUpgradeAccrued, speedDelta, telegramId, DUCK_UPGRADE_COST_COINS).run();
 
   if (!deductResult.meta || deductResult.meta.changes === 0) {
     return jsonResponse({ error: "insufficient_funds" }, 400);
   }
+
+  const nowIso = new Date().toISOString();
 
   // شرط "level = المستوى القديم" يمنع تطبيق ترقيتين متزامنتين على نفس الشخصية
   const updatePetStmt = env.DB.prepare(
@@ -538,17 +553,29 @@ async function handleDuckUpgrade(request, env) {
      WHERE telegram_id = ? AND pet_id = ? AND level = ?`
   ).bind(newLevel, newSpeed, telegramId, DUCK_PET_ID, pet.level);
 
+  // تصفير نقطة بداية التراكم الآن — السرعة الجديدة تُحسب من هذه اللحظة فقط
+  const resetStorageStmt = env.DB.prepare(
+    "UPDATE user_storage SET last_claim_at = ? WHERE telegram_id = ?"
+  ).bind(nowIso, telegramId);
+
   const txnStmt = env.DB.prepare(
     "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'pet_upgrade', ?, 'coins')"
   ).bind(telegramId, -DUCK_UPGRADE_COST_COINS);
 
-  const [updatePetResult] = await env.DB.batch([updatePetStmt, txnStmt]);
+  const stmts = [updatePetStmt, resetStorageStmt, txnStmt];
+  if (preUpgradeAccrued > 0) {
+    stmts.push(env.DB.prepare(
+      "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'storage_auto_collect', ?, 'coins')"
+    ).bind(telegramId, preUpgradeAccrued));
+  }
+
+  const [updatePetResult] = await env.DB.batch(stmts);
 
   if (!updatePetResult.meta || updatePetResult.meta.changes === 0) {
-    // نادر: طلب ترقية متزامن سبقه — نُرجع العملات والسرعة المخصومة
+    // نادر: طلب ترقية متزامن سبقه — نُرجع العملات (بما فيها ما صُفِّي من Storage) والسرعة
     await env.DB.prepare(
-      "UPDATE users SET coins = coins + ?, total_speed = total_speed - ? WHERE telegram_id = ?"
-    ).bind(DUCK_UPGRADE_COST_COINS, speedDelta, telegramId).run();
+      "UPDATE users SET coins = coins + ? - ?, total_speed = total_speed - ? WHERE telegram_id = ?"
+    ).bind(DUCK_UPGRADE_COST_COINS, preUpgradeAccrued, speedDelta, telegramId).run();
     return jsonResponse({ error: "level_changed" }, 409);
   }
 
@@ -561,6 +588,7 @@ async function handleDuckUpgrade(request, env) {
     speed: newSpeed,
     total_speed: updatedUser.total_speed,
     coins: updatedUser.coins,
+    storage_credited: preUpgradeAccrued,
     is_max_level: newLevel >= DUCK_MAX_LEVEL
   });
 }
