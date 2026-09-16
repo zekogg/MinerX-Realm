@@ -607,12 +607,11 @@ img,svg{ display:block; }
 }
 .btn-primary:active{ transform:scale(.97); }
 .btn-primary.is-mining{
-  border-color:rgba(74,158,255,.6);
-  background:
-    radial-gradient(120% 140% at 50% 20%, rgba(74,158,255,.22), transparent 60%),
-    linear-gradient(160deg, #1d4ed8, #12276b);
-  box-shadow:0 0 16px -2px rgba(74,158,255,.5), inset 0 0 10px rgba(74,158,255,.12);
-  text-shadow:0 0 8px rgba(74,158,255,.45);
+  border-color:rgba(74,158,255,.55);
+  background:linear-gradient(155deg, rgba(74,158,255,.4), rgba(33,211,237,.2), rgba(74,158,255,.32));
+  box-shadow:0 0 16px -2px rgba(74,158,255,.5), inset 0 1px 0 rgba(255,255,255,.2);
+  color:#eaf4ff;
+  text-shadow:none;
 }
 /* -- حالة "Claim Reward": نفس أسلوب تدرج أزرار Upgrade (rgba شفاف) لكن بلون أخضر مائي -- */
 .btn-primary.is-claim-ready{
@@ -1317,6 +1316,11 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   background:linear-gradient(135deg, var(--c-btn-deposit-1), var(--c-btn-deposit-2));
   color:var(--c-btn-deposit-text); font-weight:800; font-size:12px;
 }
+/* -- أحمر شفاف خفيف أثناء امتلاء التخزين، يرجع لنفس الأخضر الحالي عند الاكتمال -- */
+.storage-card__claim.is-charging{
+  background:linear-gradient(135deg, rgba(217,99,79,.32), rgba(156,62,47,.26));
+  color:#ffd9d3; border:1px solid rgba(217,99,79,.45); box-shadow:none;
+}
 
 .pet-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:start; }
 .pet-slot{
@@ -1796,6 +1800,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   box-shadow:0 0 8px rgba(74,158,255,.3), inset 0 1px 0 rgba(255,255,255,.2);
 }
 .pet-card__upgrade-btn svg{ width:12px; height:12px; flex-shrink:0; }
+.pet-card__upgrade-btn:disabled{ opacity:.4; pointer-events:none; }
 .pet-card__btn{
   width:48%; padding:6px; border-radius:9px;   /* صُغّر 20% إضافية من اليمين واليسار (كان 60%) */
   background:linear-gradient(155deg, rgba(74,222,128,.92), rgba(34,197,94,.88) 45%, rgba(21,128,61,.92));   /* أخضر يناسب ندرة Common */
@@ -1807,10 +1812,11 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 }
 .pet-card__btn svg{ width:11px; height:11px; }
 .pet-card__btn.is-success{
-  background:rgba(255,255,255,.06);
-  border-color:rgba(255,255,255,.14);
+  background:var(--c-streakcard-claim-bg);
+  border-color:rgba(111,191,115,.4);
+  color:var(--c-streakcard-claim-text);
   box-shadow:none;
-  opacity:.55;
+  opacity:1;
 }
 .pet-card__btn-check{ width:17px; height:17px; }
 
@@ -2697,7 +2703,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         </div>
         <div class="topbar-coin-card__text">
           <span class="topbar-coin-card__num" id="display-coins-topbar">00</span>
-          <div class="topbar-coin-card__gram">≈ $0,000 Gram</div>
+          <div class="topbar-coin-card__gram" id="display-gram-equiv-topbar">≈ $0.0000 Gram</div>
         </div>
       </div>
 
@@ -3397,7 +3403,10 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
             <div class="wallet-icon-wrap">
               <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:42px;height:42px;">
             </div>
-            <span class="wb-num" id="display-coins-wallet">0,000</span>
+            <span class="wb-num" id="display-coins-wallet" style="position:relative; cursor:pointer;" onclick="togglePriceTooltip('wallet-coins-exact-tooltip')">
+              <span id="display-coins-wallet-text">0</span>
+              <span class="price-tooltip" id="wallet-coins-exact-tooltip">0 Coins</span>
+            </span>
             <span class="wb-label">Coins</span>
           </div>
           <div class="wallet-balances__item">
@@ -3439,19 +3448,19 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
       </div>
 
       <div class="card storage-card">
-        <span class="realm-label realm-label--nav-gold">Total Speed (+000 Coins / hr)</span>
+        <span class="realm-label realm-label--nav-gold" id="total-speed-badge">Total Speed (+0 Coins / hr)</span>
         <div class="storage-card__icon">
           <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:34px;height:34px;flex-shrink:0;">
         </div>
         <div class="storage-card__info">
           <div class="storage-card__label">Storage</div>
           <div class="storage-card__val" id="display-storage-val">0.00000</div>
-          <div class="storage-card__timer">Full in 06:00:00</div>
+          <div class="storage-card__timer" id="storage-timer" style="display:none;">Full in 06:00:00</div>
         </div>
         <button class="storage-card__boost" aria-label="Boost" onclick="openStorageUpgradeModal()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/><path d="M6 20l6-6 6 6"/></svg>
         </button>
-        <button class="storage-card__claim">Claim</button>
+        <button class="storage-card__claim" id="storage-claim-btn" onclick="onStorageClaimClick()">Claim</button>
       </div>
 
       <div class="pet-grid">
@@ -3491,7 +3500,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         <div class="pet-card-wrap" style="position:relative;">
           <span class="realm-label realm-label--shine"><span>The Duck</span></span>
           <div class="pet-card" id="pet-card-duck">
-            <span class="pet-card__lv">Lv.0</span>
+            <span class="pet-card__lv" id="duck-lv-badge">Lv.0</span>
             <span class="pet-card__rarity">Common</span>
             <div class="pet-card__art-wrap" onclick="tiltPetImage(event, this)">
               <img class="pet-card__art" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Duck%20Hero%20.webp" alt="Duck Hero">
@@ -3501,7 +3510,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
             <div class="pet-info-card__row">
               <div class="pet-card__rate">
                 <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
-                <span>+114/hr</span>
+                <span id="duck-rate-text">+114/hr</span>
               </div>
               <span class="pet-info-card__divider"></span>
               <div class="pet-card__price" id="pet-card-price" onclick="togglePriceTooltip('price-tooltip')">
@@ -3511,11 +3520,11 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
               </div>
             </div>
             <div class="pet-info-card__actions">
-              <button class="pet-card__upgrade-btn" onclick="openUpgradeDuckModal()">
+              <button class="pet-card__upgrade-btn" id="duck-upgrade-btn" onclick="openUpgradeDuckModal()" disabled>
                 <span>Upgrade</span>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/><path d="M6 20l6-6 6 6"/></svg>
               </button>
-              <button class="pet-card__btn" id="pet-card-btn" onclick="showBuySuccessDuck(this)">Buy</button>
+              <button class="pet-card__btn" id="pet-card-btn" onclick="onDuckBuyClick(this)">Buy</button>
             </div>
           </div>
         </div>
@@ -3878,6 +3887,8 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         <button class="modal-close" onclick="closeModal('modal-upgrade-storage')">✕</button>
       </div>
 
+      <div class="upgrade-level-badge">Lv.1 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg> Lv.2</div>
+
       <div class="upgrade-speed-row">
         <div class="upgrade-speed-box">
           <span class="upgrade-speed-box__label">Current Duration</span>
@@ -3917,17 +3928,17 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         <button class="modal-close" onclick="closeModal('modal-upgrade-duck')">✕</button>
       </div>
 
-      <div class="upgrade-level-badge">Lv.1 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg> Lv.2</div>
+      <div class="upgrade-level-badge">Lv.<span id="duck-upgrade-lv-current">1</span> <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg> Lv.<span id="duck-upgrade-lv-new">2</span></div>
 
       <div class="upgrade-speed-row">
         <div class="upgrade-speed-box">
           <span class="upgrade-speed-box__label">Current Speed</span>
-          <span class="upgrade-speed-box__val">114/hr</span>
+          <span class="upgrade-speed-box__val" id="duck-upgrade-speed-current">114/hr</span>
         </div>
         <svg class="upgrade-speed-arrow" viewBox="0 0 24 24" fill="none" stroke="#f0d878" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
         <div class="upgrade-speed-box upgrade-speed-box--new">
           <span class="upgrade-speed-box__label">New Speed</span>
-          <span class="upgrade-speed-box__val">125/hr</span>
+          <span class="upgrade-speed-box__val" id="duck-upgrade-speed-new">125/hr</span>
         </div>
       </div>
 
@@ -3941,7 +3952,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         </span>
       </div>
 
-      <button class="upgrade-confirm-btn" onclick="closeModal('modal-upgrade-duck')">Confirm Upgrade</button>
+      <button class="upgrade-confirm-btn" id="duck-upgrade-confirm-btn" onclick="onDuckUpgradeConfirm()">Confirm Upgrade</button>
     </div>
   </div>
 
@@ -4641,10 +4652,31 @@ function getTelegramInitData(){
   return '';
 }
 
+// سعر صرف Coins <-> Gram الافتراضي (يُستبدل بالقيمة الحقيقية القادمة من
+// /api/user فور توفرها — يبقى هذا فقط احتياطياً قبل أول تحميل).
+var EXCHANGE_RATE_COIN_TO_GRAM = 0.00001;
+
+// تنسيق أرقام Coins الكبيرة في صفحة Wallet بصيغة مختصرة (1 K, 1.1 K, 10 K, 1 M...)
+function formatCoinsK(value){
+  value = Number(value) || 0;
+  if (value < 1000) return Math.floor(value).toLocaleString('en-US');
+
+  var isMillion = value >= 1000000;
+  var divisor = isMillion ? 1000000 : 1000;
+  var unit = isMillion ? 'M' : 'K';
+  var scaled = Math.floor((value / divisor) * 10) / 10; // درجة عشرية واحدة فقط، بدون تقريب للأعلى
+  var text = (scaled % 1 === 0) ? scaled.toFixed(0) : scaled.toFixed(1);
+  return text + ' ' + unit;
+}
+
 function updateBalanceDisplay(u){
   var coinsWhole = Number(u.coins).toLocaleString('en-US', { maximumFractionDigits: 0 });
   var gramText = Number(u.gram).toFixed(2);
   var gramWhole = Number(u.gram).toLocaleString('en-US', { maximumFractionDigits: 0 });
+
+  if (typeof u.exchange_rate_coin_to_gram === 'number'){
+    EXCHANGE_RATE_COIN_TO_GRAM = u.exchange_rate_coin_to_gram;
+  }
 
   var elTopbarCoins = document.getElementById('display-coins-topbar');
   if (elTopbarCoins) elTopbarCoins.textContent = coinsWhole;
@@ -4652,8 +4684,17 @@ function updateBalanceDisplay(u){
   var elTopbarGram = document.getElementById('display-gram-topbar');
   if (elTopbarGram) elTopbarGram.textContent = gramText;
 
-  var elWalletCoins = document.getElementById('display-coins-wallet');
-  if (elWalletCoins) elWalletCoins.textContent = coinsWhole;
+  var elGramEquiv = document.getElementById('display-gram-equiv-topbar');
+  if (elGramEquiv){
+    var gramEquiv = Number(u.coins) * EXCHANGE_RATE_COIN_TO_GRAM;
+    elGramEquiv.textContent = '≈ $' + gramEquiv.toFixed(4) + ' Gram';
+  }
+
+  var elWalletCoinsText = document.getElementById('display-coins-wallet-text');
+  if (elWalletCoinsText) elWalletCoinsText.textContent = formatCoinsK(u.coins);
+
+  var elWalletCoinsTooltip = document.getElementById('wallet-coins-exact-tooltip');
+  if (elWalletCoinsTooltip) elWalletCoinsTooltip.textContent = coinsWhole + ' Coins';
 
   var elWalletGram = document.getElementById('display-gram-wallet');
   if (elWalletGram) elWalletGram.textContent = gramWhole;
@@ -4701,6 +4742,17 @@ function fetchUserData(){
     applyGiftPickState({
       claimed_today: data.user.giftpick_claimed_today,
       next_reset_utc: data.user.giftpick_next_reset_utc
+    });
+    applyDuckState({
+      duck_level: data.user.duck_level,
+      duck_speed: data.user.duck_speed
+    });
+    applyStorageState({
+      storage_has_pet: data.user.storage_has_pet,
+      total_speed: data.user.total_speed,
+      storage_capacity_seconds: data.user.storage_capacity_seconds,
+      storage_remaining_seconds: data.user.storage_remaining_seconds,
+      storage_min_claim: data.user.storage_min_claim
     });
   })
   .catch(function(err){
@@ -4839,6 +4891,7 @@ function onMiningButtonClick(){
       if (typeof data.coins === 'number'){
         var gramEl = document.getElementById('display-gram-wallet');
         updateBalanceDisplay({ coins: data.coins, gram: gramEl ? Number(gramEl.textContent) : 0, total_mined: data.total_mined });
+        showPrizeToast('coins', data.reward);
       }
       applyMiningState({ mining_started_at: null, cycles_today: data.cycles_today, cycles_max: data.cycles_max, cycle_duration_seconds: miningState.cycleDurationSec });
     } else {
@@ -4976,20 +5029,52 @@ var PRIZE_ICON_URLS = {
 };
 var prizeToastTimer = null;
 
-function showPrizeToast(type, amount){
+// توست عام قابل لإعادة الاستخدام لأي رسالة لحظية (جائزة، شراء، ترقية،
+// أو تنبيه) — نفس البطاقة المرئية، فقط العنوان والأيقونة والنص يتغيّرون.
+function showAppToast(opts){
   var toast = document.getElementById('prize-toast');
   if (!toast) return;
 
   var icon = document.getElementById('prize-toast-icon');
   var amountEl = document.getElementById('prize-toast-amount');
-  if (icon) icon.src = PRIZE_ICON_URLS[type] || PRIZE_ICON_URLS.coins;
-  if (amountEl) amountEl.textContent = '+' + amount + (type === 'gram' ? ' Gram' : ' Coins');
+  var titleEl = toast.querySelector('.prize-toast__title');
+  if (icon && opts.icon) icon.src = opts.icon;
+  if (titleEl) titleEl.textContent = opts.title || 'You Won!';
+  if (amountEl) amountEl.textContent = opts.amount || '';
 
   toast.classList.add('is-visible');
   clearTimeout(prizeToastTimer);
   prizeToastTimer = setTimeout(function(){
     toast.classList.remove('is-visible');
   }, 4000);
+}
+
+function showPrizeToast(type, amount){
+  showAppToast({
+    title: 'You Won!',
+    icon: PRIZE_ICON_URLS[type] || PRIZE_ICON_URLS.coins,
+    amount: '+' + amount + (type === 'gram' ? ' Gram' : ' Coins')
+  });
+}
+
+function showMinClaimToast(minimum){
+  showAppToast({
+    title: 'Minimum Claim',
+    icon: PRIZE_ICON_URLS.coins,
+    amount: minimum + ' Coins Required'
+  });
+}
+
+function showBuyErrorToast(message){
+  showAppToast({ title: 'Cannot Buy', icon: PRIZE_ICON_URLS.coins, amount: message });
+}
+
+function showPurchaseToast(name, level){
+  showAppToast({ title: 'Purchased!', icon: PRIZE_ICON_URLS.coins, amount: name + ' — ' + level });
+}
+
+function showUpgradeToast(name, level){
+  showAppToast({ title: 'Upgraded!', icon: PRIZE_ICON_URLS.coins, amount: name + ' → ' + level });
 }
 
 /* =====================================================================
@@ -5237,6 +5322,259 @@ function onGiftOpenClick(){
   });
 }
 
+/* =====================================================================
+   كود شخصية The Duck + Storage. كل الاقتصاد (الأسعار، السرعات، التراكم)
+   يُحسب ويُتحقق منه في السيرفر فقط؛ هذا الكود يعرض الحالة القادمة منه
+   ويستدعي /api/duck/buy، /api/duck/upgrade، و/api/storage/claim.
+   ===================================================================== */
+var DUCK_BASE_SPEED = 114;   // سرعة Lv.1 عند الشراء (Coins/hr)
+var DUCK_MAX_LEVEL = 30;     // للعرض فقط — نفس الحد الأقصى المطبَّق بالسيرفر
+
+var duckState = { level: 0, speed: 0 };
+var duckBuyBusy = false;
+var duckUpgradeBusy = false;
+
+// نفس صيغة السيرفر بالضبط: كل مستوى يضيف 10% من السرعة الأساسية (ثابتة،
+// وليست من السرعة المحدَّثة) — نُعيد حسابها هنا فقط لعرض معاينة صحيحة
+// داخل نافذة الترقية قبل إرسال الطلب.
+function duckSpeedForLevel(level){
+  return DUCK_BASE_SPEED + (level - 1) * (DUCK_BASE_SPEED * 0.10);
+}
+
+function renderDuckCard(){
+  var lvBadge = document.getElementById('duck-lv-badge');
+  if (lvBadge) lvBadge.textContent = 'Lv.' + duckState.level;
+
+  var rateText = document.getElementById('duck-rate-text');
+  if (rateText) rateText.textContent = '+' + Math.round(duckState.speed) + '/hr';
+
+  var upgradeBtn = document.getElementById('duck-upgrade-btn');
+  if (upgradeBtn) upgradeBtn.disabled = duckState.level <= 0 || duckState.level >= DUCK_MAX_LEVEL;
+
+  var buyBtn = document.getElementById('pet-card-btn');
+  if (buyBtn && duckState.level > 0 && !buyBtn.classList.contains('is-success')){
+    buyBtn.textContent = 'Owned';
+    buyBtn.disabled = true;
+  }
+}
+
+function applyDuckState(data){
+  duckState.level = data.duck_level || 0;
+  duckState.speed = data.duck_speed || 0;
+  renderDuckCard();
+}
+
+function onDuckBuyClick(btn){
+  if (duckBuyBusy || duckState.level > 0) return;
+
+  var initData = getTelegramInitData();
+  if (!initData){
+    alert('Open this app from Telegram to buy pets.');
+    return;
+  }
+
+  duckBuyBusy = true;
+  fetch('/api/duck/buy', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: initData })
+  })
+  .then(function(res){ return res.json().then(function(data){ return { status: res.status, data: data }; }); })
+  .then(function(result){
+    var data = result.data;
+    if (data.error){
+      if (data.error === 'insufficient_funds'){
+        showBuyErrorToast('Not enough Coins');
+      } else if (data.error === 'already_owned'){
+        fetchUserData();
+      } else {
+        console.error('duck buy error:', data.error);
+      }
+      return;
+    }
+
+    applyDuckState({ duck_level: data.level, duck_speed: data.speed });
+    var gramEl = document.getElementById('display-gram-wallet');
+    updateBalanceDisplay({ coins: data.coins, gram: gramEl ? Number(gramEl.textContent) : 0 });
+    applyStorageState({
+      storage_has_pet: true,
+      total_speed: data.total_speed,
+      storage_capacity_seconds: storageState.capacitySeconds,
+      storage_remaining_seconds: storageState.capacitySeconds, // تخزين جديد يبدأ ممتلئاً من الصفر عند أول شراء
+      storage_min_claim: storageState.minClaim
+    });
+    showBuySuccessDuck(btn);
+    showPurchaseToast('The Duck', 'Lv.1');
+  })
+  .catch(function(err){
+    console.error('duck buy request failed:', err);
+  })
+  .finally(function(){
+    duckBuyBusy = false;
+  });
+}
+
+function onDuckUpgradeConfirm(){
+  if (duckUpgradeBusy) return;
+
+  var initData = getTelegramInitData();
+  if (!initData){
+    alert('Open this app from Telegram to upgrade pets.');
+    return;
+  }
+
+  duckUpgradeBusy = true;
+  fetch('/api/duck/upgrade', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: initData })
+  })
+  .then(function(res){ return res.json().then(function(data){ return { status: res.status, data: data }; }); })
+  .then(function(result){
+    var data = result.data;
+    if (data.error){
+      if (data.error === 'insufficient_funds'){
+        showBuyErrorToast('Not enough Coins');
+      } else if (data.error === 'max_level_reached' || data.error === 'not_owned' || data.error === 'level_changed'){
+        fetchUserData();
+      } else {
+        console.error('duck upgrade error:', data.error);
+      }
+      return;
+    }
+
+    closeModal('modal-upgrade-duck');
+    applyDuckState({ duck_level: data.level, duck_speed: data.speed });
+    var gramEl = document.getElementById('display-gram-wallet');
+    updateBalanceDisplay({ coins: data.coins, gram: gramEl ? Number(gramEl.textContent) : 0 });
+    storageState.totalSpeed = data.total_speed;
+    renderTotalSpeedBadge();
+    showUpgradeToast('The Duck', 'Lv.' + data.level);
+  })
+  .catch(function(err){
+    console.error('duck upgrade request failed:', err);
+  })
+  .finally(function(){
+    duckUpgradeBusy = false;
+  });
+}
+
+/* -- Storage: تراكم يبدأ عند شراء أول شخصية، يمتلئ خلال ساعات السعة
+      المحدَّدة (6 افتراضياً)، ثم ينتظر Claim. العداد المعروض محلي فقط
+      للعرض الحي؛ المبلغ الفعلي يُحسب ويُتحقق منه بالكامل في السيرفر
+      عند الضغط على Claim. -- */
+var storageState = {
+  hasPet: false,
+  totalSpeed: 0,
+  capacitySeconds: 6 * 3600,
+  minClaim: 10,
+  elapsedAtSync: 0,
+  syncedAtMs: Date.now()
+};
+var storageTickTimer = null;
+var storageClaimBusy = false;
+
+function renderTotalSpeedBadge(){
+  var badge = document.getElementById('total-speed-badge');
+  if (badge) badge.textContent = 'Total Speed (+' + Math.round(storageState.totalSpeed) + ' Coins / hr)';
+}
+
+function applyStorageState(data){
+  storageState.hasPet = !!data.storage_has_pet;
+  storageState.totalSpeed = data.total_speed || 0;
+  storageState.capacitySeconds = data.storage_capacity_seconds || (6 * 3600);
+  storageState.minClaim = data.storage_min_claim || 10;
+  var remainingSeconds = (data.storage_remaining_seconds != null) ? data.storage_remaining_seconds : storageState.capacitySeconds;
+  storageState.elapsedAtSync = Math.max(0, storageState.capacitySeconds - remainingSeconds);
+  storageState.syncedAtMs = Date.now();
+
+  renderTotalSpeedBadge();
+  clearInterval(storageTickTimer);
+  storageTick();
+  if (storageState.hasPet){
+    storageTickTimer = setInterval(storageTick, 1000);
+  }
+}
+
+function storageTick(){
+  var timerEl = document.getElementById('storage-timer');
+  var claimBtn = document.getElementById('storage-claim-btn');
+  var valEl = document.getElementById('display-storage-val');
+  if (!timerEl || !claimBtn || !valEl) return;
+
+  if (!storageState.hasPet){
+    timerEl.style.display = 'none';
+    valEl.textContent = '0.00000';
+    claimBtn.classList.remove('is-charging');
+    return;
+  }
+
+  timerEl.style.display = '';
+  var elapsedSinceSync = (Date.now() - storageState.syncedAtMs) / 1000;
+  var elapsedNow = Math.min(storageState.capacitySeconds, storageState.elapsedAtSync + elapsedSinceSync);
+  var perSecondRate = storageState.totalSpeed / 3600;
+  var accruedNow = elapsedNow * perSecondRate;
+  valEl.textContent = accruedNow.toFixed(5);
+
+  var remainingSeconds = storageState.capacitySeconds - elapsedNow;
+  if (remainingSeconds <= 0){
+    timerEl.textContent = 'Full';
+    claimBtn.classList.remove('is-charging');
+  } else {
+    var hh = String(Math.floor(remainingSeconds / 3600)).padStart(2, '0');
+    var mm = String(Math.floor((remainingSeconds % 3600) / 60)).padStart(2, '0');
+    var ss = String(Math.floor(remainingSeconds % 60)).padStart(2, '0');
+    timerEl.textContent = 'Full in ' + hh + ':' + mm + ':' + ss;
+    claimBtn.classList.add('is-charging');
+  }
+}
+
+function onStorageClaimClick(){
+  if (storageClaimBusy || !storageState.hasPet) return;
+
+  var initData = getTelegramInitData();
+  if (!initData){
+    alert('Open this app from Telegram to claim storage.');
+    return;
+  }
+
+  storageClaimBusy = true;
+  fetch('/api/storage/claim', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: initData })
+  })
+  .then(function(res){ return res.json().then(function(data){ return { status: res.status, data: data }; }); })
+  .then(function(result){
+    var data = result.data;
+    if (data.error){
+      if (data.error === 'below_minimum_claim'){
+        showMinClaimToast(data.minimum);
+      } else {
+        console.error('storage claim error:', data.error);
+      }
+      return;
+    }
+
+    var gramEl = document.getElementById('display-gram-wallet');
+    updateBalanceDisplay({ coins: data.coins, gram: gramEl ? Number(gramEl.textContent) : 0 });
+    showPrizeToast('coins', Math.round(data.claimed_amount * 100) / 100);
+    applyStorageState({
+      storage_has_pet: true,
+      total_speed: storageState.totalSpeed,
+      storage_capacity_seconds: data.capacity_seconds || storageState.capacitySeconds,
+      storage_remaining_seconds: data.capacity_seconds || storageState.capacitySeconds,
+      storage_min_claim: storageState.minClaim
+    });
+  })
+  .catch(function(err){
+    console.error('storage claim request failed:', err);
+  })
+  .finally(function(){
+    storageClaimBusy = false;
+  });
+}
+
 fetchUserData();
 
 /* /////كود التنقل بين الصفحات (JavaScript)///// */
@@ -5342,6 +5680,20 @@ function openWithdrawReqModal(){
 }
 
 function openUpgradeDuckModal(){
+  if (duckState.level <= 0 || duckState.level >= DUCK_MAX_LEVEL) return;
+
+  var newLevel = duckState.level + 1;
+  var newSpeed = duckSpeedForLevel(newLevel);
+
+  var lvCurrent = document.getElementById('duck-upgrade-lv-current');
+  var lvNew = document.getElementById('duck-upgrade-lv-new');
+  var speedCurrent = document.getElementById('duck-upgrade-speed-current');
+  var speedNew = document.getElementById('duck-upgrade-speed-new');
+  if (lvCurrent) lvCurrent.textContent = duckState.level;
+  if (lvNew) lvNew.textContent = newLevel;
+  if (speedCurrent) speedCurrent.textContent = Math.round(duckState.speed) + '/hr';
+  if (speedNew) speedNew.textContent = Math.round(newSpeed) + '/hr';
+
   openModal('modal-upgrade-duck');
 }
 
@@ -5374,14 +5726,17 @@ function claimMilestone(btn){
 }
 
 /* -- تأثير مؤقت 4 ثواني عند شراء The Duck: علامة صح + تغيير شكل الزر -- */
+// تُستدعى بعد نجاح شراء The Duck فعلياً من السيرفر (وليس عند مجرد الضغط):
+// علامة صح مؤقتة 4 ثوانٍ، ثم يبقى الزر "Owned" ومعطّلاً دائماً (الشخصية
+// مملوكة بالفعل ولا يمكن إعادة شرائها).
 function showBuySuccessDuck(btn){
   if (btn.classList.contains('is-success')) return;
-  var originalText = btn.textContent;
   btn.classList.add('is-success');
+  btn.disabled = true;
   btn.innerHTML = '<svg class="pet-card__btn-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
   setTimeout(function(){
     btn.classList.remove('is-success');
-    btn.textContent = originalText;
+    btn.textContent = 'Owned';
   }, 4000);
 }
 
