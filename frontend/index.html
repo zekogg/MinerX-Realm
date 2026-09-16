@@ -3896,17 +3896,17 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         <button class="modal-close" onclick="closeModal('modal-upgrade-storage')">✕</button>
       </div>
 
-      <div class="upgrade-level-badge">Lv.1 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg> Lv.2</div>
+      <div class="upgrade-level-badge">Lv.<span id="storage-upgrade-lv-current">1</span> <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg> Lv.<span id="storage-upgrade-lv-new">2</span></div>
 
       <div class="upgrade-speed-row">
         <div class="upgrade-speed-box">
           <span class="upgrade-speed-box__label">Current Duration</span>
-          <span class="upgrade-speed-box__val">6 Hours</span>
+          <span class="upgrade-speed-box__val" id="storage-upgrade-duration-current">6 Hours</span>
         </div>
         <svg class="upgrade-speed-arrow" viewBox="0 0 24 24" fill="none" stroke="#f0d878" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
         <div class="upgrade-speed-box upgrade-speed-box--new">
           <span class="upgrade-speed-box__label">New Duration</span>
-          <span class="upgrade-speed-box__val">8 Hours</span>
+          <span class="upgrade-speed-box__val" id="storage-upgrade-duration-new">8 Hours</span>
         </div>
       </div>
 
@@ -3920,7 +3920,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         </span>
       </div>
 
-      <button class="upgrade-confirm-btn" onclick="closeModal('modal-upgrade-storage')">Confirm Upgrade</button>
+      <button class="upgrade-confirm-btn" id="storage-upgrade-confirm-btn" onclick="onStorageUpgradeConfirm()">Confirm Upgrade</button>
     </div>
   </div>
 
@@ -4759,6 +4759,7 @@ function fetchUserData(){
     applyStorageState({
       storage_has_pet: data.user.storage_has_pet,
       total_speed: data.user.total_speed,
+      storage_level: data.user.storage_level,
       storage_capacity_seconds: data.user.storage_capacity_seconds,
       storage_remaining_seconds: data.user.storage_remaining_seconds,
       storage_min_claim: data.user.storage_min_claim
@@ -5044,10 +5045,17 @@ function showAppToast(opts){
   var toast = document.getElementById('prize-toast');
   if (!toast) return;
 
+  var iconWrap = toast.querySelector('.prize-toast__icon-wrap');
   var icon = document.getElementById('prize-toast-icon');
   var amountEl = document.getElementById('prize-toast-amount');
   var titleEl = toast.querySelector('.prize-toast__title');
-  if (icon && opts.icon) icon.src = opts.icon;
+
+  if (opts.icon){
+    if (icon) icon.src = opts.icon;
+    if (iconWrap) iconWrap.style.display = '';
+  } else if (iconWrap) {
+    iconWrap.style.display = 'none';
+  }
   if (titleEl) titleEl.textContent = opts.title || 'You Won!';
   if (amountEl) amountEl.textContent = opts.amount || '';
 
@@ -5084,6 +5092,11 @@ function showPurchaseToast(name, level){
 
 function showUpgradeToast(name, level){
   showAppToast({ title: 'Upgraded!', icon: PRIZE_ICON_URLS.coins, amount: name + ' → ' + level });
+}
+
+// توست ترقية Storage — بدون أيقونة عملة كما طُلب صراحة (تركيز على المدة الجديدة فقط)
+function showStorageUpgradeToast(level, hours){
+  showAppToast({ title: 'Storage Upgraded!', amount: 'Lv.' + level + ' — Full in ' + hours + 'h' });
 }
 
 /* =====================================================================
@@ -5480,9 +5493,14 @@ function onDuckUpgradeConfirm(){
       المحدَّدة (6 افتراضياً)، ثم ينتظر Claim. العداد المعروض محلي فقط
       للعرض الحي؛ المبلغ الفعلي يُحسب ويُتحقق منه بالكامل في السيرفر
       عند الضغط على Claim. -- */
+// نفس ترتيب STORAGE_LEVELS بالسيرفر بالضبط (بالساعات) — للعرض فقط.
+var STORAGE_LEVEL_HOURS = [6, 8, 12, 16, 24];
+var STORAGE_MAX_LEVEL = STORAGE_LEVEL_HOURS.length;
+
 var storageState = {
   hasPet: false,
   totalSpeed: 0,
+  level: 1,
   capacitySeconds: 6 * 3600,
   minClaim: 10,
   elapsedAtSync: 0,
@@ -5490,6 +5508,7 @@ var storageState = {
 };
 var storageTickTimer = null;
 var storageClaimBusy = false;
+var storageUpgradeBusy = false;
 
 function renderTotalSpeedBadge(){
   var badge = document.getElementById('total-speed-badge');
@@ -5499,6 +5518,7 @@ function renderTotalSpeedBadge(){
 function applyStorageState(data){
   storageState.hasPet = !!data.storage_has_pet;
   storageState.totalSpeed = data.total_speed || 0;
+  storageState.level = data.storage_level || 1;
   storageState.capacitySeconds = data.storage_capacity_seconds || (6 * 3600);
   storageState.minClaim = data.storage_min_claim || 10;
   var remainingSeconds = (data.storage_remaining_seconds != null) ? data.storage_remaining_seconds : storageState.capacitySeconds;
@@ -5715,7 +5735,72 @@ function openUpgradeDuckModal(){
 }
 
 function openStorageUpgradeModal(){
+  if (!storageState.hasPet || storageState.level >= STORAGE_MAX_LEVEL) return;
+
+  var newLevel = storageState.level + 1;
+  var currentHours = STORAGE_LEVEL_HOURS[storageState.level - 1];
+  var newHours = STORAGE_LEVEL_HOURS[newLevel - 1];
+
+  var lvCurrent = document.getElementById('storage-upgrade-lv-current');
+  var lvNew = document.getElementById('storage-upgrade-lv-new');
+  var durationCurrent = document.getElementById('storage-upgrade-duration-current');
+  var durationNew = document.getElementById('storage-upgrade-duration-new');
+  if (lvCurrent) lvCurrent.textContent = storageState.level;
+  if (lvNew) lvNew.textContent = newLevel;
+  if (durationCurrent) durationCurrent.textContent = currentHours + ' Hours';
+  if (durationNew) durationNew.textContent = newHours + ' Hours';
+
   openModal('modal-upgrade-storage');
+}
+
+function onStorageUpgradeConfirm(){
+  if (storageUpgradeBusy) return;
+
+  var initData = getTelegramInitData();
+  if (!initData){
+    alert('Open this app from Telegram to upgrade storage.');
+    return;
+  }
+
+  storageUpgradeBusy = true;
+  fetch('/api/storage/upgrade', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: initData })
+  })
+  .then(function(res){ return res.json().then(function(data){ return { status: res.status, data: data }; }); })
+  .then(function(result){
+    var data = result.data;
+    if (data.error){
+      if (data.error === 'insufficient_funds'){
+        showBuyErrorToast('Not enough Coins');
+      } else if (data.error === 'max_level_reached' || data.error === 'no_storage' || data.error === 'level_changed'){
+        fetchUserData();
+      } else {
+        console.error('storage upgrade error:', data.error);
+      }
+      return;
+    }
+
+    closeModal('modal-upgrade-storage');
+    var gramEl = document.getElementById('display-gram-wallet');
+    updateBalanceDisplay({ coins: data.coins, gram: gramEl ? Number(gramEl.textContent) : 0 });
+    applyStorageState({
+      storage_has_pet: true,
+      total_speed: storageState.totalSpeed,
+      storage_level: data.level,
+      storage_capacity_seconds: data.capacity_seconds,
+      storage_remaining_seconds: data.capacity_seconds,
+      storage_min_claim: storageState.minClaim
+    });
+    showStorageUpgradeToast(data.level, STORAGE_LEVEL_HOURS[data.level - 1]);
+  })
+  .catch(function(err){
+    console.error('storage upgrade request failed:', err);
+  })
+  .finally(function(){
+    storageUpgradeBusy = false;
+  });
 }
 
 function claimHappyDog(btn){

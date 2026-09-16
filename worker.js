@@ -58,8 +58,21 @@ const DUCK_SPEED_INCREMENT = DUCK_BASE_SPEED * 0.10; // 11.4 Coins/hr لكل م�
 const STORAGE_DEFAULT_CAPACITY_HOURS = 6;
 const STORAGE_MIN_CLAIM_COINS = 10;
 
+// مستويات مدة التخزين (Storage) بالساعات — الفهرس 0 = Lv.1 (الافتراضي عند
+// أول شراء لأي شخصية). كل ترقية تكلّف نفس المبلغ الثابت (300,000، مطابق
+// لسعر شراء The Duck)، وتُشتق قيمة المستوى الحالي مباشرة من capacity_hours
+// المخزّنة بدون الحاجة لعمود منفصل.
+const STORAGE_LEVELS = [6, 8, 12, 16, 24];
+const STORAGE_MAX_LEVEL = STORAGE_LEVELS.length;
+const STORAGE_UPGRADE_COST_COINS = 300000;
+
 function duckSpeedForLevel(level) {
   return DUCK_BASE_SPEED + (level - 1) * DUCK_SPEED_INCREMENT;
+}
+
+function storageLevelForCapacityHours(capacityHours) {
+  const index = STORAGE_LEVELS.indexOf(capacityHours);
+  return index === -1 ? 1 : index + 1;
 }
 
 export default {
@@ -110,6 +123,10 @@ export default {
 
     if (url.pathname === "/api/storage/claim" && request.method === "POST") {
       return handleStorageClaim(request, env);
+    }
+
+    if (url.pathname === "/api/storage/upgrade" && request.method === "POST") {
+      return handleStorageUpgrade(request, env);
     }
 
     // Everything else -> serve the Mini App static files
@@ -657,6 +674,95 @@ async function handleStorageClaim(request, env) {
   });
 }
 
+// =====================================================================
+// نقطة /api/storage/upgrade — ترقية مدة Storage (5 مستويات: 6→8→12→16→24
+// ساعة). التكلفة ثابتة لكل مستوى (300,000). قبل رفع السعة نُصفّي
+// (checkpoint) ما تراكم بالسعة القديمة أولاً — وإلا فإن رفع السقف
+// سيجعل نفس الوقت المنقضي يُحتسب فجأة بسعة أكبر (نفس مشكلة ترقية
+// The Duck)، فنضمن أن السعة الجديدة تسري فقط من هذه اللحظة فصاعداً.
+// =====================================================================
+async function handleStorageUpgrade(request, env) {
+  const auth = await authenticateRequest(request, env);
+  if (!auth.ok) return auth.response;
+  const { telegramId } = auth;
+
+  const row = await env.DB.prepare(
+    `SELECT u.total_speed, s.capacity_hours, s.last_claim_at
+     FROM users u LEFT JOIN user_storage s ON s.telegram_id = u.telegram_id
+     WHERE u.telegram_id = ?`
+  ).bind(telegramId).first();
+
+  if (!row || !row.last_claim_at) {
+    return jsonResponse({ error: "no_storage" }, 400);
+  }
+
+  const currentCapacityHours = row.capacity_hours || STORAGE_DEFAULT_CAPACITY_HOURS;
+  const currentLevel = storageLevelForCapacityHours(currentCapacityHours);
+  if (currentLevel >= STORAGE_MAX_LEVEL) {
+    return jsonResponse({ error: "max_level_reached", level: currentLevel }, 400);
+  }
+
+  const newLevel = currentLevel + 1;
+  const newCapacityHours = STORAGE_LEVELS[newLevel - 1];
+  const newCapacitySeconds = newCapacityHours * 3600;
+
+  const oldCapacitySeconds = currentCapacityHours * 3600;
+  const perSecondRate = (row.total_speed || 0) / 3600;
+  const elapsedSeconds = Math.max(0, (Date.now() - Date.parse(row.last_claim_at)) / 1000);
+  const preUpgradeAccrued = Math.min(elapsedSeconds, oldCapacitySeconds) * perSecondRate;
+
+  const deductResult = await env.DB.prepare(
+    `UPDATE users SET coins = coins - ? + ?
+     WHERE telegram_id = ? AND coins >= ?`
+  ).bind(STORAGE_UPGRADE_COST_COINS, preUpgradeAccrued, telegramId, STORAGE_UPGRADE_COST_COINS).run();
+
+  if (!deductResult.meta || deductResult.meta.changes === 0) {
+    return jsonResponse({ error: "insufficient_funds" }, 400);
+  }
+
+  const nowIso = new Date().toISOString();
+
+  // شرط "capacity_hours = القيمة القديمة" يمنع تطبيق ترقيتين متزامنتين
+  const updateStorageStmt = env.DB.prepare(
+    `UPDATE user_storage SET capacity_hours = ?, last_claim_at = ?
+     WHERE telegram_id = ? AND capacity_hours = ?`
+  ).bind(newCapacityHours, nowIso, telegramId, currentCapacityHours);
+
+  const txnStmt = env.DB.prepare(
+    "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'storage_upgrade', ?, 'coins')"
+  ).bind(telegramId, -STORAGE_UPGRADE_COST_COINS);
+
+  const stmts = [updateStorageStmt, txnStmt];
+  if (preUpgradeAccrued > 0) {
+    stmts.push(env.DB.prepare(
+      "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'storage_auto_collect', ?, 'coins')"
+    ).bind(telegramId, preUpgradeAccrued));
+  }
+
+  const [updateStorageResult] = await env.DB.batch(stmts);
+
+  if (!updateStorageResult.meta || updateStorageResult.meta.changes === 0) {
+    // نادر: طلب ترقية متزامن سبقه — نُرجع العملات (بما فيها ما صُفِّي من Storage)
+    await env.DB.prepare(
+      "UPDATE users SET coins = coins + ? - ? WHERE telegram_id = ?"
+    ).bind(STORAGE_UPGRADE_COST_COINS, preUpgradeAccrued, telegramId).run();
+    return jsonResponse({ error: "level_changed" }, 409);
+  }
+
+  const updatedUser = await env.DB.prepare(
+    "SELECT coins FROM users WHERE telegram_id = ?"
+  ).bind(telegramId).first();
+
+  return jsonResponse({
+    level: newLevel,
+    capacity_hours: newCapacityHours,
+    capacity_seconds: newCapacitySeconds,
+    coins: updatedUser.coins,
+    storage_credited: preUpgradeAccrued,
+    is_max_level: newLevel >= STORAGE_MAX_LEVEL
+  });
+}
+
 // يحسب حالة Storage الحالية (كم تراكم؟ هل امتلأ؟ كم تبقّى؟) بدون أي
 // كتابة لقاعدة البيانات — يُستخدم فقط للعرض في /api/user.
 function withStorageView(user) {
@@ -683,6 +789,9 @@ function withStorageView(user) {
     duck_speed: user.duck_speed || 0,
     storage_has_pet: hasPet,
     storage_accrued: accrued,
+    storage_capacity_hours: capacityHours,
+    storage_level: storageLevelForCapacityHours(capacityHours),
+    storage_max_level: STORAGE_MAX_LEVEL,
     storage_capacity_seconds: capacitySeconds,
     storage_remaining_seconds: remainingSeconds,
     storage_is_full: isFull,
