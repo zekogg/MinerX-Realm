@@ -252,6 +252,38 @@ img,svg{ display:block; }
   );
 }
 
+/* /////كود توست الجوائز (Prize Toast)///// */
+.prize-toast{
+  position:fixed; top:50%; left:50%;
+  transform:translate(-50%,-50%) scale(.7);
+  z-index:800;
+  display:flex; align-items:center; gap:10px;
+  padding:12px 20px 12px 12px; border-radius:999px;
+  background:linear-gradient(155deg, rgba(28,22,46,.92), rgba(16,12,26,.96));
+  border:1.5px solid rgba(240,193,75,.55);
+  box-shadow:0 12px 32px -10px rgba(0,0,0,.6), 0 0 22px -4px rgba(240,193,75,.4);
+  opacity:0; pointer-events:none;
+  transition:opacity .25s ease, transform .35s cubic-bezier(.34,1.56,.64,1);
+}
+.prize-toast.is-visible{
+  opacity:1; transform:translate(-50%,-50%) scale(1);
+}
+.prize-toast__icon-wrap{
+  width:34px; height:34px; border-radius:50%; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  background:radial-gradient(circle at 35% 30%, rgba(240,193,75,.28), transparent 70%), var(--stone-2);
+  border:1px solid rgba(240,193,75,.4);
+}
+.prize-toast__icon-wrap img{ width:22px; height:22px; object-fit:contain; }
+.prize-toast__title{
+  font-size:9px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; color:var(--ink-dim);
+}
+.prize-toast__amount{
+  font-family:var(--font-display); font-weight:800; font-size:15px;
+  background:linear-gradient(90deg, #a9701f, #ffe9b8 45%, #f0d878 55%, #a9701f);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+
 /* /////كود شاشة وضع الصيانة///// */
 .maintenance-screen{
   display:none;
@@ -371,6 +403,7 @@ img,svg{ display:block; }
   position:absolute; inset:0;
   padding:6px 18px 130px;
   overflow-y:auto;
+  overflow-x:hidden;
   opacity:0;
   transform:translateY(10px);
   pointer-events:none;
@@ -1846,6 +1879,12 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 }
 .price-tooltip.is-visible{ opacity:1; }
 .price-tooltip--wide{ width:150px; white-space:normal; line-height:1.5; text-align:center; }
+/* -- تلميح بطاقة Spin: يُثبَّت من جهة اليمين بدل التمركز، لأن شارة "؟" قريبة
+      من الحافة اليمنى للبطاقة والتمركز كان يدفع عرض الصفحة للخارج ويسبب
+      تمريراً أفقياً غير مرغوب حتى أثناء اختفاء التلميح (opacity:0 لا يلغي
+      مساحته من حساب overflow) -- */
+#spin-help-tooltip{ left:auto; right:0; transform:translateY(-6px); }
+#spin-help-tooltip::after{ left:auto; right:10px; transform:none; }
 
 /* -- ميلان 3D بسيط لصورة الشخصية عند الضغط -- */
 .pet-card{ perspective:600px; }
@@ -3582,6 +3621,15 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 
   </main>
 
+  <!-- /////كود توست الجوائز (Prize Toast) — يظهر وسط الشاشة لحظياً بعد أي جائزة///// -->
+  <div class="prize-toast" id="prize-toast">
+    <div class="prize-toast__icon-wrap"><img id="prize-toast-icon" src="" alt="Prize"></div>
+    <div class="prize-toast__text">
+      <div class="prize-toast__title">You Won!</div>
+      <div class="prize-toast__amount" id="prize-toast-amount">+0</div>
+    </div>
+  </div>
+
 <!-- /////كود الشريط السفلي///// -->
   <nav class="navwrap">
     <div class="nav">
@@ -4814,6 +4862,32 @@ function onStreakClaimClick(){
 }
 
 /* =====================================================================
+   كود توست الجوائز (Prize Toast) — عام وقابل لإعادة الاستخدام لأي جائزة
+   مستقبلية (Spin حالياً)، يظهر وسط الشاشة لمدة 4 ثوانٍ ثم يختفي تلقائياً.
+   ===================================================================== */
+var PRIZE_ICON_URLS = {
+  coins: 'https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp',
+  gram: 'https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png'
+};
+var prizeToastTimer = null;
+
+function showPrizeToast(type, amount){
+  var toast = document.getElementById('prize-toast');
+  if (!toast) return;
+
+  var icon = document.getElementById('prize-toast-icon');
+  var amountEl = document.getElementById('prize-toast-amount');
+  if (icon) icon.src = PRIZE_ICON_URLS[type] || PRIZE_ICON_URLS.coins;
+  if (amountEl) amountEl.textContent = '+' + amount + (type === 'gram' ? ' Gram' : ' Coins');
+
+  toast.classList.add('is-visible');
+  clearTimeout(prizeToastTimer);
+  prizeToastTimer = setTimeout(function(){
+    toast.classList.remove('is-visible');
+  }, 4000);
+}
+
+/* =====================================================================
    كود عجلة الحظ (Spin). النتيجة (segment_index) تأتي من السيرفر فقط —
    هذا الكود يستقبلها ويشغّل الأنيميشن، ولا يقرر الفائز بنفسه إطلاقاً.
    دوران الشريحة 0 يبدأ من الأعلى (حيث المؤشر) وباتجاه عقارب الساعة،
@@ -4889,6 +4963,7 @@ function onSpinButtonClick(){
     setTimeout(function(){
       updateBalanceDisplay({ coins: data.coins, gram: data.gram });
       applySpinState({ claimed_today: true, next_reset_utc: data.next_reset_utc });
+      showPrizeToast(data.prize_type, data.prize_amount);
     }, 4000); // نفس مدة أنيميشن الدوران — الرصيد يتحدث بعد توقف العجلة تماماً
   })
   .catch(function(err){
