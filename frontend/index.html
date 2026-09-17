@@ -268,6 +268,9 @@ img,svg{ display:block; }
 .prize-toast.is-visible{
   opacity:1; transform:translate(-50%,0) scale(1);
 }
+.prize-toast.no-icon{
+  border-radius:14px; padding:12px 18px;
+}
 .prize-toast__icon-wrap{
   width:34px; height:34px; border-radius:50%; flex-shrink:0;
   display:flex; align-items:center; justify-content:center;
@@ -1075,8 +1078,17 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 
 /* -- بطاقة مهمة مشاهدة إعلان -- */
 .ad-tasks-grid{ display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; }
-/* -- قسم Partner فقط: مستطيل عريض بدل المربع (عمود واحد بعرض كامل) -- */
+/* -- قسم Partner فقط: صف أفقي مضغوط بدل المربع (عمود واحد بعرض كامل) -- */
 #task-panel-partner .ad-tasks-grid{ grid-template-columns:1fr; }
+.partner-task{
+  display:flex; align-items:center; gap:12px;
+  padding:12px 14px;
+}
+.partner-task__body{ flex:1; min-width:0; display:flex; flex-direction:column; gap:4px; }
+.partner-task__btn{
+  width:auto; flex-shrink:0;
+  padding:8px 20px;
+}
 .ad-task{
   position:relative;
   display:flex; flex-direction:column; gap:6px;
@@ -3244,20 +3256,19 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
       <div class="task-panel" id="task-panel-partner">
         <div class="task-warning"><span>🤝 You Have A Channel Or a Project ? Contact The Support To Become Ambassador or for cross task .</span></div>
         <div class="ad-tasks-grid">
-          <div class="card ad-task">
+          <div class="card partner-task">
             <div class="ad-task__icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="var(--c-ad-watch-1)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22 11 13 2 9 22 2Z"/></svg>
             </div>
-            <div class="ad-task__title">Join This Channel</div>
-            <div class="ad-task__meta">
-              <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
-              <span class="ad-task__reward">+10</span>
-              <span class="ad-task__avail">Available</span>
+            <div class="partner-task__body">
+              <div class="ad-task__title">Join This Channel</div>
+              <div class="ad-task__meta">
+                <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
+                <span class="ad-task__reward">+10</span>
+                <span class="ad-task__avail">Available</span>
+              </div>
             </div>
-            <div class="ad-task__divider"></div>
-            <div class="ad-task__footer" style="justify-content:center;">
-              <button class="ad-task__watch" style="width:100%;">Go</button>
-            </div>
+            <button class="ad-task__watch partner-task__btn">Go</button>
           </div>
         </div>
       </div>
@@ -4554,18 +4565,21 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
       </div>
 
       <div id="deposit-step1">
-        <div class="modal-field-label"><span>Deposit Amount (Gram):</span></div>
+        <div class="modal-field-label"><span>Deposit Amount (Gram):</span> <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:16px;height:16px;flex-shrink:0;vertical-align:middle;"></div>
         <input type="number" class="modal-plain-input" id="deposit-input" placeholder="0" oninput="updateDeposit()">
 
         <div class="modal-field-label"><span>You will Get</span></div>
-        <div class="modal-plain-box"><span id="deposit-output">0</span> +Coins <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:14px;height:14px;flex-shrink:0;vertical-align:middle;"></div>
+        <div class="modal-plain-box" style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+          <span><span id="deposit-output">0</span> +Coins</span>
+          <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:16px;height:16px;flex-shrink:0;">
+        </div>
 
         <button class="modal-cta" id="deposit-cta" disabled onclick="goDepositStep2()" style="margin-top:6px;">Deposit</button>
       </div>
 
       <div id="deposit-step2" style="display:none;">
 
-        <div class="modal-field-label"><span>Send exactly:</span></div>
+        <div class="modal-field-label"><span>Send exactly:</span> <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:16px;height:16px;flex-shrink:0;vertical-align:middle;"></div>
         <div class="modal-plain-box has-gram" id="deposit-amount-display">1 Gram</div>
 
         <div class="modal-field-label"><span>To wallet address:</span></div>
@@ -4604,7 +4618,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
       <input type="text" class="modal-plain-input" placeholder="UQ...">
 
       <div class="modal-field-label"><span>Amount to be received:</span></div>
-      <div class="modal-plain-box has-gram"><span id="withdraw-output">0.0000</span> Gram</div>
+      <div class="modal-plain-box has-gram" style="display:flex;align-items:center;gap:6px;"><span id="withdraw-output">0.0000</span> Gram <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:16px;height:16px;flex-shrink:0;"></div>
 
       <div class="wd-req">
         <div class="wd-req__label"><span>Min Withdraw</span><span>0.1</span></div>
@@ -4658,6 +4672,7 @@ function getTelegramInitData(){
 // سعر صرف Coins <-> Gram الافتراضي (يُستبدل بالقيمة الحقيقية القادمة من
 // /api/user فور توفرها — يبقى هذا فقط احتياطياً قبل أول تحميل).
 var EXCHANGE_RATE_COIN_TO_GRAM = 0.00001;
+var EXCHANGE_MIN_COINS = 1000;
 
 // تنسيق أرقام Coins الكبيرة في صفحة Wallet بصيغة مختصرة (1 K, 1.1 K, 10 K, 1 M...)
 function formatCoinsK(value){
@@ -4687,6 +4702,9 @@ function updateBalanceDisplay(u){
 
   if (typeof u.exchange_rate_coin_to_gram === 'number'){
     EXCHANGE_RATE_COIN_TO_GRAM = u.exchange_rate_coin_to_gram;
+  }
+  if (typeof u.exchange_min_coins === 'number'){
+    EXCHANGE_MIN_COINS = u.exchange_min_coins;
   }
 
   var elTopbarCoins = document.getElementById('display-coins-topbar');
@@ -5052,8 +5070,10 @@ function showAppToast(opts){
   if (opts.icon){
     if (icon) icon.src = opts.icon;
     if (iconWrap) iconWrap.style.display = '';
-  } else if (iconWrap) {
-    iconWrap.style.display = 'none';
+    toast.classList.remove('no-icon');
+  } else {
+    if (iconWrap) iconWrap.style.display = 'none';
+    toast.classList.add('no-icon');
   }
   if (titleEl) titleEl.textContent = opts.title || 'You Won!';
   if (amountEl) amountEl.textContent = opts.amount || '';
@@ -5992,14 +6012,20 @@ function updateExchange(){
   var output = val * EXCHANGE_RATE_COIN_TO_GRAM;
   document.getElementById('exchange-output').textContent = output.toFixed(5);
   var cta = document.getElementById('exchange-cta');
-  if (val > 0 && val <= CURRENT_COINS_BALANCE){
+  if (val > 0 && val >= EXCHANGE_MIN_COINS && val <= CURRENT_COINS_BALANCE){
     cta.textContent = 'Exchange ' + val + ' coins';
     cta.classList.add('is-ready');
     cta.disabled = false;
   } else {
-    cta.textContent = val > CURRENT_COINS_BALANCE ? 'Not Enough Coins' : 'Enter The Amount';
     cta.classList.remove('is-ready');
     cta.disabled = true;
+    if (val > CURRENT_COINS_BALANCE){
+      cta.textContent = 'Not Enough Coins';
+    } else if (val > 0 && val < EXCHANGE_MIN_COINS){
+      cta.textContent = 'Minimum ' + EXCHANGE_MIN_COINS + ' Coins';
+    } else {
+      cta.textContent = 'Enter The Amount';
+    }
   }
 }
 function setMaxExchange(){
@@ -6011,7 +6037,7 @@ function onExchangeConfirm(){
   if (exchangeBusy) return;
   var input = document.getElementById('exchange-input');
   var amount = parseFloat(input.value) || 0;
-  if (amount <= 0 || amount > CURRENT_COINS_BALANCE) return;
+  if (amount < EXCHANGE_MIN_COINS || amount > CURRENT_COINS_BALANCE) return;
 
   var initData = getTelegramInitData();
   if (!initData){
@@ -6031,6 +6057,8 @@ function onExchangeConfirm(){
     if (data.error){
       if (data.error === 'insufficient_funds'){
         showBuyErrorToast('Not enough Coins');
+      } else if (data.error === 'below_minimum'){
+        showBuyErrorToast('Minimum ' + (data.minimum || EXCHANGE_MIN_COINS) + ' Coins');
       } else {
         console.error('exchange error:', data.error);
       }

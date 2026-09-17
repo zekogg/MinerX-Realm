@@ -39,6 +39,7 @@ const SPIN_SEGMENTS = [
 // سعر صرف Coins <-> Gram الموحّد (يُستخدم في الواجهة لعرض "≈ Gram" وفي
 // نافذة Exchange) — مصدر واحد بدل تكرار الرقم في أكثر من مكان.
 const EXCHANGE_RATE_COIN_TO_GRAM = 0.00001;
+const EXCHANGE_MIN_COINS = 1000; // الحد الأدنى لعملية Exchange واحدة
 
 // =====================================================================
 // إعدادات حيوانات Realm القابلة للشراء + Storage. نفس القاعدة لكل
@@ -213,6 +214,7 @@ async function handleGetUser(request, env) {
   view = withDailyPrizeView(view, "last_giftpick_date", "giftpick_claimed_today", "giftpick_next_reset_utc");
   view = withStorageView(view);
   view.exchange_rate_coin_to_gram = EXCHANGE_RATE_COIN_TO_GRAM;
+  view.exchange_min_coins = EXCHANGE_MIN_COINS;
 
   return jsonResponse({ user: view });
 }
@@ -897,6 +899,9 @@ async function handleExchange(request, env) {
   const amountCoins = Number(body.amount);
   if (!Number.isFinite(amountCoins) || amountCoins <= 0) {
     return jsonResponse({ error: "invalid_amount" }, 400);
+  }
+  if (amountCoins < EXCHANGE_MIN_COINS) {
+    return jsonResponse({ error: "below_minimum", minimum: EXCHANGE_MIN_COINS }, 400);
   }
 
   const gramAmount = amountCoins * EXCHANGE_RATE_COIN_TO_GRAM;
