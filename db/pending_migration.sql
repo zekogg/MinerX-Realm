@@ -46,3 +46,11 @@ ALTER TABLE users ADD COLUMN last_spin_date TEXT;
 -- last_giftpick_date : تاريخ آخر فتح هدية ناجح بتوقيت UTC
 ALTER TABLE users ADD COLUMN last_chest_date TEXT;
 ALTER TABLE users ADD COLUMN last_giftpick_date TEXT;
+
+-- -- Promo Code ------------------------------------------------------------
+-- uses_count : عدّاد مخزَّن لعدد مرات استخدام الكود، يُحدَّث ذرّياً عند كل
+--              استبدال ناجح. بديل عن COUNT(*) على promo_redemptions في كل
+--              محاولة (كان سيقرأ كل الصفوف المتراكمة لنفس الكود في كل مرة —
+--              مكلف على D1 كلما زاد عدد المستخدمين له). قراءة/كتابة صف واحد
+--              ثابتة التكلفة بدلاً من ذلك.
+ALTER TABLE promo_codes ADD COLUMN uses_count INTEGER DEFAULT 0;

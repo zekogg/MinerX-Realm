@@ -829,15 +829,6 @@ async function handlePromoRedeem(request, env) {
     return jsonResponse({ error: "code_expired" }, 400);
   }
 
-  if (promo.max_uses != null) {
-    const usedCount = await env.DB.prepare(
-      "SELECT COUNT(*) AS c FROM promo_redemptions WHERE code = ?"
-    ).bind(code).first();
-    if ((usedCount.c || 0) >= promo.max_uses) {
-      return jsonResponse({ error: "code_exhausted" }, 400);
-    }
-  }
-
   // "نحجز" هذا الاستخدام أولاً عبر INSERT — يفشل تلقائياً لو استُخدم نفس
   // الكود من نفس المستخدم من قبل (PRIMARY KEY telegram_id+code)، فيمنع
   // أي محاولة استبدال مزدوج حتى لو تكرر نفس الطلب بسرعة.
@@ -847,6 +838,23 @@ async function handlePromoRedeem(request, env) {
     ).bind(telegramId, code).run();
   } catch (e) {
     return jsonResponse({ error: "already_redeemed" }, 409);
+  }
+
+  // نستخدم عدّاداً مخزَّناً (uses_count) بدل COUNT(*) على promo_redemptions
+  // في كل محاولة — قراءة/كتابة صف واحد ثابتة التكلفة بدل مسح كل السجلات
+  // المتراكمة لكل كود، وأرخص بكثير على D1 كلما زاد عدد المستخدمين له.
+  // شرط "uses_count < max_uses" ذرّي: يمنع تجاوز الحد حتى مع طلبات متزامنة.
+  const counterResult = await env.DB.prepare(
+    `UPDATE promo_codes SET uses_count = uses_count + 1
+     WHERE code = ? AND (max_uses IS NULL OR uses_count < max_uses)`
+  ).bind(code).run();
+
+  if (!counterResult.meta || counterResult.meta.changes === 0) {
+    // الحد الأقصى استُنفد — نُلغي الحجز الذي أخذناه للتو
+    await env.DB.prepare(
+      "DELETE FROM promo_redemptions WHERE telegram_id = ? AND code = ?"
+    ).bind(telegramId, code).run();
+    return jsonResponse({ error: "code_exhausted" }, 400);
   }
 
   const column = promo.currency === "gram" ? "gram" : "coins";
