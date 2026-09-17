@@ -22,17 +22,17 @@ const STREAK_REWARDS = [50, 100, 150, 200, 250, 300, 500]; // index 0 = اليو
 // درجة، بدءاً من الأعلى وباتجاه عقارب الساعة). الاختيار عشوائي مرجّح
 // (weighted random) من السيرفر فقط — لا شيء يُستقبل من المتصفح سوى initData.
 // وزن كل جائزة من 10000 (يساوي نسبتها المئوية × 100):
-//   50 عملة = 78% ، 100 = 10% ، 250 = 10% ، 1000 = 1%  (المجموع 99%)
+//   50 عملة = 88% ، 100 = 5% ، 250 = 5% ، 1000 = 1%  (المجموع 99%)
 //   كل جوائز Gram الأربع تتقاسم الـ1% المتبقي بالتساوي (0.25% لكل واحدة)
 // =====================================================================
 const SPIN_SEGMENTS = [
-  { type: "coins", amount: 100,    weight: 1000 }, // 0°   (10%)
+  { type: "coins", amount: 100,    weight: 500  }, // 0°   (5%)
   { type: "gram",  amount: 0.0025, weight: 25   }, // 45°  (0.25%)
   { type: "coins", amount: 1000,   weight: 100  }, // 90°  (1%)
   { type: "gram",  amount: 0.005,  weight: 25   }, // 135° (0.25%)
-  { type: "coins", amount: 250,    weight: 1000 }, // 180° (10%)
+  { type: "coins", amount: 250,    weight: 500  }, // 180° (5%)
   { type: "gram",  amount: 0.001,  weight: 25   }, // 225° (0.25%)
-  { type: "coins", amount: 50,     weight: 7800 }, // 270° (78%)
+  { type: "coins", amount: 50,     weight: 8800 }, // 270° (88%)
   { type: "gram",  amount: 0.01,   weight: 25   }  // 315° (0.25%)
 ];
 
@@ -139,6 +139,14 @@ export default {
 
     if (url.pathname === "/api/storage/upgrade" && request.method === "POST") {
       return handleStorageUpgrade(request, env);
+    }
+
+    if (url.pathname === "/api/promo/redeem" && request.method === "POST") {
+      return handlePromoRedeem(request, env);
+    }
+
+    if (url.pathname === "/api/exchange" && request.method === "POST") {
+      return handleExchange(request, env);
     }
 
     // Everything else -> serve the Mini App static files
@@ -792,6 +800,124 @@ async function handleStorageUpgrade(request, env) {
   });
 }
 
+// =====================================================================
+// نقطة /api/promo/redeem — استبدال كود خصم. غير قابل للتلاعب: صحة الكود،
+// تاريخ الانتهاء، الحد الأقصى للاستخدام، ومنع الاستخدام المزدوج لنفس
+// المستخدم — كلها تُتحقَّق وتُفرَض من السيرفر فقط عبر قاعدة البيانات.
+// =====================================================================
+async function handlePromoRedeem(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "invalid_body" }, 400);
+  }
+
+  const auth = await authenticateRequest(request, env, body);
+  if (!auth.ok) return auth.response;
+  const { telegramId } = auth;
+
+  const code = typeof body.code === "string" ? body.code.trim().toUpperCase() : "";
+  if (!code) return jsonResponse({ error: "missing_code" }, 400);
+
+  const promo = await env.DB.prepare(
+    "SELECT code, reward, currency, max_uses, expires_at FROM promo_codes WHERE code = ?"
+  ).bind(code).first();
+  if (!promo) return jsonResponse({ error: "invalid_code" }, 404);
+
+  if (promo.expires_at && Date.now() > Date.parse(promo.expires_at)) {
+    return jsonResponse({ error: "code_expired" }, 400);
+  }
+
+  if (promo.max_uses != null) {
+    const usedCount = await env.DB.prepare(
+      "SELECT COUNT(*) AS c FROM promo_redemptions WHERE code = ?"
+    ).bind(code).first();
+    if ((usedCount.c || 0) >= promo.max_uses) {
+      return jsonResponse({ error: "code_exhausted" }, 400);
+    }
+  }
+
+  // "نحجز" هذا الاستخدام أولاً عبر INSERT — يفشل تلقائياً لو استُخدم نفس
+  // الكود من نفس المستخدم من قبل (PRIMARY KEY telegram_id+code)، فيمنع
+  // أي محاولة استبدال مزدوج حتى لو تكرر نفس الطلب بسرعة.
+  try {
+    await env.DB.prepare(
+      "INSERT INTO promo_redemptions (telegram_id, code) VALUES (?, ?)"
+    ).bind(telegramId, code).run();
+  } catch (e) {
+    return jsonResponse({ error: "already_redeemed" }, 409);
+  }
+
+  const column = promo.currency === "gram" ? "gram" : "coins";
+  const creditStmt = env.DB.prepare(
+    `UPDATE users SET ${column} = ${column} + ? WHERE telegram_id = ?`
+  ).bind(promo.reward, telegramId);
+  const txnStmt = env.DB.prepare(
+    "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'promo_redeem', ?, ?)"
+  ).bind(telegramId, promo.reward, column);
+  await env.DB.batch([creditStmt, txnStmt]);
+
+  const updatedUser = await env.DB.prepare(
+    "SELECT coins, gram FROM users WHERE telegram_id = ?"
+  ).bind(telegramId).first();
+
+  return jsonResponse({
+    reward: promo.reward,
+    currency: column,
+    coins: updatedUser.coins,
+    gram: updatedUser.gram
+  });
+}
+
+// =====================================================================
+// نقطة /api/exchange — تحويل Coins إلى Gram بسعر الصرف الموحّد. خصم
+// ذري بشرط توفر الرصيد (CAS) يمنع تحويل رصيد غير موجود.
+// =====================================================================
+async function handleExchange(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "invalid_body" }, 400);
+  }
+
+  const auth = await authenticateRequest(request, env, body);
+  if (!auth.ok) return auth.response;
+  const { telegramId } = auth;
+
+  const amountCoins = Number(body.amount);
+  if (!Number.isFinite(amountCoins) || amountCoins <= 0) {
+    return jsonResponse({ error: "invalid_amount" }, 400);
+  }
+
+  const gramAmount = amountCoins * EXCHANGE_RATE_COIN_TO_GRAM;
+
+  const result = await env.DB.prepare(
+    `UPDATE users SET coins = coins - ?, gram = gram + ?
+     WHERE telegram_id = ? AND coins >= ?`
+  ).bind(amountCoins, gramAmount, telegramId, amountCoins).run();
+
+  if (!result.meta || result.meta.changes === 0) {
+    return jsonResponse({ error: "insufficient_funds" }, 400);
+  }
+
+  await env.DB.prepare(
+    "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'exchange', ?, 'coins')"
+  ).bind(telegramId, -amountCoins).run();
+
+  const updatedUser = await env.DB.prepare(
+    "SELECT coins, gram FROM users WHERE telegram_id = ?"
+  ).bind(telegramId).first();
+
+  return jsonResponse({
+    exchanged_coins: amountCoins,
+    received_gram: gramAmount,
+    coins: updatedUser.coins,
+    gram: updatedUser.gram
+  });
+}
+
 // يحسب حالة Storage الحالية (كم تراكم؟ هل امتلأ؟ كم تبقّى؟) بدون أي
 // كتابة لقاعدة البيانات — يُستخدم فقط للعرض في /api/user.
 function withStorageView(user) {
@@ -899,12 +1025,14 @@ function withMiningView(user) {
 // تتحقق من initData وترجع معرّف المستخدم تيليجرام + بيانات الدعوة.
 // تُستخدم من طرف كل نقاط /api/* المحمية.
 // =====================================================================
-async function authenticateRequest(request, env) {
-  let body;
-  try {
-    body = await request.json();
-  } catch (e) {
-    return { ok: false, response: jsonResponse({ error: "invalid_body" }, 400) };
+async function authenticateRequest(request, env, preParsedBody) {
+  let body = preParsedBody;
+  if (!body) {
+    try {
+      body = await request.json();
+    } catch (e) {
+      return { ok: false, response: jsonResponse({ error: "invalid_body" }, 400) };
+    }
   }
 
   const initData = body.initData;
