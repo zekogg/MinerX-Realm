@@ -1026,15 +1026,15 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   display:flex; align-items:center; gap:12px;
   background:linear-gradient(155deg, rgba(255,255,255,.06), rgba(240,216,120,.06));
   border:1.5px dashed rgba(240,216,120,.45);
-  border-radius:16px; padding:14px;
+  border-radius:16px; padding:8.4px 14px;   /* أعلى/أسفل مصغّرة 40% (كانت 14px)، اليمين/اليسار كما هي */
   backdrop-filter:blur(var(--glass-blur));
   -webkit-backdrop-filter:blur(var(--glass-blur));
 }
 .add-task-card__icon{
-  width:44px; height:44px; border-radius:14px; flex-shrink:0;
+  width:26px; height:26px; border-radius:8px; flex-shrink:0;   /* مصغّرة 40% (كانت 44px/14px) */
   display:flex; align-items:center; justify-content:center;
   background:rgba(240,216,120,.14);
-  color:#e3a542; font-size:22px; font-weight:700; line-height:1;
+  color:#e3a542; font-size:13px; font-weight:700; line-height:1;
 }
 .add-task-card__body{ flex:1; min-width:0; }
 .add-task-card__title{
@@ -1075,6 +1075,8 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 
 /* -- بطاقة مهمة مشاهدة إعلان -- */
 .ad-tasks-grid{ display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; }
+/* -- قسم Partner فقط: مستطيل عريض بدل المربع (عمود واحد بعرض كامل) -- */
+#task-panel-partner .ad-tasks-grid{ grid-template-columns:1fr; }
 .ad-task{
   position:relative;
   display:flex; flex-direction:column; gap:6px;
@@ -3015,9 +3017,9 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
             <div class="promo-card__title">Promo Code</div>
           </div>
           <div class="promo-card__input-row">
-            <input class="promo-card__input" type="text" placeholder="CODE">
+            <input class="promo-card__input" type="text" id="promo-code-input" placeholder="CODE">
           </div>
-          <button class="promo-card__redeem">Redeem</button>
+          <button class="promo-card__redeem" id="promo-redeem-btn" onclick="onPromoRedeemClick()">Redeem</button>
         </div>
 
         <div class="card mystery-box">
@@ -3181,21 +3183,6 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
               <svg viewBox="0 0 24 24" fill="none" stroke="var(--c-ad-watch-1)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5 l6.8 4M15.4 6.5 l-6.8 4"/></svg>
             </div>
             <div class="ad-task__title">Share with Friends</div>
-            <div class="ad-task__meta">
-              <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
-              <span class="ad-task__reward">+10</span>
-              <span class="ad-task__avail">Available</span>
-            </div>
-            <div class="ad-task__divider"></div>
-            <div class="ad-task__footer" style="justify-content:center;">
-              <button class="ad-task__watch" style="width:100%;">Go</button>
-            </div>
-          </div>
-          <div class="card ad-task">
-            <div class="ad-task__icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="var(--c-ad-watch-1)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4 L20 10 L10 20 L4 20 L4 14 Z"/></svg>
-            </div>
-            <div class="ad-task__title">Join This Bot &amp; Start Mining ⛏️</div>
             <div class="ad-task__meta">
               <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
               <span class="ad-task__reward">+10</span>
@@ -4520,14 +4507,14 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
             <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:21px;height:21px;flex-shrink:0;vertical-align:middle;">
             <span>Coin Balance</span>
           </div>
-          <div class="modal-balance-box__val">0,000</div>
+          <div class="modal-balance-box__val" id="exchange-coin-balance">0,000</div>
         </div>
         <div class="modal-balance-box has-gram">
           <div class="modal-balance-box__head">
             <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:21px;height:21px;flex-shrink:0;vertical-align:middle;">
             <span>Gram Balance</span>
           </div>
-          <div class="modal-balance-box__val" style="color:#4a9eff">0,000</div>
+          <div class="modal-balance-box__val" id="exchange-gram-balance" style="color:#4a9eff">0,000</div>
         </div>
       </div>
 
@@ -4550,7 +4537,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         <span class="modal-input-suffix">GRAM</span>
       </div>
 
-      <button class="modal-cta" id="exchange-cta" disabled>Enter The Amount</button>
+      <button class="modal-cta" id="exchange-cta" onclick="onExchangeConfirm()" disabled>Enter The Amount</button>
     </div>
   </div>
 
@@ -4589,8 +4576,8 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         <div class="modal-plain-box modal-mono" id="deposit-comment">0000000</div>
         <button class="modal-secondary-btn" onclick="copyText('deposit-comment')">Copy comment</button>
 
-        <button class="modal-cta is-ready" onclick="closeModal('modal-deposit')">Check</button>
-        <div class="modal-footnote" id="deposit-check-note">After sending, press Check. Confirmation usually arrives in a few minutes.</div>
+        <button class="modal-cta is-ready" onclick="closeModal('modal-deposit')">I've Sent - Check</button>
+        <div class="modal-footnote" id="deposit-check-note">Tap Check after sending — required to confirm your deposit.</div>
       </div>
     </div>
   </div>
@@ -4685,7 +4672,15 @@ function formatCoinsK(value){
   return text + ' ' + unit;
 }
 
+// آخر رصيد حقيقي معروف (يُحدَّث في كل مرة يصل فيها رد من السيرفر) —
+// يُستخدم لملء نافذة Exchange بدون الاعتماد على نص منسَّق (مثل "1.1 K").
+var CURRENT_COINS_BALANCE = 0;
+var CURRENT_GRAM_BALANCE = 0;
+
 function updateBalanceDisplay(u){
+  CURRENT_COINS_BALANCE = Number(u.coins) || 0;
+  CURRENT_GRAM_BALANCE = Number(u.gram) || 0;
+
   var coinsWhole = Number(u.coins).toLocaleString('en-US', { maximumFractionDigits: 0 });
   var gramText = Number(u.gram).toFixed(2);
   var gramWhole = Number(u.gram).toLocaleString('en-US', { maximumFractionDigits: 0 });
@@ -5290,7 +5285,7 @@ function onGiftOpenClick(){
 
   var selectedBox = document.querySelector('.gift-pick-box.is-selected');
   if (!selectedBox){
-    alert('Pick one of the 3 gifts first.');
+    showAppToast({ title: 'Pick A Gift First', amount: 'Choose one of the 3 gifts' });
     return;
   }
 
@@ -5980,32 +5975,134 @@ document.querySelectorAll('.modal-overlay').forEach(function(overlay){
 });
 
 /* -- Exchange -- */
-var EXCHANGE_RATE = 0.00001;
-var EXCHANGE_COIN_BALANCE = 0; // بيانات وهمية — تُستبدل لاحقاً بالرصيد الحقيقي
+var exchangeBusy = false;
+
 function openExchangeModal(){
   document.getElementById('exchange-input').value = '';
+  var coinBalEl = document.getElementById('exchange-coin-balance');
+  var gramBalEl = document.getElementById('exchange-gram-balance');
+  if (coinBalEl) coinBalEl.textContent = CURRENT_COINS_BALANCE.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  if (gramBalEl) gramBalEl.textContent = CURRENT_GRAM_BALANCE.toFixed(2);
   updateExchange();
   openModal('modal-exchange');
 }
 function updateExchange(){
   var input = document.getElementById('exchange-input');
   var val = parseFloat(input.value) || 0;
-  var output = val * EXCHANGE_RATE;
+  var output = val * EXCHANGE_RATE_COIN_TO_GRAM;
   document.getElementById('exchange-output').textContent = output.toFixed(5);
   var cta = document.getElementById('exchange-cta');
-  if (val > 0){
+  if (val > 0 && val <= CURRENT_COINS_BALANCE){
     cta.textContent = 'Exchange ' + val + ' coins';
     cta.classList.add('is-ready');
     cta.disabled = false;
   } else {
-    cta.textContent = 'Enter The Amount';
+    cta.textContent = val > CURRENT_COINS_BALANCE ? 'Not Enough Coins' : 'Enter The Amount';
     cta.classList.remove('is-ready');
     cta.disabled = true;
   }
 }
 function setMaxExchange(){
-  document.getElementById('exchange-input').value = EXCHANGE_COIN_BALANCE;
+  document.getElementById('exchange-input').value = CURRENT_COINS_BALANCE;
   updateExchange();
+}
+
+function onExchangeConfirm(){
+  if (exchangeBusy) return;
+  var input = document.getElementById('exchange-input');
+  var amount = parseFloat(input.value) || 0;
+  if (amount <= 0 || amount > CURRENT_COINS_BALANCE) return;
+
+  var initData = getTelegramInitData();
+  if (!initData){
+    alert('Open this app from Telegram to exchange.');
+    return;
+  }
+
+  exchangeBusy = true;
+  fetch('/api/exchange', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: initData, amount: amount })
+  })
+  .then(function(res){ return res.json().then(function(data){ return { status: res.status, data: data }; }); })
+  .then(function(result){
+    var data = result.data;
+    if (data.error){
+      if (data.error === 'insufficient_funds'){
+        showBuyErrorToast('Not enough Coins');
+      } else {
+        console.error('exchange error:', data.error);
+      }
+      return;
+    }
+
+    updateBalanceDisplay({ coins: data.coins, gram: data.gram });
+    closeModal('modal-exchange');
+    showAppToast({
+      title: 'Exchange Successful',
+      icon: PRIZE_ICON_URLS.gram,
+      amount: Math.round(data.exchanged_coins) + ' Coins → ' + data.received_gram.toFixed(5) + ' Gram'
+    });
+  })
+  .catch(function(err){
+    console.error('exchange request failed:', err);
+  })
+  .finally(function(){
+    exchangeBusy = false;
+  });
+}
+
+/* -- Promo Code -- */
+var promoRedeemBusy = false;
+
+function onPromoRedeemClick(){
+  if (promoRedeemBusy) return;
+
+  var input = document.getElementById('promo-code-input');
+  var code = input ? input.value.trim() : '';
+  if (!code){
+    showAppToast({ title: 'Enter A Code', amount: 'Type a promo code first' });
+    return;
+  }
+
+  var initData = getTelegramInitData();
+  if (!initData){
+    alert('Open this app from Telegram to redeem codes.');
+    return;
+  }
+
+  promoRedeemBusy = true;
+  fetch('/api/promo/redeem', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: initData, code: code })
+  })
+  .then(function(res){ return res.json().then(function(data){ return { status: res.status, data: data }; }); })
+  .then(function(result){
+    var data = result.data;
+    if (data.error){
+      var messages = {
+        missing_code: 'Enter a code first',
+        invalid_code: 'This code does not exist',
+        code_expired: 'This code has expired',
+        code_exhausted: 'This code reached its usage limit',
+        already_redeemed: 'You already used this code'
+      };
+      showAppToast({ title: 'Redeem Failed', amount: messages[data.error] || 'Something went wrong' });
+      return;
+    }
+
+    updateBalanceDisplay({ coins: data.coins, gram: data.gram });
+    if (input) input.value = '';
+    showPrizeToast(data.currency, data.reward, 'Code Redeemed!');
+  })
+  .catch(function(err){
+    console.error('promo redeem request failed:', err);
+  })
+  .finally(function(){
+    promoRedeemBusy = false;
+  });
 }
 
 /* -- Deposit -- */

@@ -141,6 +141,14 @@ export default {
       return handleStorageUpgrade(request, env);
     }
 
+    if (url.pathname === "/api/promo/redeem" && request.method === "POST") {
+      return handlePromoRedeem(request, env);
+    }
+
+    if (url.pathname === "/api/exchange" && request.method === "POST") {
+      return handleExchange(request, env);
+    }
+
     // Everything else -> serve the Mini App static files
     return env.ASSETS.fetch(request);
   }
@@ -792,6 +800,124 @@ async function handleStorageUpgrade(request, env) {
   });
 }
 
+// =====================================================================
+// نقطة /api/promo/redeem — استبدال كود خصم. غير قابل للتلاعب: صحة الكود،
+// تاريخ الانتهاء، الحد الأقصى للاستخدام، ومنع الاستخدام المزدوج لنفس
+// المستخدم — كلها تُتحقَّق وتُفرَض من السيرفر فقط عبر قاعدة البيانات.
+// =====================================================================
+async function handlePromoRedeem(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "invalid_body" }, 400);
+  }
+
+  const auth = await authenticateRequest(request, env, body);
+  if (!auth.ok) return auth.response;
+  const { telegramId } = auth;
+
+  const code = typeof body.code === "string" ? body.code.trim().toUpperCase() : "";
+  if (!code) return jsonResponse({ error: "missing_code" }, 400);
+
+  const promo = await env.DB.prepare(
+    "SELECT code, reward, currency, max_uses, expires_at FROM promo_codes WHERE code = ?"
+  ).bind(code).first();
+  if (!promo) return jsonResponse({ error: "invalid_code" }, 404);
+
+  if (promo.expires_at && Date.now() > Date.parse(promo.expires_at)) {
+    return jsonResponse({ error: "code_expired" }, 400);
+  }
+
+  if (promo.max_uses != null) {
+    const usedCount = await env.DB.prepare(
+      "SELECT COUNT(*) AS c FROM promo_redemptions WHERE code = ?"
+    ).bind(code).first();
+    if ((usedCount.c || 0) >= promo.max_uses) {
+      return jsonResponse({ error: "code_exhausted" }, 400);
+    }
+  }
+
+  // "نحجز" هذا الاستخدام أولاً عبر INSERT — يفشل تلقائياً لو استُخدم نفس
+  // الكود من نفس المستخدم من قبل (PRIMARY KEY telegram_id+code)، فيمنع
+  // أي محاولة استبدال مزدوج حتى لو تكرر نفس الطلب بسرعة.
+  try {
+    await env.DB.prepare(
+      "INSERT INTO promo_redemptions (telegram_id, code) VALUES (?, ?)"
+    ).bind(telegramId, code).run();
+  } catch (e) {
+    return jsonResponse({ error: "already_redeemed" }, 409);
+  }
+
+  const column = promo.currency === "gram" ? "gram" : "coins";
+  const creditStmt = env.DB.prepare(
+    `UPDATE users SET ${column} = ${column} + ? WHERE telegram_id = ?`
+  ).bind(promo.reward, telegramId);
+  const txnStmt = env.DB.prepare(
+    "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'promo_redeem', ?, ?)"
+  ).bind(telegramId, promo.reward, column);
+  await env.DB.batch([creditStmt, txnStmt]);
+
+  const updatedUser = await env.DB.prepare(
+    "SELECT coins, gram FROM users WHERE telegram_id = ?"
+  ).bind(telegramId).first();
+
+  return jsonResponse({
+    reward: promo.reward,
+    currency: column,
+    coins: updatedUser.coins,
+    gram: updatedUser.gram
+  });
+}
+
+// =====================================================================
+// نقطة /api/exchange — تحويل Coins إلى Gram بسعر الصرف الموحّد. خصم
+// ذري بشرط توفر الرصيد (CAS) يمنع تحويل رصيد غير موجود.
+// =====================================================================
+async function handleExchange(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "invalid_body" }, 400);
+  }
+
+  const auth = await authenticateRequest(request, env, body);
+  if (!auth.ok) return auth.response;
+  const { telegramId } = auth;
+
+  const amountCoins = Number(body.amount);
+  if (!Number.isFinite(amountCoins) || amountCoins <= 0) {
+    return jsonResponse({ error: "invalid_amount" }, 400);
+  }
+
+  const gramAmount = amountCoins * EXCHANGE_RATE_COIN_TO_GRAM;
+
+  const result = await env.DB.prepare(
+    `UPDATE users SET coins = coins - ?, gram = gram + ?
+     WHERE telegram_id = ? AND coins >= ?`
+  ).bind(amountCoins, gramAmount, telegramId, amountCoins).run();
+
+  if (!result.meta || result.meta.changes === 0) {
+    return jsonResponse({ error: "insufficient_funds" }, 400);
+  }
+
+  await env.DB.prepare(
+    "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'exchange', ?, 'coins')"
+  ).bind(telegramId, -amountCoins).run();
+
+  const updatedUser = await env.DB.prepare(
+    "SELECT coins, gram FROM users WHERE telegram_id = ?"
+  ).bind(telegramId).first();
+
+  return jsonResponse({
+    exchanged_coins: amountCoins,
+    received_gram: gramAmount,
+    coins: updatedUser.coins,
+    gram: updatedUser.gram
+  });
+}
+
 // يحسب حالة Storage الحالية (كم تراكم؟ هل امتلأ؟ كم تبقّى؟) بدون أي
 // كتابة لقاعدة البيانات — يُستخدم فقط للعرض في /api/user.
 function withStorageView(user) {
@@ -899,12 +1025,14 @@ function withMiningView(user) {
 // تتحقق من initData وترجع معرّف المستخدم تيليجرام + بيانات الدعوة.
 // تُستخدم من طرف كل نقاط /api/* المحمية.
 // =====================================================================
-async function authenticateRequest(request, env) {
-  let body;
-  try {
-    body = await request.json();
-  } catch (e) {
-    return { ok: false, response: jsonResponse({ error: "invalid_body" }, 400) };
+async function authenticateRequest(request, env, preParsedBody) {
+  let body = preParsedBody;
+  if (!body) {
+    try {
+      body = await request.json();
+    } catch (e) {
+      return { ok: false, response: jsonResponse({ error: "invalid_body" }, 400) };
+    }
   }
 
   const initData = body.initData;
