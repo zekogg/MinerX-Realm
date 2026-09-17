@@ -6069,7 +6069,6 @@ function onExchangeConfirm(){
     closeModal('modal-exchange');
     showAppToast({
       title: 'Exchange Successful',
-      icon: PRIZE_ICON_URLS.gram,
       amount: Math.round(data.exchanged_coins) + ' Coins → ' + data.received_gram.toFixed(5) + ' Gram'
     });
   })
