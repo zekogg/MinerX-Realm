@@ -4565,13 +4565,13 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
       </div>
 
       <div id="deposit-step1">
-        <div class="modal-field-label"><span>Deposit Amount (Gram):</span> <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:16px;height:16px;flex-shrink:0;vertical-align:middle;"></div>
+        <div class="modal-field-label"><span>Deposit Amount (<img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:14px;height:14px;flex-shrink:0;vertical-align:middle;">):</span></div>
         <input type="number" class="modal-plain-input" id="deposit-input" placeholder="0" oninput="updateDeposit()">
 
         <div class="modal-field-label"><span>You will Get</span></div>
         <div class="modal-plain-box" style="display:flex;flex-direction:column;align-items:center;gap:4px;">
           <span><span id="deposit-output">0</span> +Coins</span>
-          <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:16px;height:16px;flex-shrink:0;">
+          <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:24px;height:24px;flex-shrink:0;">
         </div>
 
         <button class="modal-cta" id="deposit-cta" disabled onclick="goDepositStep2()" style="margin-top:6px;">Deposit</button>
@@ -4579,8 +4579,8 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 
       <div id="deposit-step2" style="display:none;">
 
-        <div class="modal-field-label"><span>Send exactly:</span> <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:16px;height:16px;flex-shrink:0;vertical-align:middle;"></div>
-        <div class="modal-plain-box has-gram" id="deposit-amount-display">1 Gram</div>
+        <div class="modal-field-label"><span>Send exactly:</span></div>
+        <div class="modal-plain-box has-gram" id="deposit-amount-display" style="display:flex;align-items:center;gap:6px;"><span id="deposit-amount-display-text">1 Gram</span> <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:16px;height:16px;flex-shrink:0;"></div>
 
         <div class="modal-field-label"><span>To wallet address:</span></div>
         <div class="modal-plain-box modal-mono" id="deposit-address">Your_Deposit_wallet</div>
@@ -6069,7 +6069,6 @@ function onExchangeConfirm(){
     closeModal('modal-exchange');
     showAppToast({
       title: 'Exchange Successful',
-      icon: PRIZE_ICON_URLS.gram,
       amount: Math.round(data.exchanged_coins) + ' Coins → ' + data.received_gram.toFixed(5) + ' Gram'
     });
   })
@@ -6155,7 +6154,7 @@ function updateDeposit(){
 function goDepositStep2(){
   var val = parseFloat(document.getElementById('deposit-input').value) || 0;
   if (val <= 0) return;
-  document.getElementById('deposit-amount-display').textContent = val + ' Gram';
+  document.getElementById('deposit-amount-display-text').textContent = val + ' Gram';
   document.getElementById('deposit-step1').style.display = 'none';
   document.getElementById('deposit-step2').style.display = 'block';
 }
