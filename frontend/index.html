@@ -2302,7 +2302,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   width:60%; margin:0 auto 14px; display:block;
   padding:9px; border-radius:var(--radius-sm);
   background:var(--stone-2); border:1px solid var(--stone-border-2);
-  color:var(--ink-dim); font-weight:700; font-size:11px;
+  color:#a3acb8; font-weight:700; font-size:11px;
 }
 .modal-footnote{ font-size:10.5px; color:#a3acb8; line-height:1.6; margin-top:12px; text-align:center; }
 
@@ -6171,12 +6171,19 @@ function updateDeposit(){
   var output = Math.round(val * 100000);
   document.getElementById('deposit-output').textContent = output.toLocaleString('en-US');
   var cta = document.getElementById('deposit-cta');
-  cta.disabled = val <= 0;
-  cta.classList.toggle('is-ready', val > 0);
+  if (val > 0 && val < DEPOSIT_MIN_GRAM){
+    cta.textContent = 'Minimum ' + DEPOSIT_MIN_GRAM + ' Gram';
+    cta.disabled = true;
+    cta.classList.remove('is-ready');
+  } else {
+    cta.textContent = 'Deposit';
+    cta.disabled = val <= 0;
+    cta.classList.toggle('is-ready', val > 0);
+  }
 }
 function goDepositStep2(){
   var val = parseFloat(document.getElementById('deposit-input').value) || 0;
-  if (val <= 0) return;
+  if (val <= 0 || val < DEPOSIT_MIN_GRAM) return;
   document.getElementById('deposit-amount-display-text').textContent = val + ' Gram';
   document.getElementById('deposit-address').textContent = DEPOSIT_ADDRESS || 'Unavailable';
   document.getElementById('deposit-comment').textContent = DEPOSIT_MEMO;
