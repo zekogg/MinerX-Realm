@@ -258,7 +258,7 @@ img,svg{ display:block; }
   transform:translate(-50%,-14px) scale(.9);
   z-index:800;
   display:flex; align-items:center; gap:10px;
-  padding:12px 20px 12px 12px; border-radius:999px;
+  padding:12px 20px 12px 12px; border-radius:14px;
   background:linear-gradient(155deg, rgba(28,22,46,.92), rgba(16,12,26,.96));
   border:1.5px solid rgba(240,193,75,.55);
   box-shadow:0 12px 32px -10px rgba(0,0,0,.6), 0 0 22px -4px rgba(240,193,75,.4);
@@ -2304,6 +2304,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   background:rgba(74,158,255,.14); border:1px solid rgba(74,158,255,.4);
   color:#4a9eff; font-weight:800; font-size:10px;
 }
+.withdraw-max-btn:active{ transform:translateY(-50%) scale(.97); }
 .modal-mono{ font-size:12px; word-break:break-all; line-height:1.5; }
 .modal-secondary-btn{
   width:60%; margin:0 auto 14px; display:block;
@@ -5109,8 +5110,17 @@ function showMinClaimToast(minimum){
   });
 }
 
-function showBuyErrorToast(message){
-  showAppToast({ title: 'Cannot Buy', icon: PRIZE_ICON_URLS.coins, amount: message });
+function showComeBackTomorrowToast(){
+  showAppToast({ title: 'Come Back Tomorrow', amount: 'No attempts left today' });
+}
+
+function showBuyErrorToast(message, opts){
+  opts = opts || {};
+  showAppToast({
+    title: opts.title || 'Cannot Buy',
+    icon: opts.icon || PRIZE_ICON_URLS.coins,
+    amount: message
+  });
 }
 
 function showPurchaseToast(name, level){
@@ -5168,7 +5178,11 @@ function rotateSpinWheelToSegment(index){
 }
 
 function onSpinButtonClick(){
-  if (spinBusy || spinState.claimedToday) return;
+  if (spinBusy) return;
+  if (spinState.claimedToday){
+    showComeBackTomorrowToast();
+    return;
+  }
 
   var initData = getTelegramInitData();
   if (!initData){
@@ -5236,7 +5250,11 @@ function applyChestState(data){
 }
 
 function onChestOpenClick(){
-  if (chestBusy || chestState.claimedToday) return;
+  if (chestBusy) return;
+  if (chestState.claimedToday){
+    showComeBackTomorrowToast();
+    return;
+  }
 
   var initData = getTelegramInitData();
   if (!initData){
@@ -5309,7 +5327,11 @@ function applyGiftPickState(data){
 }
 
 function onGiftOpenClick(){
-  if (giftPickBusy || giftPickState.claimedToday) return;
+  if (giftPickBusy) return;
+  if (giftPickState.claimedToday){
+    showComeBackTomorrowToast();
+    return;
+  }
 
   var selectedBox = document.querySelector('.gift-pick-box.is-selected');
   if (!selectedBox){
@@ -6061,9 +6083,9 @@ function onExchangeConfirm(){
     var data = result.data;
     if (data.error){
       if (data.error === 'insufficient_funds'){
-        showBuyErrorToast('Not enough Coins');
+        showBuyErrorToast('Not enough Coins', { title: 'Exchange Failed' });
       } else if (data.error === 'below_minimum'){
-        showBuyErrorToast('Minimum ' + (data.minimum || EXCHANGE_MIN_COINS) + ' Coins');
+        showBuyErrorToast('Minimum ' + (data.minimum || EXCHANGE_MIN_COINS) + ' Coins', { title: 'Exchange Failed' });
       } else {
         console.error('exchange error:', data.error);
       }
@@ -6229,7 +6251,7 @@ function checkDepositStatus(){
   .then(function(data){
     if (data.error){
       stopDepositPolling();
-      showBuyErrorToast(data.error === 'deposit_not_configured' ? 'Deposit unavailable right now' : 'Could not start check');
+      showBuyErrorToast(data.error === 'deposit_not_configured' ? 'Deposit unavailable right now' : 'Could not start check', { title: 'Deposit Failed', icon: PRIZE_ICON_URLS.gram });
       return;
     }
     pollDepositStatus(initData);
@@ -6267,13 +6289,13 @@ function pollDepositStatus(initData){
 
     if (data.status === 'below_minimum'){
       stopDepositPolling();
-      showBuyErrorToast('Minimum deposit is ' + DEPOSIT_MIN_GRAM + ' Gram');
+      showBuyErrorToast('Minimum deposit is ' + DEPOSIT_MIN_GRAM + ' Gram', { title: 'Deposit Failed', icon: PRIZE_ICON_URLS.gram });
       return;
     }
 
     // timeout أو أي حالة غير متوقعة أخرى — نتوقف ونترك للمستخدم إعادة المحاولة
     stopDepositPolling();
-    showBuyErrorToast('Transaction not found yet — try again in a few minutes');
+    showBuyErrorToast('Transaction not found yet — try again in a few minutes', { title: 'Deposit Failed', icon: PRIZE_ICON_URLS.gram });
   })
   .catch(function(err){
     console.error('deposit status request failed:', err);
@@ -6353,7 +6375,7 @@ function submitWithdrawRequest(){
   var address = document.getElementById('withdraw-address').value.trim();
   if (amount < WITHDRAW_MIN_GRAM || amount > CURRENT_GRAM_BALANCE) return;
   if (!address){
-    showBuyErrorToast('Enter a withdrawal address');
+    showBuyErrorToast('Enter a withdrawal address', { title: 'Cannot Withdraw', icon: PRIZE_ICON_URLS.gram });
     return;
   }
 
@@ -6374,14 +6396,14 @@ function submitWithdrawRequest(){
     var data = result.data;
     if (data.error){
       if (data.error === 'below_minimum'){
-        showBuyErrorToast('Minimum ' + (data.minimum || WITHDRAW_MIN_GRAM) + ' Gram');
+        showBuyErrorToast('Minimum ' + (data.minimum || WITHDRAW_MIN_GRAM) + ' Gram', { title: 'Cannot Withdraw', icon: PRIZE_ICON_URLS.gram });
       } else if (data.error === 'insufficient_funds'){
-        showBuyErrorToast('Not enough Gram');
+        showBuyErrorToast('Not enough Gram', { title: 'Cannot Withdraw', icon: PRIZE_ICON_URLS.gram });
       } else if (data.error === 'cooldown_active'){
         NEXT_WITHDRAW_ALLOWED_AT = data.next_allowed_at;
         refreshWithdrawCooldown();
       } else if (data.error === 'missing_address'){
-        showBuyErrorToast('Enter a withdrawal address');
+        showBuyErrorToast('Enter a withdrawal address', { title: 'Cannot Withdraw', icon: PRIZE_ICON_URLS.gram });
       } else {
         console.error('withdraw error:', data.error);
       }
