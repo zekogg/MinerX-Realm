@@ -1255,14 +1255,38 @@ async function handleWithdrawRequest(request, env) {
 
   const now = Date.now();
   const cooldownCutoff = now - WITHDRAW_COOLDOWN_MS;
+  const netGram = Math.max(0, amountGram - WITHDRAW_FEE_GRAM);
 
   // شرط CAS واحد يضمن ذرّياً: الرصيد كافٍ + انتهاء فترة الـ24 ساعة معاً —
   // يمنع سباقاً بين طلبين متزامنين من نفس المستخدم يتجاوزان أي من الشرطين.
-  const reserveResult = await env.DB.prepare(
+  const reserveStmt = env.DB.prepare(
     `UPDATE users SET gram = gram - ?, last_withdraw_request_at = ?
      WHERE telegram_id = ? AND gram >= ?
        AND (last_withdraw_request_at IS NULL OR last_withdraw_request_at <= ?)`
-  ).bind(amountGram, now, telegramId, amountGram, cooldownCutoff).run();
+  ).bind(amountGram, now, telegramId, amountGram, cooldownCutoff);
+
+  const insertStmt = env.DB.prepare(
+    `INSERT INTO withdrawals
+       (telegram_id, raw_username, first_name, amount_gram, fee_gram, net_gram, address, status, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)`
+  ).bind(telegramId, rawUsername, firstName, amountGram, WITHDRAW_FEE_GRAM, netGram, address, now);
+
+  const txnStmt = env.DB.prepare(
+    "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'withdraw_request', ?, 'gram')"
+  ).bind(telegramId, -amountGram);
+
+  // حجز الرصيد + تسجيل الطلب في batch واحد ذرّي: إما الاثنان معاً أو لا شيء
+  // إطلاقاً — لو فشل الإدراج (مثلاً جدول withdrawals غير موجود بعد) لن
+  // يُخصَم أي رصيد بدون سجل مقابل له، بدل ترك المستخدم بخصم بلا أثر.
+  let batchResults;
+  try {
+    batchResults = await env.DB.batch([reserveStmt, insertStmt, txnStmt]);
+  } catch (e) {
+    console.error("withdraw request batch failed:", e?.message || e);
+    return jsonResponse({ error: "server_error" }, 500);
+  }
+
+  const [reserveResult, insertResult] = batchResults;
 
   if (!reserveResult.meta || reserveResult.meta.changes === 0) {
     const user = await env.DB.prepare(
@@ -1277,42 +1301,44 @@ async function handleWithdrawRequest(request, env) {
     return jsonResponse({ error: "insufficient_funds" }, 400);
   }
 
-  const netGram = Math.max(0, amountGram - WITHDRAW_FEE_GRAM);
-
-  const insertResult = await env.DB.prepare(
-    `INSERT INTO withdrawals
-       (telegram_id, raw_username, first_name, amount_gram, fee_gram, net_gram, address, status, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)`
-  ).bind(telegramId, rawUsername, firstName, amountGram, WITHDRAW_FEE_GRAM, netGram, address, now).run();
-
   const withdrawalId = insertResult.meta.last_row_id;
 
-  await env.DB.prepare(
-    "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'withdraw_request', ?, 'gram')"
-  ).bind(telegramId, -amountGram).run();
+  // إشعارات تيليجرام (منشور القناة + رسالة خاصة للمستخدم) بعد تأكيد نجاح
+  // الحجز والتسجيل بالكامل. أي فشل هنا لا يُفشل الطلب نفسه (الرصيد محجوز
+  // والسجل موجود فعلاً في withdrawals) لكن يُسجَّل بالتفصيل عبر console.error
+  // ليمكن تشخيصه (مثلاً: البوت ليس أدمن في القناة، أو ADMIN_CHANNEL_ID خطأ).
+  try {
+    const channelMsg = await sendMessage(env, ADMIN_CHANNEL_ID, {
+      text: buildWithdrawText("pending", { telegramId, rawUsername, firstName, netGram, address }),
+      reply_markup: {
+        inline_keyboard: [[
+          { text: "✅ Approve", callback_data: `wd_approve_${withdrawalId}` },
+          { text: "❌ Reject", callback_data: `wd_reject_${withdrawalId}` }
+        ]]
+      }
+    });
 
-  const channelMsg = await sendMessage(env, ADMIN_CHANNEL_ID, {
-    text: buildWithdrawText("pending", { telegramId, rawUsername, firstName, netGram, address }),
-    reply_markup: {
-      inline_keyboard: [[
-        { text: "✅ Approve", callback_data: `wd_approve_${withdrawalId}` },
-        { text: "❌ Reject", callback_data: `wd_reject_${withdrawalId}` }
-      ]]
+    if (channelMsg && channelMsg.ok && channelMsg.result) {
+      await env.DB.prepare(
+        "UPDATE withdrawals SET channel_message_id = ? WHERE id = ?"
+      ).bind(channelMsg.result.message_id, withdrawalId).run();
+    } else {
+      console.error("withdraw channel notification failed:", JSON.stringify(channelMsg));
     }
-  });
-
-  if (channelMsg && channelMsg.ok && channelMsg.result) {
-    await env.DB.prepare(
-      "UPDATE withdrawals SET channel_message_id = ? WHERE id = ?"
-    ).bind(channelMsg.result.message_id, withdrawalId).run();
+  } catch (e) {
+    console.error("withdraw channel notification threw:", e?.message || e);
   }
 
-  await sendMessage(env, telegramId, {
-    text:
-      `📨 Withdrawal Request Created\n\n` +
-      `Your request for ${netGram} Gram has been received and is being processed.\n\n` +
-      `⏱ This usually takes a few minutes, but can sometimes take up to 24 hours.`
-  });
+  try {
+    await sendMessage(env, telegramId, {
+      text:
+        `📨 Withdrawal Request Created\n\n` +
+        `Your request for ${netGram} Gram has been received and is being processed.\n\n` +
+        `⏱ This usually takes a few minutes, but can sometimes take up to 24 hours.`
+    });
+  } catch (e) {
+    console.error("withdraw confirmation DM failed:", e?.message || e);
+  }
 
   const updatedUser = await env.DB.prepare(
     "SELECT gram FROM users WHERE telegram_id = ?"
@@ -1659,53 +1685,70 @@ async function handleWithdrawCallback(cbq, env) {
   const withdrawalId = Number(match[2]);
   const newStatus = action === "approve" ? "approved" : "rejected";
 
-  const updateResult = await env.DB.prepare(
-    "UPDATE withdrawals SET status = ?, resolved_at = ? WHERE id = ? AND status = 'pending'"
-  ).bind(newStatus, Date.now(), withdrawalId).run();
+  try {
+    const updateResult = await env.DB.prepare(
+      "UPDATE withdrawals SET status = ?, resolved_at = ? WHERE id = ? AND status = 'pending'"
+    ).bind(newStatus, Date.now(), withdrawalId).run();
 
-  if (!updateResult.meta || updateResult.meta.changes === 0) {
-    await answerCallbackQuery(env, cbq.id, "⚠️ Already processed");
-    return;
-  }
+    if (!updateResult.meta || updateResult.meta.changes === 0) {
+      await answerCallbackQuery(env, cbq.id, "⚠️ Already processed");
+      return;
+    }
 
-  const w = await env.DB.prepare(
-    "SELECT * FROM withdrawals WHERE id = ?"
-  ).bind(withdrawalId).first();
+    const w = await env.DB.prepare(
+      "SELECT * FROM withdrawals WHERE id = ?"
+    ).bind(withdrawalId).first();
 
-  if (newStatus === "rejected") {
-    // إعادة المبلغ الكامل (المخصوم عند الطلب) لرصيد المستخدم
-    await env.DB.batch([
-      env.DB.prepare("UPDATE users SET gram = gram + ? WHERE telegram_id = ?")
-        .bind(w.amount_gram, w.telegram_id),
-      env.DB.prepare(
-        "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'withdraw_refund', ?, 'gram')"
-      ).bind(w.telegram_id, w.amount_gram)
-    ]);
-  }
+    if (newStatus === "rejected") {
+      // إعادة المبلغ الكامل (المخصوم عند الطلب) لرصيد المستخدم
+      await env.DB.batch([
+        env.DB.prepare("UPDATE users SET gram = gram + ? WHERE telegram_id = ?")
+          .bind(w.amount_gram, w.telegram_id),
+        env.DB.prepare(
+          "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'withdraw_refund', ?, 'gram')"
+        ).bind(w.telegram_id, w.amount_gram)
+      ]);
+    }
 
-  const textArgs = {
-    telegramId: w.telegram_id,
-    rawUsername: w.raw_username,
-    firstName: w.first_name,
-    netGram: w.net_gram,
-    address: w.address
-  };
-
-  const editPayload = { text: buildWithdrawText(newStatus, textArgs) };
-  if (newStatus === "approved") {
-    editPayload.reply_markup = {
-      inline_keyboard: [
-        [{ text: "🎮 PLAY GAME 🕹️", url: PLAY_GAME_URL }],
-        [{ text: "📢 News Channel 📢", url: NEWS_CHANNEL_URL }]
-      ]
+    const textArgs = {
+      telegramId: w.telegram_id,
+      rawUsername: w.raw_username,
+      firstName: w.first_name,
+      netGram: w.net_gram,
+      address: w.address
     };
+
+    const editPayload = { text: buildWithdrawText(newStatus, textArgs) };
+    if (newStatus === "approved") {
+      editPayload.reply_markup = {
+        inline_keyboard: [
+          [{ text: "🎮 PLAY GAME 🕹️", url: PLAY_GAME_URL }],
+          [{ text: "📢 News Channel 📢", url: NEWS_CHANNEL_URL }]
+        ]
+      };
+    }
+
+    try {
+      const editResult = await editMessage(env, ADMIN_CHANNEL_ID, w.channel_message_id, editPayload);
+      if (!editResult || !editResult.ok) {
+        console.error("withdraw callback editMessage failed:", JSON.stringify(editResult));
+      }
+    } catch (e) {
+      console.error("withdraw callback editMessage threw:", e?.message || e);
+    }
+
+    const dmText = newStatus === "approved"
+      ? `✅ Withdrawal Successful\n\nYour withdrawal of ${w.net_gram} Gram has been sent to your wallet.`
+      : `❌ Withdrawal Rejected\n\nYour withdrawal request could not be processed. Please try again later.\n\nYour balance has been refunded.`;
+    try {
+      await sendMessage(env, w.telegram_id, { text: dmText });
+    } catch (e) {
+      console.error("withdraw callback user DM threw:", e?.message || e);
+    }
+
+    await answerCallbackQuery(env, cbq.id, newStatus === "approved" ? "✅ Approved" : "❌ Rejected");
+  } catch (e) {
+    console.error("withdraw callback failed:", e?.message || e);
+    await answerCallbackQuery(env, cbq.id, "⚠️ Something went wrong");
   }
-  await editMessage(env, ADMIN_CHANNEL_ID, w.channel_message_id, editPayload);
-
-  const dmText = newStatus === "approved"
-    ? `✅ Withdrawal Successful\n\nYour withdrawal of ${w.net_gram} Gram has been sent to your wallet.`
-    : `❌ Withdrawal Rejected\n\nYour withdrawal request could not be processed. Please try again later.\n\nYour balance has been refunded.`;
-  await sendMessage(env, w.telegram_id, { text: dmText });
-
-  await answerCallbackQuery(env, cbq.id, newStatus === "approved" ? "✅ Approved" : "❌ Rejected");
 }
