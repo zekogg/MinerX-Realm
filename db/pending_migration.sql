@@ -54,3 +54,20 @@ ALTER TABLE users ADD COLUMN last_giftpick_date TEXT;
 --              مكلف على D1 كلما زاد عدد المستخدمين له). قراءة/كتابة صف واحد
 --              ثابتة التكلفة بدلاً من ذلك.
 ALTER TABLE promo_codes ADD COLUMN uses_count INTEGER DEFAULT 0;
+
+-- -- Deposit (إيداع Gram حقيقي على شبكة TON — يُحوَّل تلقائياً إلى Coins) --
+-- جدول جديد بالكامل: كل صف = معاملة TON واحدة تم تأكيدها فعلياً على
+-- البلوكتشين (تحققها DepositChecker Durable Object). قيد UNIQUE على
+-- tx_hash هو خط الدفاع الأخير ضد أي تحصيل مضاعف لنفس المعاملة، حتى لو
+-- أعاد الـ alarm نفس الفحص أكثر من مرة أو أعاد Worker تشغيل نفسه.
+CREATE TABLE IF NOT EXISTS deposits (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  telegram_id INTEGER NOT NULL,
+  tx_hash TEXT NOT NULL UNIQUE,
+  amount_gram REAL NOT NULL,
+  coins_credited REAL NOT NULL,
+  status TEXT NOT NULL,
+  memo TEXT,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_deposits_telegram_id ON deposits(telegram_id);

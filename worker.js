@@ -42,6 +42,19 @@ const EXCHANGE_RATE_COIN_TO_GRAM = 0.00001;
 const EXCHANGE_MIN_COINS = 1000; // الحد الأدنى لعملية Exchange واحدة
 
 // =====================================================================
+// إعدادات الإيداع (Deposit): إيداع Gram على شبكة TON يُحوَّل مباشرة إلى
+// Coins بنفس سعر صرف Exchange بالعكس (1 Gram = 1/EXCHANGE_RATE_COIN_TO_GRAM
+// Coins) — نفس الرقم المعروض حالياً بالواجهة (val * 100000). الفحص الفعلي
+// لبلوكتشين TON يتم داخل DepositChecker (Durable Object واحد لكل مستخدم).
+// =====================================================================
+const DEPOSIT_GRAM_TO_COINS_RATE = 1 / EXCHANGE_RATE_COIN_TO_GRAM; // 100000
+const DEPOSIT_MIN_GRAM = 3; // أقل مبلغ إيداع مسموح به
+const DEPOSIT_CHECK_TIMEOUT_MS = 120_000; // ينتقل status إلى "timeout" بعد هذا الوقت من بدء الفحص
+const DEPOSIT_CHECK_MAX_ATTEMPTS = 8;
+const DEPOSIT_CHECK_FIRST_DELAY_MS = 5_000;
+const DEPOSIT_CHECK_RETRY_DELAY_MS = 15_000;
+
+// =====================================================================
 // إعدادات حيوانات Realm القابلة للشراء + Storage. نفس القاعدة لكل
 // الحيوانات الستة (مطابقة لما طُبِّق على The Duck):
 // - السرعة عند الشراء (Lv.1) = basespeed الخاص بالحيوان، وكل مستوى يضيف
@@ -148,6 +161,18 @@ export default {
 
     if (url.pathname === "/api/exchange" && request.method === "POST") {
       return handleExchange(request, env);
+    }
+
+    if (url.pathname === "/api/deposit/info" && request.method === "POST") {
+      return handleDepositInfo(request, env);
+    }
+
+    if (url.pathname === "/api/deposit/check" && request.method === "POST") {
+      return handleDepositCheck(request, env);
+    }
+
+    if (url.pathname === "/api/deposit/status" && request.method === "POST") {
+      return handleDepositStatus(request, env);
     }
 
     // Everything else -> serve the Mini App static files
@@ -929,6 +954,247 @@ async function handleExchange(request, env) {
     coins: updatedUser.coins,
     gram: updatedUser.gram
   });
+}
+
+// =====================================================================
+// نقطة /api/deposit/info — تُرجع عنوان محفظة الإيداع + memo (تعليق TON)
+// الخاص بهذا المستخدم فقط (= telegram_id كنص)، تُستخدم الواجهة هذا الـ
+// memo لمطابقة معاملة هذا المستخدم بالتحديد على البلوكتشين.
+// =====================================================================
+async function handleDepositInfo(request, env) {
+  const auth = await authenticateRequest(request, env);
+  if (!auth.ok) return auth.response;
+  const { telegramId } = auth;
+
+  return jsonResponse({
+    address: env.DEPOSIT_ADDRESS || "",
+    memo: String(telegramId),
+    min_gram: DEPOSIT_MIN_GRAM,
+    rate_gram_to_coins: DEPOSIT_GRAM_TO_COINS_RATE
+  });
+}
+
+// =====================================================================
+// نقطة /api/deposit/check — تُشغّل (أو تُرجع حالة) DepositChecker: Durable
+// Object واحد لكل مستخدم (idFromName) يفحص بلوكتشين TON بشكل دوري (alarm)
+// بحثاً عن معاملة بنفس memo، بغض النظر عن حالة اتصال المتصفح.
+// =====================================================================
+async function handleDepositCheck(request, env) {
+  const auth = await authenticateRequest(request, env);
+  if (!auth.ok) return auth.response;
+  const { telegramId } = auth;
+
+  if (!env.DEPOSIT_ADDRESS) {
+    return jsonResponse({ error: "deposit_not_configured" }, 500);
+  }
+
+  const doId = env.DEPOSIT_CHECKER.idFromName(`user_${telegramId}`);
+  const doStub = env.DEPOSIT_CHECKER.get(doId);
+
+  const doRes = await doStub.fetch("https://do/start", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ telegramId, memo: String(telegramId) })
+  });
+
+  return new Response(doRes.body, {
+    status: doRes.status,
+    headers: { "Content-Type": "application/json" }
+  });
+}
+
+// =====================================================================
+// نقطة /api/deposit/status — تجلب حالة الفحص الحالية من DepositChecker.
+// عند اكتمال الفحص (found/already_processed) تُرفق أيضاً رصيد Coins
+// المُحدَّث حتى تُحدِّث الواجهة الرصيد المعروض فوراً بدون طلب /api/user إضافي.
+// =====================================================================
+async function handleDepositStatus(request, env) {
+  const auth = await authenticateRequest(request, env);
+  if (!auth.ok) return auth.response;
+  const { telegramId } = auth;
+
+  const doId = env.DEPOSIT_CHECKER.idFromName(`user_${telegramId}`);
+  const doStub = env.DEPOSIT_CHECKER.get(doId);
+
+  const doRes = await doStub.fetch("https://do/status");
+  const doData = await doRes.json();
+
+  if (doData.status === "found" || doData.status === "already_processed") {
+    const updatedUser = await env.DB.prepare(
+      "SELECT coins, gram FROM users WHERE telegram_id = ?"
+    ).bind(telegramId).first();
+    return jsonResponse({ ...doData, coins: updatedUser.coins, gram: updatedUser.gram });
+  }
+
+  return jsonResponse(doData);
+}
+
+// =====================================================================
+// DepositChecker — Durable Object واحد لكل مستخدم (idFromName(`user_${id}`)).
+// يفحص TonCenter بشكل دوري (alarm) عن معاملة واردة على DEPOSIT_ADDRESS
+// بنفس memo، ثم يحسب Coins المقابلة (Gram × DEPOSIT_GRAM_TO_COINS_RATE)
+// ويحصّلها في D1 مرة واحدة فقط لكل tx_hash (قيد UNIQUE في جدول deposits
+// يمنع أي تحصيل مضاعف حتى مع إعادة محاولة الـ alarm).
+// =====================================================================
+export class DepositChecker {
+  constructor(state, env) {
+    this.state = state;
+    this.env = env;
+  }
+
+  async fetch(request) {
+    const url = new URL(request.url);
+
+    if (url.pathname === "/start" && request.method === "POST") {
+      const currentStatus = await this.state.storage.get("status");
+      if (currentStatus === "pending") {
+        return jsonResponse({ status: "pending", alreadyRunning: true });
+      }
+
+      const { telegramId, memo } = await request.json();
+
+      await this.state.storage.put("telegramId", telegramId);
+      await this.state.storage.put("memo", String(memo));
+      await this.state.storage.put("status", "pending");
+      await this.state.storage.put("startTime", Date.now());
+      await this.state.storage.put("attempts", 0);
+      await this.state.storage.delete("amountGram");
+      await this.state.storage.delete("coinsCredited");
+
+      await this.state.storage.setAlarm(Date.now() + DEPOSIT_CHECK_FIRST_DELAY_MS);
+      return jsonResponse({ status: "pending" });
+    }
+
+    if (url.pathname === "/status" && request.method === "GET") {
+      const status = (await this.state.storage.get("status")) ?? "idle";
+      const amountGram = (await this.state.storage.get("amountGram")) ?? null;
+      const coinsCredited = (await this.state.storage.get("coinsCredited")) ?? null;
+      return jsonResponse({ status, amount_gram: amountGram, coins_credited: coinsCredited });
+    }
+
+    return jsonResponse({ error: "not_found" }, 404);
+  }
+
+  async alarm() {
+    const telegramId = await this.state.storage.get("telegramId");
+    const memo = await this.state.storage.get("memo");
+    const startTime = await this.state.storage.get("startTime");
+    let attempts = (await this.state.storage.get("attempts")) || 0;
+
+    attempts++;
+    await this.state.storage.put("attempts", attempts);
+
+    if (Date.now() - startTime > DEPOSIT_CHECK_TIMEOUT_MS) {
+      await this.state.storage.put("status", "timeout");
+      return;
+    }
+
+    const depositAddress = this.env.DEPOSIT_ADDRESS || "";
+    const headers = { "Accept": "application/json" };
+    if (this.env.TONCENTER_API_KEY) headers["X-API-Key"] = this.env.TONCENTER_API_KEY;
+
+    try {
+      const tonRes = await fetch(
+        `https://toncenter.com/api/v2/getTransactions?address=${encodeURIComponent(depositAddress)}&limit=10&archival=false`,
+        { headers }
+      );
+
+      if (tonRes.ok) {
+        const tonData = await tonRes.json();
+
+        if (tonData?.ok && Array.isArray(tonData.result)) {
+          for (const tx of tonData.result) {
+            const inMsg = tx.in_msg;
+            if (!inMsg || !inMsg.value || Number(inMsg.value) === 0) continue;
+
+            let txComment = "";
+            if (typeof inMsg.message === "string" && inMsg.message.length > 0) {
+              txComment = inMsg.message;
+            } else {
+              const msgData = inMsg.msg_data;
+              if (msgData?.["@type"] === "msg.dataText" && msgData.text) {
+                try {
+                  txComment = atob(msgData.text).replace(/^\x00+/, "");
+                } catch (e) {
+                  txComment = "";
+                }
+              }
+            }
+
+            if (txComment.trim() !== String(memo).trim()) continue;
+
+            const txHash = tx.transaction_id?.hash;
+            if (!txHash) continue;
+
+            const amountGram = Number(inMsg.value) / 1e9;
+
+            if (amountGram < DEPOSIT_MIN_GRAM) {
+              await this.state.storage.put("status", "below_minimum");
+              await this.state.storage.put("amountGram", amountGram);
+              return;
+            }
+
+            const coinsCredited = amountGram * DEPOSIT_GRAM_TO_COINS_RATE;
+
+            try {
+              await this.env.DB.batch([
+                this.env.DB.prepare(
+                  "INSERT INTO deposits (telegram_id, tx_hash, amount_gram, coins_credited, status, memo, created_at) VALUES (?, ?, ?, ?, 'confirmed', ?, ?)"
+                ).bind(telegramId, txHash, amountGram, coinsCredited, memo, Date.now()),
+                this.env.DB.prepare(
+                  "UPDATE users SET coins = coins + ? WHERE telegram_id = ?"
+                ).bind(coinsCredited, telegramId),
+                this.env.DB.prepare(
+                  "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'deposit', ?, 'coins')"
+                ).bind(telegramId, coinsCredited)
+              ]);
+            } catch (e) {
+              // D1 يُرجع الدفعة (batch) بالكامل ذرّية: لو فشل الإدراج بسبب tx_hash
+              // مكرر (UNIQUE) فهذا يعني أن هذه المعاملة سُجِّلت واحتُسبت في محاولة
+              // سابقة بالفعل — لا تُكرَّر. أي خطأ آخر (فشل D1 مؤقت مثلاً) لم تُكتب
+              // فيه أي عملية بالفعل (الدفعة كلها تراجعت) فيجب ألا تُصنَّف كحالة
+              // نهائية "already_processed" (كذبة تُوقف كل إعادة محاولة لاحقة) —
+              // بل تُترك بدون تغيير الحالة حتى يعيد alarm التالي فحص نفس المعاملة.
+              const errMsg = String(e?.message || e).toLowerCase();
+              if (errMsg.includes("unique")) {
+                await this.state.storage.put("status", "already_processed");
+                await this.state.storage.put("amountGram", amountGram);
+                return;
+              }
+              break;
+            }
+
+            await this.state.storage.put("status", "found");
+            await this.state.storage.put("amountGram", amountGram);
+            await this.state.storage.put("coinsCredited", coinsCredited);
+            await this.notifyUser(telegramId, amountGram, coinsCredited);
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      // شبكة/توكن سنتر غير متاح مؤقتاً — يُعاد المحاولة في الـ alarm التالي
+    }
+
+    if (attempts < DEPOSIT_CHECK_MAX_ATTEMPTS) {
+      await this.state.storage.setAlarm(Date.now() + DEPOSIT_CHECK_RETRY_DELAY_MS);
+    } else {
+      await this.state.storage.put("status", "timeout");
+    }
+  }
+
+  async notifyUser(telegramId, amountGram, coinsCredited) {
+    if (!this.env.BOT_TOKEN) return;
+    try {
+      await sendMessage(this.env, telegramId, {
+        text:
+          `✅ <b>Deposit Confirmed!</b>\n\n` +
+          `💎 Amount: <b>${amountGram.toFixed(4)} Gram</b>\n` +
+          `🪙 Credited: <b>${Math.round(coinsCredited).toLocaleString("en-US")} Coins</b>`,
+        parse_mode: "HTML"
+      });
+    } catch (e) {}
+  }
 }
 
 // يحسب حالة Storage الحالية (كم تراكم؟ هل امتلأ؟ كم تبقّى؟) بدون أي

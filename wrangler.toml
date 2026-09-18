@@ -12,3 +12,15 @@ run_worker_first = true
 binding = "DB"
 database_name = "minerxrealm"
 database_id = "9ebdd2c5-85f9-45d2-8d3b-0eb0f86ab0d3"
+
+[[durable_objects.bindings]]
+name = "DEPOSIT_CHECKER"
+class_name = "DepositChecker"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["DepositChecker"]
+
+# DEPOSIT_ADDRESS و TONCENTER_API_KEY (اختياري) يُضبطان كـ Cloudflare Secrets
+# لا كـ [vars] — عبر: wrangler secret put DEPOSIT_ADDRESS
+# (نفس أسلوب البوت السابق؛ env.DEPOSIT_ADDRESS يعمل بنفس الطريقة تماماً)
