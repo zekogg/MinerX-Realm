@@ -213,6 +213,11 @@ body{
 }
 button{ font-family:inherit; border:none; background:none; color:inherit; cursor:pointer; transition:transform .15s ease; }
 button:active{ transform:scale(.97); }
+/* أزرار Spin/Chest/Gift Pick تبقى قابلة للضغط فعلياً حتى بعد استخدام
+   المحاولة اليومية (بدل disabled الحقيقي الذي يمنع المتصفح من إطلاق حدث
+   click أساساً) — فقط تبدو معطّلة بصرياً، حتى تعمل رسالة "Come Back
+   Tomorrow" عند الضغط عليها رغم عدم توفر محاولة. */
+button.is-claimed{ opacity:.5; }
 ul{ list-style:none; }
 img,svg{ display:block; }
 @media (prefers-reduced-motion: reduce){
@@ -5150,7 +5155,7 @@ function renderSpinButton(){
   var btn = document.getElementById('btn-spin');
   if (!btn) return;
   btn.textContent = spinState.claimedToday ? 'Spin (0)' : 'Spin (1)';
-  btn.disabled = spinState.claimedToday;
+  btn.classList.toggle('is-claimed', spinState.claimedToday);
 }
 
 function applySpinState(data){
@@ -5240,7 +5245,7 @@ function renderChestButton(){
   var btn = document.getElementById('btn-open-chest');
   if (!btn) return;
   btn.innerHTML = chestState.claimedToday ? 'Open Chest&nbsp;&nbsp;(0)' : 'Open Chest&nbsp;&nbsp;(1)';
-  btn.disabled = chestState.claimedToday;
+  btn.classList.toggle('is-claimed', chestState.claimedToday);
 }
 
 function applyChestState(data){
@@ -5317,7 +5322,7 @@ function renderGiftOpenButton(){
   var btn = document.getElementById('btn-gift-open');
   if (!btn) return;
   btn.innerHTML = giftPickState.claimedToday ? 'Open&nbsp;&nbsp;(0)' : 'Open&nbsp;&nbsp;(1)';
-  btn.disabled = giftPickState.claimedToday;
+  btn.classList.toggle('is-claimed', giftPickState.claimedToday);
 }
 
 function applyGiftPickState(data){
