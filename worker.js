@@ -55,6 +55,21 @@ const DEPOSIT_CHECK_FIRST_DELAY_MS = 5_000;
 const DEPOSIT_CHECK_RETRY_DELAY_MS = 15_000;
 
 // =====================================================================
+// إعدادات السحب (Withdraw): سحب يدوي بالكامل — المستخدم يطلب، يُخصم
+// المبلغ فوراً من رصيده (حجز)، ويُرسَل منشور للقناة الإدارية بزري
+// Approve/Reject. لا يوجد فحص بلوكتشين آلي هنا (الإرسال يدوي من الأدمن
+// خارج البوت بالكامل). "Amount" الظاهر في الرسائل = المبلغ الصافي
+// (Net) بعد خصم الرسوم — هو الرقم الذي يجب على الأدمن إرساله فعلياً.
+// =====================================================================
+const WITHDRAW_MIN_GRAM = 0.1;
+const WITHDRAW_FEE_GRAM = 0.03;
+const WITHDRAW_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 ساعة، تبدأ فور الطلب بغض النظر عن النتيجة
+const ADMIN_TELEGRAM_ID = 1018495986;
+const ADMIN_CHANNEL_ID = -1004325013522;
+const PLAY_GAME_URL = "https://t.me/MinerXRealmBot";
+const NEWS_CHANNEL_URL = "https://t.me/MinerXRealmNews";
+
+// =====================================================================
 // إعدادات حيوانات Realm القابلة للشراء + Storage. نفس القاعدة لكل
 // الحيوانات الستة (مطابقة لما طُبِّق على The Duck):
 // - السرعة عند الشراء (Lv.1) = basespeed الخاص بالحيوان، وكل مستوى يضيف
@@ -175,6 +190,14 @@ export default {
       return handleDepositStatus(request, env);
     }
 
+    if (url.pathname === "/api/withdraw/request" && request.method === "POST") {
+      return handleWithdrawRequest(request, env);
+    }
+
+    if (url.pathname === "/api/wallet/history" && request.method === "POST") {
+      return handleWalletHistory(request, env);
+    }
+
     // Everything else -> serve the Mini App static files
     return env.ASSETS.fetch(request);
   }
@@ -196,6 +219,7 @@ async function handleGetUser(request, env) {
            u.mining_started_at, u.mining_cycles_today, u.mining_cycle_date,
            u.streak_day, u.streak_last_claim_date,
            u.last_spin_date, u.last_chest_date, u.last_giftpick_date,
+           u.last_withdraw_request_at,
            s.capacity_hours AS storage_capacity_hours, s.last_claim_at AS storage_last_claim_at
     FROM users u
     LEFT JOIN user_storage s ON s.telegram_id = u.telegram_id
@@ -240,6 +264,11 @@ async function handleGetUser(request, env) {
   view = withStorageView(view);
   view.exchange_rate_coin_to_gram = EXCHANGE_RATE_COIN_TO_GRAM;
   view.exchange_min_coins = EXCHANGE_MIN_COINS;
+  view.withdraw_min_gram = WITHDRAW_MIN_GRAM;
+  view.withdraw_fee_gram = WITHDRAW_FEE_GRAM;
+  view.next_withdraw_allowed_at = user.last_withdraw_request_at
+    ? user.last_withdraw_request_at + WITHDRAW_COOLDOWN_MS
+    : null;
 
   return jsonResponse({ user: view });
 }
@@ -1197,6 +1226,136 @@ export class DepositChecker {
   }
 }
 
+// =====================================================================
+// نقطة /api/withdraw/request — سحب يدوي بالكامل. يخصم المبلغ فوراً
+// (حجز CAS ذرّي يتحقق أيضاً من انتهاء فترة الـ24 ساعة في نفس الاستعلام)،
+// يسجّل الطلب "pending"، وينشر منشوراً بالقناة الإدارية بزري Approve/Reject.
+// =====================================================================
+async function handleWithdrawRequest(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "invalid_body" }, 400);
+  }
+
+  const auth = await authenticateRequest(request, env, body);
+  if (!auth.ok) return auth.response;
+  const { telegramId, rawUsername, firstName } = auth;
+
+  const amountGram = Number(body.amount);
+  const address = typeof body.address === "string" ? body.address.trim() : "";
+
+  if (!Number.isFinite(amountGram) || amountGram < WITHDRAW_MIN_GRAM) {
+    return jsonResponse({ error: "below_minimum", minimum: WITHDRAW_MIN_GRAM }, 400);
+  }
+  if (!address) {
+    return jsonResponse({ error: "missing_address" }, 400);
+  }
+
+  const now = Date.now();
+  const cooldownCutoff = now - WITHDRAW_COOLDOWN_MS;
+
+  // شرط CAS واحد يضمن ذرّياً: الرصيد كافٍ + انتهاء فترة الـ24 ساعة معاً —
+  // يمنع سباقاً بين طلبين متزامنين من نفس المستخدم يتجاوزان أي من الشرطين.
+  const reserveResult = await env.DB.prepare(
+    `UPDATE users SET gram = gram - ?, last_withdraw_request_at = ?
+     WHERE telegram_id = ? AND gram >= ?
+       AND (last_withdraw_request_at IS NULL OR last_withdraw_request_at <= ?)`
+  ).bind(amountGram, now, telegramId, amountGram, cooldownCutoff).run();
+
+  if (!reserveResult.meta || reserveResult.meta.changes === 0) {
+    const user = await env.DB.prepare(
+      "SELECT gram, last_withdraw_request_at FROM users WHERE telegram_id = ?"
+    ).bind(telegramId).first();
+    if (user && user.last_withdraw_request_at && user.last_withdraw_request_at > cooldownCutoff) {
+      return jsonResponse({
+        error: "cooldown_active",
+        next_allowed_at: user.last_withdraw_request_at + WITHDRAW_COOLDOWN_MS
+      }, 400);
+    }
+    return jsonResponse({ error: "insufficient_funds" }, 400);
+  }
+
+  const netGram = Math.max(0, amountGram - WITHDRAW_FEE_GRAM);
+
+  const insertResult = await env.DB.prepare(
+    `INSERT INTO withdrawals
+       (telegram_id, raw_username, first_name, amount_gram, fee_gram, net_gram, address, status, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)`
+  ).bind(telegramId, rawUsername, firstName, amountGram, WITHDRAW_FEE_GRAM, netGram, address, now).run();
+
+  const withdrawalId = insertResult.meta.last_row_id;
+
+  await env.DB.prepare(
+    "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'withdraw_request', ?, 'gram')"
+  ).bind(telegramId, -amountGram).run();
+
+  const channelMsg = await sendMessage(env, ADMIN_CHANNEL_ID, {
+    text: buildWithdrawText("pending", { telegramId, rawUsername, firstName, netGram, address }),
+    reply_markup: {
+      inline_keyboard: [[
+        { text: "✅ Approve", callback_data: `wd_approve_${withdrawalId}` },
+        { text: "❌ Reject", callback_data: `wd_reject_${withdrawalId}` }
+      ]]
+    }
+  });
+
+  if (channelMsg && channelMsg.ok && channelMsg.result) {
+    await env.DB.prepare(
+      "UPDATE withdrawals SET channel_message_id = ? WHERE id = ?"
+    ).bind(channelMsg.result.message_id, withdrawalId).run();
+  }
+
+  await sendMessage(env, telegramId, {
+    text:
+      `📨 Withdrawal Request Created\n\n` +
+      `Your request for ${netGram} Gram has been received and is being processed.\n\n` +
+      `⏱ This usually takes a few minutes, but can sometimes take up to 24 hours.`
+  });
+
+  const updatedUser = await env.DB.prepare(
+    "SELECT gram FROM users WHERE telegram_id = ?"
+  ).bind(telegramId).first();
+
+  return jsonResponse({
+    gram: updatedUser.gram,
+    net_gram: netGram,
+    next_allowed_at: now + WITHDRAW_COOLDOWN_MS
+  });
+}
+
+// =====================================================================
+// نقطة /api/wallet/history — سجل معاملات Wallet: آخر 5 إيداعات مؤكدة
+// (status='confirmed') + آخر 5 طلبات سحب (pending/approved/rejected) —
+// 10 كحد أقصى إجمالاً بعد الدمج والترتيب حسب التاريخ.
+// =====================================================================
+async function handleWalletHistory(request, env) {
+  const auth = await authenticateRequest(request, env);
+  if (!auth.ok) return auth.response;
+  const { telegramId } = auth;
+
+  const [depositsResult, withdrawalsResult] = await env.DB.batch([
+    env.DB.prepare(
+      "SELECT coins_credited AS amount, created_at FROM deposits WHERE telegram_id = ? AND status = 'confirmed' ORDER BY created_at DESC LIMIT 5"
+    ).bind(telegramId),
+    env.DB.prepare(
+      "SELECT net_gram AS amount, status, created_at FROM withdrawals WHERE telegram_id = ? ORDER BY created_at DESC LIMIT 5"
+    ).bind(telegramId)
+  ]);
+
+  const items = [];
+  for (const row of (depositsResult.results || [])) {
+    items.push({ type: "deposit", amount: row.amount, status: "confirmed", created_at: row.created_at });
+  }
+  for (const row of (withdrawalsResult.results || [])) {
+    items.push({ type: "withdraw", amount: row.amount, status: row.status, created_at: row.created_at });
+  }
+  items.sort((a, b) => b.created_at - a.created_at);
+
+  return jsonResponse({ items: items.slice(0, 10) });
+}
+
 // يحسب حالة Storage الحالية (كم تراكم؟ هل امتلأ؟ كم تبقّى؟) بدون أي
 // كتابة لقاعدة البيانات — يُستخدم فقط للعرض في /api/user.
 function withStorageView(user) {
@@ -1342,7 +1501,17 @@ async function authenticateRequest(request, env, preParsedBody) {
     if (!isNaN(parsed) && parsed !== telegramId) referredBy = parsed;
   }
 
-  return { ok: true, telegramId, username, referredBy };
+  // rawUsername/firstName منفصلان عن username (الذي يخلط بينهما) — لازمان
+  // لبناء اسم عرض صحيح في رسائل السحب: "@user" فقط لو كان اسم مستخدم حقيقياً،
+  // وإلا الاسم الأول بدون "@" (لا نضع "@" أمام اسم عادي، سيظهر كمنشن مكسور).
+  return {
+    ok: true,
+    telegramId,
+    username,
+    rawUsername: tgUser.username || null,
+    firstName: tgUser.first_name || null,
+    referredBy
+  };
 }
 
 // =====================================================================
@@ -1414,13 +1583,129 @@ async function handleTelegram(request, env) {
     });
   }
 
+  // أزرار Approve/Reject لطلبات السحب — فقط ADMIN_TELEGRAM_ID يُنفَّذ له أي إجراء،
+  // أي ضغطة من أي شخص آخر تُرفض بتنبيه بدون أي تأثير على البيانات.
+  if (update.callback_query) {
+    await handleWithdrawCallback(update.callback_query, env);
+  }
+
   return new Response("OK");
 }
 
 async function sendMessage(env, chatId, payload) {
-  await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/sendMessage`, {
+  const res = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ chat_id: chatId, ...payload })
   });
+  return res.json().catch(() => null);
+}
+
+async function editMessage(env, chatId, messageId, payload) {
+  const res = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/editMessageText`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: chatId, message_id: messageId, ...payload })
+  });
+  return res.json().catch(() => null);
+}
+
+async function answerCallbackQuery(env, callbackQueryId, text) {
+  await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/answerCallbackQuery`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ callback_query_id: callbackQueryId, text })
+  }).catch(() => {});
+}
+
+// =====================================================================
+// يبني نص رسالة السحب الثلاث حالاتها (pending/approved/rejected) — نفس
+// البيانات، فقط العنوان/الإيموجي يتغيّر، ويُحذف قسم الأزرار عند الرفض.
+// =====================================================================
+function buildWithdrawText(status, w) {
+  const title = status === "approved"
+    ? "✅ Withdrawal Successful!"
+    : status === "rejected"
+    ? "❌ Withdrawal Rejected"
+    : "⏰ Pending Withdrawal";
+
+  const nameLine = w.rawUsername ? `@${w.rawUsername}` : (w.firstName || `ID: ${w.telegramId}`);
+
+  return (
+    `${title}\n\n` +
+    `👤 ${nameLine}\n` +
+    `🆔 ${w.telegramId}\n\n` +
+    `💵 Amount: ${w.netGram} Gram\n\n` +
+    `📍 Address:\n${w.address}`
+  );
+}
+
+// =====================================================================
+// يعالج ضغطة Approve/Reject على منشور السحب في القناة. يتحقق أولاً أن
+// الضاغط هو ADMIN_TELEGRAM_ID، ثم يستخدم شرط "status='pending'" كـ CAS
+// ذرّي يمنع تنفيذ الزر مرتين (مثلاً لو ضُغط Approve وReject في نفس اللحظة).
+// =====================================================================
+async function handleWithdrawCallback(cbq, env) {
+  const data = cbq.data || "";
+  const match = data.match(/^wd_(approve|reject)_(\d+)$/);
+  if (!match) return;
+
+  if (cbq.from.id !== ADMIN_TELEGRAM_ID) {
+    await answerCallbackQuery(env, cbq.id, "⛔ Not authorized");
+    return;
+  }
+
+  const action = match[1];
+  const withdrawalId = Number(match[2]);
+  const newStatus = action === "approve" ? "approved" : "rejected";
+
+  const updateResult = await env.DB.prepare(
+    "UPDATE withdrawals SET status = ?, resolved_at = ? WHERE id = ? AND status = 'pending'"
+  ).bind(newStatus, Date.now(), withdrawalId).run();
+
+  if (!updateResult.meta || updateResult.meta.changes === 0) {
+    await answerCallbackQuery(env, cbq.id, "⚠️ Already processed");
+    return;
+  }
+
+  const w = await env.DB.prepare(
+    "SELECT * FROM withdrawals WHERE id = ?"
+  ).bind(withdrawalId).first();
+
+  if (newStatus === "rejected") {
+    // إعادة المبلغ الكامل (المخصوم عند الطلب) لرصيد المستخدم
+    await env.DB.batch([
+      env.DB.prepare("UPDATE users SET gram = gram + ? WHERE telegram_id = ?")
+        .bind(w.amount_gram, w.telegram_id),
+      env.DB.prepare(
+        "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'withdraw_refund', ?, 'gram')"
+      ).bind(w.telegram_id, w.amount_gram)
+    ]);
+  }
+
+  const textArgs = {
+    telegramId: w.telegram_id,
+    rawUsername: w.raw_username,
+    firstName: w.first_name,
+    netGram: w.net_gram,
+    address: w.address
+  };
+
+  const editPayload = { text: buildWithdrawText(newStatus, textArgs) };
+  if (newStatus === "approved") {
+    editPayload.reply_markup = {
+      inline_keyboard: [
+        [{ text: "🎮 PLAY GAME 🕹️", url: PLAY_GAME_URL }],
+        [{ text: "📢 News Channel 📢", url: NEWS_CHANNEL_URL }]
+      ]
+    };
+  }
+  await editMessage(env, ADMIN_CHANNEL_ID, w.channel_message_id, editPayload);
+
+  const dmText = newStatus === "approved"
+    ? `✅ Withdrawal Successful\n\nYour withdrawal of ${w.net_gram} Gram has been sent to your wallet.`
+    : `❌ Withdrawal Rejected\n\nYour withdrawal request could not be processed. Please try again later.\n\nYour balance has been refunded.`;
+  await sendMessage(env, w.telegram_id, { text: dmText });
+
+  await answerCallbackQuery(env, cbq.id, newStatus === "approved" ? "✅ Approved" : "❌ Rejected");
 }

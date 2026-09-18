@@ -268,7 +268,7 @@ img,svg{ display:block; }
 .prize-toast.is-visible{
   opacity:1; transform:translate(-50%,0) scale(1);
 }
-.prize-toast.no-icon{
+.prize-toast.no-icon, .prize-toast.is-rect{
   border-radius:14px; padding:12px 18px;
 }
 .prize-toast__icon-wrap{
@@ -1292,6 +1292,13 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .tx__amt{ font-family:var(--font-display); font-weight:700; font-size:13px; }
 .tx__amt.is-pos{ color:var(--success); }
 .tx__amt.is-neg{ color:var(--danger); }
+.tx__amt-icon{ width:12px; height:12px; flex-shrink:0; vertical-align:middle; margin-right:1px; }
+.tx__status{ font-size:11px; font-weight:700; }
+.tx__status.is-pending{ color:#38bdf8; }
+.tx__status.is-sent{ color:var(--success); }
+.tx__status.is-confirmed{ color:var(--c-progress-2); }
+.tx__status.is-rejected{ color:var(--danger); }
+.tx-empty{ text-align:center; font-size:12px; color:var(--ink-faint); padding:18px 0; }
 
 /* /////كود صفحة الشخصيات (Pets)///// */
 .storage-card{
@@ -3443,15 +3450,8 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 
       <div class="page-title" style="font-size:15px;margin-top:22px;">Transaction history</div>
 
-      <div class="card tx is-neg">
-        <div class="tx__icon"><svg viewBox="0 0 24 24" fill="none" stroke="#d98a86" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M19 12l-7 7-7-7"/></svg></div>
-        <div class="tx__body"><div class="tx__title">Withdrawal to wallet</div><div class="tx__date">Yesterday — 20:05</div></div>
-        <div class="tx__amt is-neg">-2,000</div>
-      </div>
-      <div class="card tx is-pos">
-        <div class="tx__icon"><svg viewBox="0 0 24 24" fill="none" stroke="#6fbf9a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div>
-        <div class="tx__body"><div class="tx__title">Referral commission</div><div class="tx__date">Yesterday — 09:41</div></div>
-        <div class="tx__amt is-pos">+64</div>
+      <div id="tx-history-list">
+        <div class="tx-empty" id="tx-history-empty">No transactions yet</div>
       </div>
     </section>
 
@@ -4616,25 +4616,25 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
       </div>
 
       <div class="modal-field-label"><span>Address (Gram~Ton):</span></div>
-      <input type="text" class="modal-plain-input" placeholder="UQ...">
+      <input type="text" class="modal-plain-input" id="withdraw-address" placeholder="UQ...">
 
       <div class="modal-field-label"><span>Amount to be received:</span></div>
       <div class="modal-plain-box has-gram" style="display:flex;align-items:center;gap:6px;"><span id="withdraw-output">0.0000</span> Gram <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:16px;height:16px;flex-shrink:0;"></div>
 
       <div class="wd-req">
-        <div class="wd-req__label"><span>Min Withdraw</span><span>0.1</span></div>
+        <div class="wd-req__label"><span>Min Withdraw</span><span id="withdraw-min-label">0.1</span></div>
         <div class="wd-req__track"><div class="wd-req__fill" style="width:0%"></div></div>
       </div>
 
-      <button class="modal-cta" id="withdraw-cta" onclick="openWithdrawReqModal()" disabled>Withdraw</button>
+      <button class="modal-cta" id="withdraw-cta" onclick="submitWithdrawRequest()" disabled>Withdraw</button>
       <div class="modal-footnote">
-        Fee: <b>0.03</b> Gram<br>
+        Fee: <b id="withdraw-fee-label">0.03</b> Gram<br>
         Withdrawals usually take several minutes, but sometimes up to 24 hours.
       </div>
       <div class="modal-notice">
         <span class="fp-gold-text">
           You can withdraw once every 24 hours<br>
-          Your Next Withdraw Request in <b>00:00</b>
+          Your Next Withdraw Request in <b id="withdraw-cooldown-timer">00:00:00</b>
         </span>
       </div>
     </div>
@@ -4706,6 +4706,15 @@ function updateBalanceDisplay(u){
   }
   if (typeof u.exchange_min_coins === 'number'){
     EXCHANGE_MIN_COINS = u.exchange_min_coins;
+  }
+  if (typeof u.withdraw_min_gram === 'number'){
+    WITHDRAW_MIN_GRAM = u.withdraw_min_gram;
+  }
+  if (typeof u.withdraw_fee_gram === 'number'){
+    WITHDRAW_FLAT_FEE = u.withdraw_fee_gram;
+  }
+  if ('next_withdraw_allowed_at' in u){
+    NEXT_WITHDRAW_ALLOWED_AT = u.next_withdraw_allowed_at;
   }
 
   var elTopbarCoins = document.getElementById('display-coins-topbar');
@@ -5076,6 +5085,7 @@ function showAppToast(opts){
     if (iconWrap) iconWrap.style.display = 'none';
     toast.classList.add('no-icon');
   }
+  toast.classList.toggle('is-rect', !!opts.rect);
   if (titleEl) titleEl.textContent = opts.title || 'You Won!';
   if (amountEl) amountEl.textContent = opts.amount || '';
 
@@ -5705,6 +5715,7 @@ fetchUserData();
       var active = btn.getAttribute('data-page') === pageId;
       btn.classList.toggle('is-active', active);
     });
+    if (pageId === 'page-wallet' && typeof loadTxHistory === 'function') loadTxHistory();
   }
 
   navButtons.forEach(function(btn){
@@ -6279,14 +6290,22 @@ function pollDepositStatus(initData){
 
 /* -- Withdraw -- */
 var WITHDRAW_FLAT_FEE = 0.03;
-var WITHDRAW_MAX_GRAM = 0; // بيانات وهمية — تُستبدل لاحقاً برصيد Gram الحقيقي
+var WITHDRAW_MIN_GRAM = 0.1;
+var NEXT_WITHDRAW_ALLOWED_AT = null;
+var withdrawCooldownTimer = null;
+var withdrawBusy = false;
+
 function setMaxWithdraw(){
-  document.getElementById('withdraw-amount').value = WITHDRAW_MAX_GRAM;
+  document.getElementById('withdraw-amount').value = CURRENT_GRAM_BALANCE;
   updateWithdraw();
 }
 function openWithdrawModal(){
   document.getElementById('withdraw-amount').value = '';
+  document.getElementById('withdraw-address').value = '';
+  document.getElementById('withdraw-min-label').textContent = WITHDRAW_MIN_GRAM;
+  document.getElementById('withdraw-fee-label').textContent = WITHDRAW_FLAT_FEE;
   updateWithdraw();
+  refreshWithdrawCooldown();
   openModal('modal-withdraw');
 }
 function updateWithdraw(){
@@ -6294,8 +6313,169 @@ function updateWithdraw(){
   var out = Math.max(0, val - WITHDRAW_FLAT_FEE);
   document.getElementById('withdraw-output').textContent = out.toFixed(4);
   var cta = document.getElementById('withdraw-cta');
-  cta.disabled = val <= 0;
-  cta.classList.toggle('is-ready', val > 0);
+  var onCooldown = NEXT_WITHDRAW_ALLOWED_AT && Date.now() < NEXT_WITHDRAW_ALLOWED_AT;
+  if (onCooldown) return; // النص/التعطيل يتحكم بهما refreshWithdrawCooldown بدل هنا
+  if (val > 0 && val < WITHDRAW_MIN_GRAM){
+    cta.textContent = 'Minimum ' + WITHDRAW_MIN_GRAM + ' Gram';
+    cta.disabled = true;
+    cta.classList.remove('is-ready');
+  } else {
+    cta.textContent = 'Withdraw';
+    cta.disabled = val <= 0 || val > CURRENT_GRAM_BALANCE;
+    cta.classList.toggle('is-ready', val > 0 && val <= CURRENT_GRAM_BALANCE);
+  }
+}
+
+function refreshWithdrawCooldown(){
+  var notice = document.querySelector('#modal-withdraw .modal-notice');
+  var timerEl = document.getElementById('withdraw-cooldown-timer');
+  var cta = document.getElementById('withdraw-cta');
+  clearInterval(withdrawCooldownTimer);
+
+  function tick(){
+    var remaining = NEXT_WITHDRAW_ALLOWED_AT ? NEXT_WITHDRAW_ALLOWED_AT - Date.now() : 0;
+    if (!remaining || remaining <= 0){
+      if (notice) notice.style.display = 'none';
+      clearInterval(withdrawCooldownTimer);
+      updateWithdraw();
+      return;
+    }
+    if (notice) notice.style.display = '';
+    if (cta){ cta.disabled = true; cta.classList.remove('is-ready'); cta.textContent = 'Withdraw'; }
+    var totalSec = Math.floor(remaining / 1000);
+    var h = Math.floor(totalSec / 3600);
+    var m = Math.floor((totalSec % 3600) / 60);
+    var s = totalSec % 60;
+    var pad = function(n){ return String(n).padStart(2, '0'); };
+    if (timerEl) timerEl.textContent = pad(h) + ':' + pad(m) + ':' + pad(s);
+  }
+
+  tick();
+  withdrawCooldownTimer = setInterval(tick, 1000);
+}
+
+function submitWithdrawRequest(){
+  if (withdrawBusy) return;
+  var amount = parseFloat(document.getElementById('withdraw-amount').value) || 0;
+  var address = document.getElementById('withdraw-address').value.trim();
+  if (amount < WITHDRAW_MIN_GRAM || amount > CURRENT_GRAM_BALANCE) return;
+  if (!address){
+    showBuyErrorToast('Enter a withdrawal address');
+    return;
+  }
+
+  var initData = getTelegramInitData();
+  if (!initData){
+    alert('Open this app from Telegram to withdraw.');
+    return;
+  }
+
+  withdrawBusy = true;
+  fetch('/api/withdraw/request', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: initData, amount: amount, address: address })
+  })
+  .then(function(res){ return res.json().then(function(data){ return { status: res.status, data: data }; }); })
+  .then(function(result){
+    var data = result.data;
+    if (data.error){
+      if (data.error === 'below_minimum'){
+        showBuyErrorToast('Minimum ' + (data.minimum || WITHDRAW_MIN_GRAM) + ' Gram');
+      } else if (data.error === 'insufficient_funds'){
+        showBuyErrorToast('Not enough Gram');
+      } else if (data.error === 'cooldown_active'){
+        NEXT_WITHDRAW_ALLOWED_AT = data.next_allowed_at;
+        refreshWithdrawCooldown();
+      } else if (data.error === 'missing_address'){
+        showBuyErrorToast('Enter a withdrawal address');
+      } else {
+        console.error('withdraw error:', data.error);
+      }
+      return;
+    }
+
+    updateBalanceDisplay({ gram: data.gram });
+    NEXT_WITHDRAW_ALLOWED_AT = data.next_allowed_at;
+    closeModal('modal-withdraw');
+    showAppToast({
+      title: 'Withdrawal Requested',
+      icon: PRIZE_ICON_URLS.gram,
+      rect: true,
+      amount: 'Withdrawal request submitted'
+    });
+  })
+  .catch(function(err){
+    console.error('withdraw request failed:', err);
+  })
+  .finally(function(){
+    withdrawBusy = false;
+  });
+}
+
+/* -- Transaction History (Wallet) -- */
+var TX_ICON_DEPOSIT =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="#6fbf9a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7 7 7-7"/></svg>';
+var TX_ICON_WITHDRAW =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="#d98a86" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M19 12l-7 7-7-7"/></svg>';
+
+function loadTxHistory(){
+  var initData = getTelegramInitData();
+  if (!initData) return;
+  fetch('/api/wallet/history', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: initData })
+  })
+  .then(function(res){ return res.json(); })
+  .then(function(data){
+    if (data.error || !data.items) return;
+    renderTxHistory(data.items);
+  })
+  .catch(function(err){ console.error('wallet history request failed:', err); });
+}
+
+function renderTxHistory(items){
+  var list = document.getElementById('tx-history-list');
+  if (!list) return;
+
+  if (!items.length){
+    list.innerHTML = '<div class="tx-empty">No transactions yet</div>';
+    return;
+  }
+
+  var html = items.map(function(item){
+    var isWithdraw = item.type === 'withdraw';
+    var icon = isWithdraw ? TX_ICON_WITHDRAW : TX_ICON_DEPOSIT;
+    var title = isWithdraw ? 'Withdrawal to wallet' : 'Deposit received';
+    var amtClass = isWithdraw ? 'is-neg' : 'is-pos';
+    var sign = isWithdraw ? '-' : '+';
+    var amtIcon = isWithdraw ? PRIZE_ICON_URLS.gram : PRIZE_ICON_URLS.coins;
+    var amountText = isWithdraw ? Number(item.amount).toFixed(4) : Math.round(item.amount).toLocaleString('en-US');
+
+    var STATUS_MAP = {
+      pending:   { cls: 'is-pending',   text: 'Pending' },
+      confirmed: { cls: 'is-confirmed', text: 'Confirmed' },
+      rejected:  { cls: 'is-rejected',  text: 'Rejected' },
+      approved:  { cls: 'is-sent',      text: 'Sent' }
+    };
+    var statusInfo = STATUS_MAP[item.status] || STATUS_MAP.approved;
+    var statusClass = statusInfo.cls;
+    var statusText = statusInfo.text;
+
+    return (
+      '<div class="card tx ' + amtClass + '">' +
+        '<div class="tx__icon">' + icon + '</div>' +
+        '<div class="tx__body">' +
+          '<div class="tx__title">' + title + '</div>' +
+          '<div class="tx__status ' + statusClass + '">' + statusText + '</div>' +
+        '</div>' +
+        '<div class="tx__amt ' + amtClass + '">' + sign + amountText + ' <img src="' + amtIcon + '" class="tx__amt-icon" alt=""></div>' +
+      '</div>'
+    );
+  }).join('');
+
+  list.innerHTML = html;
 }
 
 /* -- نسخ نص (Copy address / Copy comment) -- */

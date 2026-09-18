@@ -71,3 +71,29 @@ CREATE TABLE IF NOT EXISTS deposits (
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_deposits_telegram_id ON deposits(telegram_id);
+
+-- -- Withdraw (سحب يدوي بالكامل — لا فحص بلوكتشين، فقط Approve/Reject) --
+-- last_withdraw_request_at : وقت آخر طلب سحب بالمللي ثانية (UTC) — يُقارَن
+--                             به لتطبيق فترة الانتظار 24 ساعة، تبدأ فور
+--                             الطلب بغض النظر عن نجاح السحب أو رفضه.
+ALTER TABLE users ADD COLUMN last_withdraw_request_at INTEGER;
+
+-- withdrawals: كل صف = طلب سحب واحد. amount_gram هو المبلغ الكامل المخصوم
+-- من رصيد المستخدم فور الطلب (يُعاد بالكامل لو رُفض)، وnet_gram هو المبلغ
+-- الصافي بعد خصم الرسوم (fee_gram) — وهو الرقم الذي يظهر بالرسائل ويجب
+-- على الأدمن إرساله فعلياً للمستخدم عند الموافقة.
+CREATE TABLE IF NOT EXISTS withdrawals (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  telegram_id INTEGER NOT NULL,
+  raw_username TEXT,
+  first_name TEXT,
+  amount_gram REAL NOT NULL,
+  fee_gram REAL NOT NULL,
+  net_gram REAL NOT NULL,
+  address TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  channel_message_id INTEGER,
+  created_at INTEGER NOT NULL,
+  resolved_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_withdrawals_telegram_id ON withdrawals(telegram_id);
