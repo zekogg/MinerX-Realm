@@ -4612,7 +4612,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
       <div class="modal-field-label"><span>Amount (Gram):</span></div>
       <div class="withdraw-amount-wrap">
         <input type="number" class="modal-plain-input" id="withdraw-amount" placeholder="0" oninput="updateWithdraw()">
-        <button class="withdraw-max-btn" onclick="setMaxWithdraw()">MAX</button>
+        <button type="button" class="withdraw-max-btn" onclick="setMaxWithdraw()">MAX</button>
       </div>
 
       <div class="modal-field-label"><span>Address (Gram~Ton):</span></div>
@@ -4622,8 +4622,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
       <div class="modal-plain-box has-gram" style="display:flex;align-items:center;gap:6px;"><span id="withdraw-output">0.0000</span> Gram <img src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:16px;height:16px;flex-shrink:0;"></div>
 
       <div class="wd-req">
-        <div class="wd-req__label"><span>Min Withdraw</span><span id="withdraw-min-label">0.1</span></div>
-        <div class="wd-req__track"><div class="wd-req__fill" style="width:0%"></div></div>
+        <div class="wd-req__label"><span>Min Withdraw : <span id="withdraw-min-label">0.1</span></span></div>
       </div>
 
       <button class="modal-cta" id="withdraw-cta" onclick="submitWithdrawRequest()" disabled>Withdraw</button>
@@ -4699,7 +4698,7 @@ function updateBalanceDisplay(u){
 
   var coinsWhole = Number(u.coins).toLocaleString('en-US', { maximumFractionDigits: 0 });
   var gramText = Number(u.gram).toFixed(2);
-  var gramWhole = Number(u.gram).toLocaleString('en-US', { maximumFractionDigits: 0 });
+  var gramWalletText = Number(u.gram).toFixed(3);
 
   if (typeof u.exchange_rate_coin_to_gram === 'number'){
     EXCHANGE_RATE_COIN_TO_GRAM = u.exchange_rate_coin_to_gram;
@@ -4736,7 +4735,7 @@ function updateBalanceDisplay(u){
   if (elWalletCoinsTooltip) elWalletCoinsTooltip.textContent = coinsWhole + ' Coins';
 
   var elWalletGram = document.getElementById('display-gram-wallet');
-  if (elWalletGram) elWalletGram.textContent = gramWhole;
+  if (elWalletGram) elWalletGram.textContent = gramWalletText;
 
   if (typeof u.total_mined === 'number'){
     var elTotalMined = document.getElementById('stat-total-mined');
@@ -4926,8 +4925,7 @@ function onMiningButtonClick(){
 
     if (isReadyToClaim){
       if (typeof data.coins === 'number'){
-        var gramEl = document.getElementById('display-gram-wallet');
-        updateBalanceDisplay({ coins: data.coins, gram: gramEl ? Number(gramEl.textContent) : 0, total_mined: data.total_mined });
+        updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE, total_mined: data.total_mined });
         showPrizeToast('coins', data.reward, 'You Got');
       }
       applyMiningState({ mining_started_at: null, cycles_today: data.cycles_today, cycles_max: data.cycles_max, cycle_duration_seconds: miningState.cycleDurationSec });
@@ -5043,8 +5041,7 @@ function onStreakClaimClick(){
     }
 
     if (typeof data.coins === 'number'){
-      var gramEl = document.getElementById('display-gram-wallet');
-      updateBalanceDisplay({ coins: data.coins, gram: gramEl ? Number(gramEl.textContent) : 0 });
+      updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE });
     }
     applyStreakState({ display_day: data.day_claimed, claimed_today: true, next_reset_utc: data.next_reset_utc });
   })
@@ -5488,8 +5485,7 @@ function onPetBuyClick(petId, btn){
 
     petStates[petId] = { level: data.level, speed: data.speed };
     renderPetCard(def);
-    var gramEl = document.getElementById('display-gram-wallet');
-    updateBalanceDisplay({ coins: data.coins, gram: gramEl ? Number(gramEl.textContent) : 0 });
+    updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE });
     applyStorageState({
       storage_has_pet: true,
       total_speed: data.total_speed,
@@ -5543,8 +5539,7 @@ function onPetUpgradeConfirm(){
     closeModal('modal-upgrade-pet');
     petStates[petId] = { level: data.level, speed: data.speed };
     renderPetCard(def);
-    var gramEl = document.getElementById('display-gram-wallet');
-    updateBalanceDisplay({ coins: data.coins, gram: gramEl ? Number(gramEl.textContent) : 0 });
+    updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE });
     // السيرفر يصفّر لحظة بداية تراكم Storage عند كل ترقية (لمنع احتساب
     // الوقت الماضي بالسرعة الكلية الجديدة الأعلى) — نطابق نفس التصفير هنا محلياً
     applyStorageState({
@@ -5674,8 +5669,7 @@ function onStorageClaimClick(){
       return;
     }
 
-    var gramEl = document.getElementById('display-gram-wallet');
-    updateBalanceDisplay({ coins: data.coins, gram: gramEl ? Number(gramEl.textContent) : 0 });
+    updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE });
     showPrizeToast('coins', Math.round(data.claimed_amount * 100) / 100, 'You Got');
     applyStorageState({
       storage_has_pet: true,
@@ -5874,8 +5868,7 @@ function onStorageUpgradeConfirm(){
     }
 
     closeModal('modal-upgrade-storage');
-    var gramEl = document.getElementById('display-gram-wallet');
-    updateBalanceDisplay({ coins: data.coins, gram: gramEl ? Number(gramEl.textContent) : 0 });
+    updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE });
     applyStorageState({
       storage_has_pet: true,
       total_speed: storageState.totalSpeed,
@@ -6296,7 +6289,7 @@ var withdrawCooldownTimer = null;
 var withdrawBusy = false;
 
 function setMaxWithdraw(){
-  document.getElementById('withdraw-amount').value = CURRENT_GRAM_BALANCE;
+  document.getElementById('withdraw-amount').value = CURRENT_GRAM_BALANCE.toFixed(4);
   updateWithdraw();
 }
 function openWithdrawModal(){
