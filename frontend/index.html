@@ -4591,7 +4591,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         <div class="modal-plain-box modal-mono" id="deposit-comment">0000000</div>
         <button class="modal-secondary-btn" onclick="copyText('deposit-comment')">Copy comment</button>
 
-        <button class="modal-cta is-ready" onclick="closeModal('modal-deposit')">I've Sent - Check</button>
+        <button class="modal-cta is-ready" id="deposit-check-btn" onclick="checkDepositStatus()">I've Sent - Check</button>
         <div class="modal-footnote" id="deposit-check-note">Tap Check after sending — required to confirm your deposit.</div>
       </div>
     </div>
@@ -6134,6 +6134,12 @@ function onPromoRedeemClick(){
 }
 
 /* -- Deposit -- */
+var DEPOSIT_ADDRESS = '';
+var DEPOSIT_MEMO = '';
+var DEPOSIT_MIN_GRAM = 3;
+var depositPollTimer = null;
+var depositCheckBusy = false;
+
 function openDepositModal(){
   document.getElementById('deposit-input').value = '';
   document.getElementById('deposit-output').textContent = '0';
@@ -6142,6 +6148,22 @@ function openDepositModal(){
   document.getElementById('deposit-step1').style.display = 'block';
   document.getElementById('deposit-step2').style.display = 'none';
   openModal('modal-deposit');
+
+  var initData = getTelegramInitData();
+  if (!initData) return;
+  fetch('/api/deposit/info', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: initData })
+  })
+  .then(function(res){ return res.json(); })
+  .then(function(data){
+    if (data.error) return;
+    DEPOSIT_ADDRESS = data.address || '';
+    DEPOSIT_MEMO = data.memo || '';
+    if (typeof data.min_gram === 'number') DEPOSIT_MIN_GRAM = data.min_gram;
+  })
+  .catch(function(err){ console.error('deposit info request failed:', err); });
 }
 function updateDeposit(){
   var input = document.getElementById('deposit-input');
@@ -6156,8 +6178,96 @@ function goDepositStep2(){
   var val = parseFloat(document.getElementById('deposit-input').value) || 0;
   if (val <= 0) return;
   document.getElementById('deposit-amount-display-text').textContent = val + ' Gram';
+  document.getElementById('deposit-address').textContent = DEPOSIT_ADDRESS || 'Unavailable';
+  document.getElementById('deposit-comment').textContent = DEPOSIT_MEMO;
   document.getElementById('deposit-step1').style.display = 'none';
   document.getElementById('deposit-step2').style.display = 'block';
+}
+
+function setDepositCheckBtnState(text, disabled){
+  var btn = document.getElementById('deposit-check-btn');
+  if (!btn) return;
+  btn.textContent = text;
+  btn.disabled = disabled;
+}
+
+function stopDepositPolling(){
+  clearTimeout(depositPollTimer);
+  depositPollTimer = null;
+  depositCheckBusy = false;
+  setDepositCheckBtnState("I've Sent - Check", false);
+}
+
+function checkDepositStatus(){
+  if (depositCheckBusy) return;
+  var initData = getTelegramInitData();
+  if (!initData){
+    alert('Open this app from Telegram to check your deposit.');
+    return;
+  }
+
+  depositCheckBusy = true;
+  setDepositCheckBtnState('Checking...', true);
+
+  fetch('/api/deposit/check', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: initData })
+  })
+  .then(function(res){ return res.json(); })
+  .then(function(data){
+    if (data.error){
+      stopDepositPolling();
+      showBuyErrorToast(data.error === 'deposit_not_configured' ? 'Deposit unavailable right now' : 'Could not start check');
+      return;
+    }
+    pollDepositStatus(initData);
+  })
+  .catch(function(err){
+    console.error('deposit check request failed:', err);
+    stopDepositPolling();
+  });
+}
+
+function pollDepositStatus(initData){
+  fetch('/api/deposit/status', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: initData })
+  })
+  .then(function(res){ return res.json(); })
+  .then(function(data){
+    if (data.status === 'pending' || data.status === 'idle'){
+      depositPollTimer = setTimeout(function(){ pollDepositStatus(initData); }, 4000);
+      return;
+    }
+
+    if (data.status === 'found' || data.status === 'already_processed'){
+      stopDepositPolling();
+      updateBalanceDisplay({ coins: data.coins, gram: data.gram });
+      closeModal('modal-deposit');
+      showAppToast({
+        title: data.status === 'found' ? 'Deposit Confirmed!' : 'Deposit Already Processed',
+        icon: PRIZE_ICON_URLS.coins,
+        amount: '+' + Math.round(data.coins_credited || 0).toLocaleString('en-US') + ' Coins'
+      });
+      return;
+    }
+
+    if (data.status === 'below_minimum'){
+      stopDepositPolling();
+      showBuyErrorToast('Minimum deposit is ' + DEPOSIT_MIN_GRAM + ' Gram');
+      return;
+    }
+
+    // timeout أو أي حالة غير متوقعة أخرى — نتوقف ونترك للمستخدم إعادة المحاولة
+    stopDepositPolling();
+    showBuyErrorToast('Transaction not found yet — try again in a few minutes');
+  })
+  .catch(function(err){
+    console.error('deposit status request failed:', err);
+    stopDepositPolling();
+  });
 }
 
 /* -- Withdraw -- */
