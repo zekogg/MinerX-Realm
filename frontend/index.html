@@ -6411,6 +6411,7 @@ function submitWithdrawRequest(){
         showBuyErrorToast('Enter a withdrawal address', { title: 'Cannot Withdraw', icon: PRIZE_ICON_URLS.gram });
       } else {
         console.error('withdraw error:', data.error);
+        showBuyErrorToast('Something went wrong, please try again', { title: 'Cannot Withdraw', icon: PRIZE_ICON_URLS.gram });
       }
       return;
     }
@@ -6427,6 +6428,7 @@ function submitWithdrawRequest(){
   })
   .catch(function(err){
     console.error('withdraw request failed:', err);
+    showBuyErrorToast('Something went wrong, please try again', { title: 'Cannot Withdraw', icon: PRIZE_ICON_URLS.gram });
   })
   .finally(function(){
     withdrawBusy = false;
