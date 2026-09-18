@@ -1310,6 +1310,7 @@ async function handleWithdrawRequest(request, env) {
   try {
     const channelMsg = await sendMessage(env, ADMIN_CHANNEL_ID, {
       text: buildWithdrawText("pending", { telegramId, rawUsername, firstName, netGram, address }),
+      parse_mode: "HTML",
       reply_markup: {
         inline_keyboard: [[
           { text: "✅ Approve", callback_data: `wd_approve_${withdrawalId}` },
@@ -1648,6 +1649,16 @@ async function answerCallbackQuery(env, callbackQueryId, text) {
 // يبني نص رسالة السحب الثلاث حالاتها (pending/approved/rejected) — نفس
 // البيانات، فقط العنوان/الإيموجي يتغيّر، ويُحذف قسم الأزرار عند الرفض.
 // =====================================================================
+// يهرب الرموز الخاصة بـ HTML قبل تضمين أي نص مصدره المستخدم (اسم المستخدم،
+// الاسم الأول، عنوان المحفظة) داخل رسالة بصيغة parse_mode=HTML — يمنع كسر
+// تنسيق الرسالة أو حقن وسوم غير مقصودة.
+function escapeHtml(text) {
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 function buildWithdrawText(status, w) {
   const title = status === "approved"
     ? "✅ Withdrawal Successful!"
@@ -1655,14 +1666,18 @@ function buildWithdrawText(status, w) {
     ? "❌ Withdrawal Rejected"
     : "⏰ Pending Withdrawal";
 
-  const nameLine = w.rawUsername ? `@${w.rawUsername}` : (w.firstName || `ID: ${w.telegramId}`);
+  const nameLine = w.rawUsername
+    ? `@${escapeHtml(w.rawUsername)}`
+    : (w.firstName ? escapeHtml(w.firstName) : `ID: ${w.telegramId}`);
 
+  // <code> يجعل تيليجرام يعرض النص بخط أحادي المسافة قابل للضغط للنسخ
+  // بضغطة واحدة — مطبَّق على ID المستخدم وعنوان المحفظة تحديداً.
   return (
     `${title}\n\n` +
     `👤 ${nameLine}\n` +
-    `🆔 ${w.telegramId}\n\n` +
+    `🆔 <code>${w.telegramId}</code>\n\n` +
     `💵 Amount: ${w.netGram} Gram\n\n` +
-    `📍 Address:\n${w.address}`
+    `📍 Address:\n<code>${escapeHtml(w.address)}</code>`
   );
 }
 
@@ -1718,7 +1733,7 @@ async function handleWithdrawCallback(cbq, env) {
       address: w.address
     };
 
-    const editPayload = { text: buildWithdrawText(newStatus, textArgs) };
+    const editPayload = { text: buildWithdrawText(newStatus, textArgs), parse_mode: "HTML" };
     if (newStatus === "approved") {
       editPayload.reply_markup = {
         inline_keyboard: [
