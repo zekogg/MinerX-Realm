@@ -768,6 +768,7 @@ img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
 .mystery-box__pick-art{ width:96%; height:96%; object-fit:contain; }
 img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .mystery-box__pick.is-used{ opacity:.35; pointer-events:none; }
+.mystery-box__pick.is-locked{ opacity:.35; pointer-events:none; }
 .mystery-box__slot--filled{ padding:0; overflow:hidden; cursor:pointer; }
 .mystery-box__slot--filled img{ width:96%; height:96%; object-fit:contain; }
 .mystery-box__slot--filled img[alt="Penguin"]{ transform:scale(1.45); }
@@ -776,6 +777,9 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   background:linear-gradient(135deg, var(--c-ad-watch-1), var(--c-ad-watch-2));
   color:var(--c-ad-watch-text); font-weight:800; font-size:10px;
 }
+.mystery-box__check:disabled{ opacity:.5; }
+.mystery-box__check.is-solved{ background:linear-gradient(135deg, #2fbf71, #1f8f54); color:#fff; opacity:1; }
+.mystery-box__check.is-failed{ background:var(--stone-2); color:var(--ink-faint); opacity:1; }
 
 /* /////كود صف Quick Actions///// */
 .quick-actions{ margin-top:18px; }
@@ -3061,17 +3065,17 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
             <div class="mystery-box__slot" id="combo-slot-0"><span>Empty</span></div>
             <div class="mystery-box__slot" id="combo-slot-1"><span>Empty</span></div>
             <div class="mystery-box__slot" id="combo-slot-2"><span>Empty</span></div>
-            <button class="mystery-box__slot mystery-box__pick" onclick="pickCombo(this, 'https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Duck%20Combo%20.webp', 'Duck')">
+            <button class="mystery-box__slot mystery-box__pick" onclick="pickCombo(this, 'https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Duck%20Combo%20.webp', 'Duck', 'duck')">
               <img draggable="false" class="mystery-box__pick-art" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Duck%20Combo%20.webp" alt="Duck">
             </button>
-            <button class="mystery-box__slot mystery-box__pick" onclick="pickCombo(this, 'https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Penguin%20Combo%20.webp', 'Penguin')">
+            <button class="mystery-box__slot mystery-box__pick" onclick="pickCombo(this, 'https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Penguin%20Combo%20.webp', 'Penguin', 'penguin')">
               <img draggable="false" class="mystery-box__pick-art" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Penguin%20Combo%20.webp" alt="Penguin">
             </button>
-            <button class="mystery-box__slot mystery-box__pick" onclick="pickCombo(this, 'https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Polar%20Combo%20.webp', 'Polar Bear')">
+            <button class="mystery-box__slot mystery-box__pick" onclick="pickCombo(this, 'https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Polar%20Combo%20.webp', 'Polar Bear', 'polar_bear')">
               <img draggable="false" class="mystery-box__pick-art" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Polar%20Combo%20.webp" alt="Polar Bear">
             </button>
           </div>
-          <button class="mystery-box__check">Check</button>
+          <button class="mystery-box__check" id="combo-check-btn" onclick="onComboCheckClick()">Check</button>
         </div>
       </div>
 
@@ -4794,6 +4798,11 @@ function fetchUserData(){
       claimed_today: data.user.giftpick_claimed_today,
       next_reset_utc: data.user.giftpick_next_reset_utc
     });
+    applyComboState({
+      solved_today: data.user.combo_solved_today,
+      attempts_used: data.user.combo_attempts_used,
+      max_attempts: data.user.combo_max_attempts
+    });
     applyPetsState(data.user.pets);
     applyStorageState({
       storage_has_pet: data.user.storage_has_pet,
@@ -5982,20 +5991,29 @@ function toggleGrowthTooltipTC(){
   tip._t = setTimeout(function(){ tip.classList.remove('is-visible'); }, 2500);
 }
 
-/* -- مثال Daily Combo: كل شخصية تُضغط تملأ أقرب مربع فاضي من اليسار لليمين -- */
-function pickCombo(btn, imgUrl, name){
-  if (btn.classList.contains('is-used')) return;
+/* =====================================================================
+   Daily Combo: كل شخصية تُضغط تملأ أقرب مربع فاضي من اليسار لليمين.
+   الترتيب الصحيح سرّي بالكامل على السيرفر (يتغيّر كل يوم 00:00 UTC) —
+   هذا الكود لا يعرفه أبداً، فقط يرسل ترتيب اختيار المستخدم لـ
+   /api/combo/check ويعرض نتيجة صحيح/خطأ التي يرجعها السيرفر.
+   ===================================================================== */
+var comboState = { solvedToday: false, attemptsUsed: 0, maxAttempts: 2, busy: false };
+
+function pickCombo(btn, imgUrl, name, cardId){
+  if (btn.classList.contains('is-used') || btn.classList.contains('is-locked')) return;
   for (var i = 0; i < 3; i++){
     var slot = document.getElementById('combo-slot-' + i);
     if (!slot.classList.contains('mystery-box__slot--filled')){
       slot.classList.add('mystery-box__slot--filled');
       slot.innerHTML = '<img draggable="false" src="' + imgUrl + '" alt="' + name + '">';
+      slot.dataset.cardId = cardId;
       slot._sourceBtn = btn;
       slot.onclick = returnCombo;
       btn.classList.add('is-used');
       break;
     }
   }
+  renderComboCheckButton();
 }
 
 function returnCombo(){
@@ -6003,8 +6021,151 @@ function returnCombo(){
   if (slot._sourceBtn){ slot._sourceBtn.classList.remove('is-used'); }
   slot._sourceBtn = null;
   slot.onclick = null;
+  delete slot.dataset.cardId;
   slot.classList.remove('mystery-box__slot--filled');
   slot.innerHTML = '<span>Empty</span>';
+  renderComboCheckButton();
+}
+
+function resetComboSlots(){
+  for (var i = 0; i < 3; i++){
+    var slot = document.getElementById('combo-slot-' + i);
+    if (slot._sourceBtn){ slot._sourceBtn.classList.remove('is-used'); }
+    slot._sourceBtn = null;
+    slot.onclick = null;
+    delete slot.dataset.cardId;
+    slot.classList.remove('mystery-box__slot--filled');
+    slot.innerHTML = '<span>Empty</span>';
+  }
+}
+
+// يعيد ترتيب مواضع بطاقات الاختيار الثلاث بصرياً فقط بعد محاولة خاطئة —
+// لا علاقة له إطلاقاً بالترتيب الصحيح السرّي، مجرد تشويش بصري بسيط.
+function shuffleComboPickButtons(){
+  var grid = document.querySelector('.mystery-box__grid');
+  if (!grid) return;
+  var picks = Array.prototype.slice.call(grid.querySelectorAll('.mystery-box__pick'));
+  for (var i = picks.length - 1; i > 0; i--){
+    var j = Math.floor(Math.random() * (i + 1));
+    var tmp = picks[i]; picks[i] = picks[j]; picks[j] = tmp;
+  }
+  picks.forEach(function(btn){ grid.appendChild(btn); });
+}
+
+function getComboGuessOrder(){
+  var order = [];
+  for (var i = 0; i < 3; i++){
+    var slot = document.getElementById('combo-slot-' + i);
+    if (!slot.dataset.cardId) return null;
+    order.push(slot.dataset.cardId);
+  }
+  return order;
+}
+
+function applyComboState(data){
+  comboState.solvedToday = !!data.solved_today;
+  comboState.attemptsUsed = data.attempts_used || 0;
+  comboState.maxAttempts = data.max_attempts || 2;
+  renderComboCheckButton();
+  renderComboPickLock();
+}
+
+function renderComboCheckButton(){
+  var btn = document.getElementById('combo-check-btn');
+  if (!btn) return;
+  var exhausted = comboState.attemptsUsed >= comboState.maxAttempts;
+
+  if (comboState.solvedToday){
+    btn.textContent = '✓';
+    btn.classList.add('is-solved');
+    btn.classList.remove('is-failed');
+    btn.disabled = true;
+    return;
+  }
+  if (exhausted){
+    btn.textContent = '✗';
+    btn.classList.add('is-failed');
+    btn.classList.remove('is-solved');
+    btn.disabled = true;
+    return;
+  }
+
+  btn.textContent = 'Check';
+  btn.classList.remove('is-solved', 'is-failed');
+  btn.disabled = !getComboGuessOrder() || comboState.busy;
+}
+
+// يقفل بطاقات الاختيار الثلاث بعد الحل أو انتهاء المحاولتين — لا فائدة
+// من تركها قابلة للضغط بعد ذلك.
+function renderComboPickLock(){
+  var locked = comboState.solvedToday || (comboState.attemptsUsed >= comboState.maxAttempts);
+  document.querySelectorAll('.mystery-box__pick').forEach(function(btn){
+    btn.classList.toggle('is-locked', locked);
+  });
+}
+
+function onComboCheckClick(){
+  if (comboState.busy || comboState.solvedToday || comboState.attemptsUsed >= comboState.maxAttempts) return;
+  var order = getComboGuessOrder();
+  if (!order) return;
+
+  var initData = getTelegramInitData();
+  if (!initData){
+    alert('Open this app from Telegram to play Daily Combo.');
+    return;
+  }
+
+  comboState.busy = true;
+  renderComboCheckButton();
+
+  fetch('/api/combo/check', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: initData, order: order })
+  })
+  .then(function(res){ return res.json(); })
+  .then(function(data){
+    comboState.busy = false;
+
+    if (data.error){
+      if (data.error === 'already_solved'){
+        comboState.solvedToday = true;
+      } else if (data.error === 'no_attempts_left'){
+        comboState.attemptsUsed = comboState.maxAttempts;
+      } else {
+        showBuyErrorToast('Try again later', { title: 'Daily Combo' });
+      }
+      renderComboCheckButton();
+      renderComboPickLock();
+      return;
+    }
+
+    comboState.attemptsUsed = data.attempts_used;
+
+    if (data.correct){
+      comboState.solvedToday = true;
+      updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE });
+      showAppToast({ title: 'Daily Combo Solved', icon: PRIZE_ICON_URLS.coins, amount: '+' + data.reward + ' Coins' });
+      renderComboCheckButton();
+      renderComboPickLock();
+      return;
+    }
+
+    resetComboSlots();
+    shuffleComboPickButtons();
+    if (data.attempts_left > 0){
+      showAppToast({ title: 'Wrong!', amount: data.attempts_left + ' Attempt Left' });
+    } else {
+      showAppToast({ title: 'Wrong!', amount: 'Come Back Tomorrow' });
+    }
+    renderComboCheckButton();
+    renderComboPickLock();
+  })
+  .catch(function(err){
+    console.error('combo check failed:', err);
+    comboState.busy = false;
+    renderComboCheckButton();
+  });
 }
 
 

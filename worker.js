@@ -70,6 +70,20 @@ const PLAY_GAME_URL = "https://t.me/MinerXRealmBot";
 const NEWS_CHANNEL_URL = "https://t.me/MinerXRealmNews";
 
 // =====================================================================
+// إعدادات Daily Combo: عند 00:00 UTC كل يوم (Cron Trigger — انظر
+// [triggers] في wrangler.toml) يختار السيرفر ترتيباً عشوائياً جديداً
+// لنفس البطاقات الثلاث الثابتة (Duck, Polar Bear, Penguin) ويحفظه في
+// daily_combo، ثم يرسل الإجابة الصحيحة للأدمن فقط عبر رسالة خاصة —
+// لا يصل أي جزء منها للمستخدم أو للواجهة إطلاقاً. للمستخدم محاولتان
+// فقط يومياً لتخمين نفس التسلسل بالضبط (الترتيب مهم، وليس فقط اختيار
+// البطاقات الصحيحة)، مقابل مكافأة ثابتة عند النجاح.
+// =====================================================================
+const COMBO_CARDS = ["duck", "polar_bear", "penguin"];
+const COMBO_CARD_LABELS = { duck: "Duck", polar_bear: "Polar Bear", penguin: "Penguin" };
+const COMBO_REWARD_COINS = 100;
+const COMBO_MAX_ATTEMPTS = 2;
+
+// =====================================================================
 // إعدادات حيوانات Realm القابلة للشراء + Storage. نفس القاعدة لكل
 // الحيوانات الستة (مطابقة لما طُبِّق على The Duck):
 // - السرعة عند الشراء (Lv.1) = basespeed الخاص بالحيوان، وكل مستوى يضيف
@@ -117,6 +131,12 @@ function storageLevelForCapacityHours(capacityHours) {
 }
 
 export default {
+  // يعمل تلقائياً كل يوم عند 00:00 UTC (Cron Trigger بلا أي تكلفة إضافية —
+  // استدعاء واحد فقط باليوم، لا علاقة له بحصة الطلبات العادية أو rows read).
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(generateDailyCombo(env));
+  },
+
   async fetch(request, env) {
     const url = new URL(request.url);
 
@@ -198,6 +218,10 @@ export default {
       return handleWalletHistory(request, env);
     }
 
+    if (url.pathname === "/api/combo/check" && request.method === "POST") {
+      return handleComboCheck(request, env);
+    }
+
     // Everything else -> serve the Mini App static files
     return env.ASSETS.fetch(request);
   }
@@ -214,20 +238,24 @@ async function handleGetUser(request, env) {
   if (!auth.ok) return auth.response;
   const { telegramId, username, referredBy } = auth;
 
+  const today = todayUTC();
+
   const userQuery = `
     SELECT u.telegram_id, u.username, u.coins, u.gram, u.total_speed, u.total_mined, u.is_admin,
            u.mining_started_at, u.mining_cycles_today, u.mining_cycle_date,
            u.streak_day, u.streak_last_claim_date,
            u.last_spin_date, u.last_chest_date, u.last_giftpick_date,
            u.last_withdraw_request_at,
-           s.capacity_hours AS storage_capacity_hours, s.last_claim_at AS storage_last_claim_at
+           s.capacity_hours AS storage_capacity_hours, s.last_claim_at AS storage_last_claim_at,
+           ca.attempts_used AS combo_attempts_used, ca.solved AS combo_solved
     FROM users u
     LEFT JOIN user_storage s ON s.telegram_id = u.telegram_id
+    LEFT JOIN combo_attempts ca ON ca.telegram_id = u.telegram_id AND ca.date = ?
     WHERE u.telegram_id = ?
   `;
 
   // موجود أصلاً؟ رجّع بياناته الحالية
-  let user = await env.DB.prepare(userQuery).bind(telegramId).first();
+  let user = await env.DB.prepare(userQuery).bind(today, telegramId).first();
 
   if (!user) {
     // أول مرة يفتح التطبيق — أنشئ له صف جديد
@@ -242,7 +270,7 @@ async function handleGetUser(request, env) {
       ).bind(referredBy, telegramId).run();
     }
 
-    user = await env.DB.prepare(userQuery).bind(telegramId).first();
+    user = await env.DB.prepare(userQuery).bind(today, telegramId).first();
   }
 
   // كل الحيوانات المملوكة (قد يكون أكثر من واحد الآن) — استعلام منفصل
@@ -269,6 +297,9 @@ async function handleGetUser(request, env) {
   view.next_withdraw_allowed_at = user.last_withdraw_request_at
     ? user.last_withdraw_request_at + WITHDRAW_COOLDOWN_MS
     : null;
+  view.combo_solved_today = !!user.combo_solved;
+  view.combo_attempts_used = user.combo_attempts_used || 0;
+  view.combo_max_attempts = COMBO_MAX_ATTEMPTS;
 
   return jsonResponse({ user: view });
 }
@@ -1381,6 +1412,147 @@ async function handleWalletHistory(request, env) {
   items.sort((a, b) => b.created_at - a.created_at);
 
   return jsonResponse({ items: items.slice(0, 10) });
+}
+
+// =====================================================================
+// تُستدعى تلقائياً من scheduled() عند 00:00 UTC فقط (انظر أعلى الملف).
+// تختار ترتيباً عشوائياً جديداً لبطاقات Daily Combo، تحفظه، وترسل
+// الإجابة الصحيحة للأدمن فقط عبر رسالة خاصة تيليجرام — لا شيء غير هذا
+// يكشف الترتيب الصحيح (لا استجابة API ولا رسالة عامة تحتويه إطلاقاً).
+// =====================================================================
+async function generateDailyCombo(env) {
+  const today = todayUTC();
+  const order = shuffleArray(COMBO_CARDS.slice());
+
+  await env.DB.prepare(
+    "INSERT OR REPLACE INTO daily_combo (date, card_order) VALUES (?, ?)"
+  ).bind(today, order.join(",")).run();
+
+  const now = new Date();
+  const dateLabel = `${now.getUTCDate()}/${now.getUTCMonth() + 1}`;
+  const labels = order.map((c) => COMBO_CARD_LABELS[c]).join(" , ");
+
+  try {
+    await sendMessage(env, ADMIN_TELEGRAM_ID, {
+      text: `(${dateLabel}) Today Combo :\n${labels}`
+    });
+  } catch (e) {
+    console.error("daily combo admin notify failed:", e?.message || e);
+  }
+}
+
+// خلط Fisher-Yates باستخدام Web Crypto (نفس أسلوب pickWeightedSpinIndex)
+// بدل Math.random لعشوائية أفضل تناسب تركيبة يومية حقيقية.
+function shuffleArray(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const buf = new Uint32Array(1);
+    crypto.getRandomValues(buf);
+    const j = buf[0] % (i + 1);
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// =====================================================================
+// نقطة /api/combo/check — يرسل المستخدم ترتيبه المخمَّن لبطاقات اليوم
+// الثلاث. لا تُرسَل أبداً الإجابة الصحيحة لأي طلب هنا (لا عند النجاح ولا
+// عند الفشل) — فقط "صحيح/خطأ" و"كم محاولة تبقّت".
+//
+// السلامة من السباقات: خطوة استهلاك المحاولة (UPDATE على combo_attempts
+// بشرط solved=0 AND attempts_used<الحد) تُنفَّذ بمفردها أولاً عبر .run()
+// وليس ضمن batch مع منح المكافأة — لو فشلت (changes=0) نتوقف فوراً بدون
+// تنفيذ أي شيء آخر. فقط لو نجحت هذه الخطوة الذرّية بالتحديد ننتقل لمنح
+// الـ100 عملة، فيستحيل منح المكافأة أكثر من مرة أو تجاوز المحاولتين حتى
+// لو وصل نفس الطلب للسيرفر أكثر من مرة في نفس اللحظة.
+// =====================================================================
+async function handleComboCheck(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "invalid_body" }, 400);
+  }
+
+  const auth = await authenticateRequest(request, env, body);
+  if (!auth.ok) return auth.response;
+  const { telegramId } = auth;
+
+  const guess = Array.isArray(body.order) ? body.order.map(String) : [];
+  const isValidGuess =
+    guess.length === COMBO_CARDS.length &&
+    COMBO_CARDS.every((c) => guess.includes(c)) &&
+    new Set(guess).size === COMBO_CARDS.length;
+  if (!isValidGuess) {
+    return jsonResponse({ error: "invalid_order" }, 400);
+  }
+
+  const today = todayUTC();
+  const combo = await env.DB.prepare(
+    "SELECT card_order FROM daily_combo WHERE date = ?"
+  ).bind(today).first();
+  if (!combo) {
+    return jsonResponse({ error: "combo_not_ready" }, 409);
+  }
+
+  // يضمن وجود صف المحاولات لهذا المستخدم/اليوم قبل أي تحديث ذرّي عليه
+  await env.DB.prepare(
+    "INSERT OR IGNORE INTO combo_attempts (telegram_id, date, attempts_used, solved) VALUES (?, ?, 0, 0)"
+  ).bind(telegramId, today).run();
+
+  const attemptRow = await env.DB.prepare(
+    "SELECT attempts_used, solved FROM combo_attempts WHERE telegram_id = ? AND date = ?"
+  ).bind(telegramId, today).first();
+
+  if (attemptRow.solved) {
+    return jsonResponse({ error: "already_solved" }, 409);
+  }
+  if (attemptRow.attempts_used >= COMBO_MAX_ATTEMPTS) {
+    return jsonResponse({ error: "no_attempts_left" }, 409);
+  }
+
+  const isCorrect = guess.join(",") === combo.card_order;
+
+  const claimResult = await env.DB.prepare(
+    `UPDATE combo_attempts SET attempts_used = attempts_used + 1, solved = ?
+     WHERE telegram_id = ? AND date = ? AND solved = 0 AND attempts_used < ?`
+  ).bind(isCorrect ? 1 : 0, telegramId, today, COMBO_MAX_ATTEMPTS).run();
+
+  if (!claimResult.meta || claimResult.meta.changes === 0) {
+    // طلب آخر (نفس اللحظة) سبقه واستهلك المحاولة الأخيرة أو حلّها بالفعل
+    return jsonResponse({ error: "no_attempts_left" }, 409);
+  }
+
+  const newAttemptsUsed = attemptRow.attempts_used + 1;
+
+  if (!isCorrect) {
+    return jsonResponse({
+      correct: false,
+      attempts_used: newAttemptsUsed,
+      attempts_left: COMBO_MAX_ATTEMPTS - newAttemptsUsed
+    });
+  }
+
+  // وصلنا هنا فقط لو التحديث الذرّي أعلاه نجح بالتحديد لهذا الطلب — أي
+  // طلب آخر متزامن كان سيفشل بشرط "solved = 0"، فلا خطر من منح المكافأة
+  // أكثر من مرة حتى بدون شرط CAS إضافي هنا.
+  const rewardStmt = env.DB.prepare(
+    "UPDATE users SET coins = coins + ? WHERE telegram_id = ?"
+  ).bind(COMBO_REWARD_COINS, telegramId);
+  const txnStmt = env.DB.prepare(
+    "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'daily_combo', ?, 'coins')"
+  ).bind(telegramId, COMBO_REWARD_COINS);
+  await env.DB.batch([rewardStmt, txnStmt]);
+
+  const user = await env.DB.prepare(
+    "SELECT coins FROM users WHERE telegram_id = ?"
+  ).bind(telegramId).first();
+
+  return jsonResponse({
+    correct: true,
+    reward: COMBO_REWARD_COINS,
+    coins: user.coins,
+    attempts_used: newAttemptsUsed
+  });
 }
 
 // يحسب حالة Storage الحالية (كم تراكم؟ هل امتلأ؟ كم تبقّى؟) بدون أي

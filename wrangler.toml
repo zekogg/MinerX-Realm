@@ -21,6 +21,12 @@ class_name = "DepositChecker"
 tag = "v1"
 new_sqlite_classes = ["DepositChecker"]
 
+# يشغّل scheduled() في worker.js مرة واحدة يومياً بالضبط عند 00:00 UTC —
+# يختار تركيبة Daily Combo الجديدة ويرسلها للأدمن فقط. استدعاء واحد
+# باليوم، لا تكلفة إضافية ولا علاقة له بحصة الطلبات العادية.
+[triggers]
+crons = ["0 0 * * *"]
+
 # DEPOSIT_ADDRESS و TONCENTER_API_KEY (اختياري) يُضبطان كـ Cloudflare Secrets
 # لا كـ [vars] — عبر: wrangler secret put DEPOSIT_ADDRESS
 # (نفس أسلوب البوت السابق؛ env.DEPOSIT_ADDRESS يعمل بنفس الطريقة تماماً)
