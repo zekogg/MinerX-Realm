@@ -6,7 +6,7 @@ const WEBAPP_URL = "https://minerxrealm.zekobusiness0.workers.dev/";
 // حيوانات Realm والتخزين). كل القيم ثابتة هنا ولا تُقرأ أبداً من المتصفح.
 // =====================================================================
 const MINING_CYCLE_SECONDS = 60 * 60; // 60 دقيقة لكل دورة
-const MINING_REWARD_COINS = 75;       // مكافأة كل دورة كاملة
+const MINING_REWARD_COINS = 65;       // مكافأة كل دورة كاملة
 const MINING_DAILY_LIMIT = 7;         // أقصى عدد دورات باليوم (يُصفَّر 00:00 UTC)
 
 // =====================================================================
@@ -28,9 +28,9 @@ const STREAK_REWARDS = [50, 100, 150, 200, 250, 300, 500]; // index 0 = اليو
 const SPIN_SEGMENTS = [
   { type: "coins", amount: 100,    weight: 500  }, // 0°   (5%)
   { type: "gram",  amount: 0.0025, weight: 25   }, // 45°  (0.25%)
-  { type: "coins", amount: 1000,   weight: 100  }, // 90°  (1%)
+  { type: "coins", amount: 500,    weight: 100  }, // 90°  (1%)
   { type: "gram",  amount: 0.005,  weight: 25   }, // 135° (0.25%)
-  { type: "coins", amount: 250,    weight: 500  }, // 180° (5%)
+  { type: "coins", amount: 150,    weight: 500  }, // 180° (5%)
   { type: "gram",  amount: 0.001,  weight: 25   }, // 225° (0.25%)
   { type: "coins", amount: 50,     weight: 8800 }, // 270° (88%)
   { type: "gram",  amount: 0.01,   weight: 25   }  // 315° (0.25%)
