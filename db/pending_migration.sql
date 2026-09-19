@@ -97,3 +97,23 @@ CREATE TABLE IF NOT EXISTS withdrawals (
   resolved_at INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_withdrawals_telegram_id ON withdrawals(telegram_id);
+
+-- -- Daily Combo (تركيبة يومية بثلاث بطاقات ثابتة: Duck, Polar Bear, Penguin) --
+-- daily_combo: صف واحد لكل يوم UTC — card_order هو الترتيب الصحيح السرّي
+-- الذي اختاره السيرفر عشوائياً (يُخزَّن كنص مفصول بفواصل، مثلاً
+-- "duck,penguin,polar_bear")، ولا يُرسَل أبداً لأي نقطة API يراها المستخدم.
+CREATE TABLE IF NOT EXISTS daily_combo (
+  date TEXT PRIMARY KEY,
+  card_order TEXT NOT NULL
+);
+
+-- combo_attempts: محاولات كل مستخدم لكل يوم — attempts_used يبدأ من 0
+-- ويصل لحد أقصى COMBO_MAX_ATTEMPTS (محاولتان)، وsolved=1 فقط عند تخمين
+-- نفس الترتيب بالضبط (الترتيب مهم، وليس فقط اختيار البطاقات الصحيحة).
+CREATE TABLE IF NOT EXISTS combo_attempts (
+  telegram_id INTEGER NOT NULL,
+  date TEXT NOT NULL,
+  attempts_used INTEGER NOT NULL DEFAULT 0,
+  solved INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (telegram_id, date)
+);
