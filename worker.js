@@ -102,18 +102,21 @@ const ADS_TASK_DAILY_LIMIT = 10;
 // تراكمياً مدى الحياة (ads_task_total) — منفصل تماماً عن ads_task_count
 // اليومي الذي يُصفَّر كل 00:00 UTC. مكافآت Milestone Missions تُضاف
 // مباشرة لـcoins عند الاستحقاق، ولا تمر عبر الرصيد المعلّق.
+//
+// عتبات/مكافآت Milestone Missions تُقرأ من جدول milestone_missions
+// الموجود مسبقاً بالقاعدة (وليست أرقاماً ثابتة هنا) — قابلة للتعديل من
+// القاعدة مباشرة بدون نشر كود جديد. حالة "نشط" وأرباح كل صديق تُخزَّن في
+// عمودين جديدين على جدول referrals الموجود مسبقاً (is_active, earned_coins)
+// بدل جدول منفصل، تفادياً لتكرار نفس المفهوم في مكانين. أما علم "تم
+// الاستلام" لكل عتبة (milestone_*_claimed) فبقي كأعمدة مسطّحة على users
+// (وليس جدولاً منفصلاً user_milestones) لأنها أرخص فعلياً على /api/user —
+// أكثر نقطة استدعاءً بالتطبيق — إذ لا تتطلب أي JOIN إضافي.
 // =====================================================================
 const REFERRAL_SIGNUP_BONUS_COINS = 20;
 const REFERRAL_ACTIVE_BONUS_COINS = 130;
 const REFERRAL_DEPOSIT_COMMISSION_RATE = 0.05;
 const REFERRAL_MIN_CLAIM_COINS = 5000;
 const ACTIVE_FRIEND_ADS_THRESHOLD = 10;
-const REFERRAL_MILESTONES = [
-  { count: 10,  reward: 1000 },
-  { count: 25,  reward: 2500 },
-  { count: 50,  reward: 5000 },
-  { count: 100, reward: 10000 }
-];
 
 // =====================================================================
 // إعدادات حيوانات Realm القابلة للشراء + Storage. نفس القاعدة لكل
@@ -316,18 +319,15 @@ async function handleGetUser(request, env) {
       "INSERT INTO users (telegram_id, username, referred_by) VALUES (?, ?, ?)"
     ).bind(telegramId, username, referredBy).run();
 
-    // لو جاء بدعوة، سجّل العلاقة بجدول referrals + امنح مكافأة التسجيل
-    // الفورية (+20) للمُحيل — مرة واحدة فقط لكل صديق (هذا الفرع بالكامل
-    // لا يُنفَّذ إلا عند إنشاء صف المستخدم الجديد لأول مرة، فلا حاجة لأي CAS).
+    // لو جاء بدعوة، سجّل العلاقة بجدول referrals الموجود مسبقاً + امنح
+    // مكافأة التسجيل الفورية (+20) للمُحيل — مرة واحدة فقط لكل صديق (هذا
+    // الفرع بالكامل لا يُنفَّذ إلا عند إنشاء صف المستخدم الجديد لأول مرة،
+    // فلا حاجة لأي CAS إضافي).
     if (referredBy) {
-      await env.DB.prepare(
-        "INSERT OR IGNORE INTO referrals (referrer_id, referred_id) VALUES (?, ?)"
-      ).bind(referredBy, telegramId).run();
-
       await env.DB.batch([
         env.DB.prepare(
-          "INSERT OR IGNORE INTO referral_status (referrer_id, referred_id, signup_bonus_paid, earned_coins, created_at) VALUES (?, ?, 1, ?, ?)"
-        ).bind(referredBy, telegramId, REFERRAL_SIGNUP_BONUS_COINS, Date.now()),
+          "INSERT OR IGNORE INTO referrals (referrer_id, referred_id, invited_at) VALUES (?, ?, ?)"
+        ).bind(referredBy, telegramId, Date.now()),
         env.DB.prepare(
           "UPDATE users SET referral_pending_earnings = referral_pending_earnings + ?, invites_count = invites_count + 1 WHERE telegram_id = ?"
         ).bind(REFERRAL_SIGNUP_BONUS_COINS, referredBy)
@@ -373,10 +373,14 @@ async function handleGetUser(request, env) {
   view.friends_active = user.active_referrals_count || 0;
   view.friends_pending_earnings = user.referral_pending_earnings || 0;
   view.friends_min_claim = REFERRAL_MIN_CLAIM_COINS;
-  view.friends_milestones = REFERRAL_MILESTONES.map((m) => ({
-    count: m.count,
+
+  const milestonesResult = await env.DB.prepare(
+    "SELECT friends_required, reward FROM milestone_missions ORDER BY friends_required ASC"
+  ).all();
+  view.friends_milestones = (milestonesResult.results || []).map((m) => ({
+    count: m.friends_required,
     reward: m.reward,
-    claimed: !!user[`milestone_${m.count}_claimed`]
+    claimed: !!user[`milestone_${m.friends_required}_claimed`]
   }));
 
   return jsonResponse({ user: view });
@@ -1300,7 +1304,7 @@ export class DepositChecker {
                   "UPDATE users SET referral_pending_earnings = referral_pending_earnings + ? WHERE telegram_id = ?"
                 ).bind(referralCommission, referrerId),
                 this.env.DB.prepare(
-                  "UPDATE referral_status SET earned_coins = earned_coins + ? WHERE referrer_id = ? AND referred_id = ?"
+                  "UPDATE referrals SET earned_coins = earned_coins + ? WHERE referrer_id = ? AND referred_id = ?"
                 ).bind(referralCommission, referrerId, telegramId)
               );
             }
@@ -1562,11 +1566,12 @@ async function handleAdsReward(url, env) {
 
   // لو هذا أول عبور لعتبة "نشط" (ads_task_total تجاوز الحد للتو) ولهذا
   // المستخدم مُحيل: امنح المُحيل مكافأة +130 مرة واحدة فقط، محمية بشرط
-  // active_bonus_paid=0 في نفس عبارة UPDATE (نفس أسلوب الحماية أعلاه).
+  // is_active=0 في نفس عبارة UPDATE (نفس أسلوب الحماية أعلاه). is_active
+  // وearned_coins عمودان على جدول referrals الموجود مسبقاً بالقاعدة.
   if (updateResult.meta && updateResult.meta.changes > 0 && row.referred_by && newTotal >= ACTIVE_FRIEND_ADS_THRESHOLD) {
     const activateResult = await env.DB.prepare(
-      `UPDATE referral_status SET active_bonus_paid = 1, earned_coins = earned_coins + ?
-       WHERE referrer_id = ? AND referred_id = ? AND active_bonus_paid = 0`
+      `UPDATE referrals SET is_active = 1, earned_coins = earned_coins + ?
+       WHERE referrer_id = ? AND referred_id = ? AND is_active = 0`
     ).bind(REFERRAL_ACTIVE_BONUS_COINS, row.referred_by, telegramId).run();
 
     if (activateResult.meta && activateResult.meta.changes > 0) {
@@ -1619,9 +1624,10 @@ async function handleFriendsClaimEarnings(request, env) {
 
 // =====================================================================
 // نقطة /api/friends/claim_milestone — تمنح مكافأة عتبة "أصدقاء نشطون"
-// (10/25/50/100) مباشرة كـcoins (لا تمر عبر الرصيد المعلّق). tier يجب أن
-// يطابق أحد REFERRAL_MILESTONES بالضبط قبل استخدامه في اسم العمود، فلا
-// خطر حقن SQL رغم استخدام template literal هنا.
+// مباشرة كـcoins (لا تمر عبر الرصيد المعلّق). العتبة والمكافأة تُقرأان
+// من جدول milestone_missions (وليستا رقمين ثابتين)، وtier يجب أن يطابق
+// friends_required لصف موجود فعلاً قبل استخدامه في اسم العمود، فلا خطر
+// حقن SQL رغم استخدام template literal هنا.
 // =====================================================================
 async function handleFriendsClaimMilestone(request, env) {
   let body;
@@ -1636,16 +1642,18 @@ async function handleFriendsClaimMilestone(request, env) {
   const { telegramId } = auth;
 
   const tier = Number(body.tier);
-  const milestone = REFERRAL_MILESTONES.find((m) => m.count === tier);
+  const milestone = await env.DB.prepare(
+    "SELECT friends_required, reward FROM milestone_missions WHERE friends_required = ?"
+  ).bind(tier).first();
   if (!milestone) {
     return jsonResponse({ error: "invalid_tier" }, 400);
   }
 
-  const column = `milestone_${milestone.count}_claimed`;
+  const column = `milestone_${milestone.friends_required}_claimed`;
   const claimStmt = await env.DB.prepare(
     `UPDATE users SET coins = coins + ?, ${column} = 1
      WHERE telegram_id = ? AND active_referrals_count >= ? AND ${column} = 0`
-  ).bind(milestone.reward, telegramId, milestone.count).run();
+  ).bind(milestone.reward, telegramId, milestone.friends_required).run();
 
   if (!claimStmt.meta || claimStmt.meta.changes === 0) {
     return jsonResponse({ error: "not_eligible" }, 400);
@@ -1669,11 +1677,11 @@ async function handleFriendsList(request, env) {
   const { telegramId } = auth;
 
   const result = await env.DB.prepare(
-    `SELECT u.telegram_id, u.username, u.ads_task_total, rs.earned_coins, rs.active_bonus_paid
-     FROM referral_status rs
-     JOIN users u ON u.telegram_id = rs.referred_id
-     WHERE rs.referrer_id = ?
-     ORDER BY rs.created_at DESC
+    `SELECT u.telegram_id, u.username, u.ads_task_total, r.earned_coins, r.is_active
+     FROM referrals r
+     JOIN users u ON u.telegram_id = r.referred_id
+     WHERE r.referrer_id = ?
+     ORDER BY r.invited_at DESC
      LIMIT 100`
   ).bind(telegramId).all();
 
@@ -1681,7 +1689,7 @@ async function handleFriendsList(request, env) {
     name: r.username || ("User " + r.telegram_id),
     ads_watched: r.ads_task_total || 0,
     earned_coins: r.earned_coins || 0,
-    active: !!r.active_bonus_paid
+    active: !!r.is_active
   }));
 
   return jsonResponse({ friends });
