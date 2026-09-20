@@ -66,7 +66,7 @@ const WITHDRAW_FEE_GRAM = 0.03;
 const WITHDRAW_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 ساعة، تبدأ فور الطلب بغض النظر عن النتيجة
 const ADMIN_TELEGRAM_ID = 1018495986;
 const ADMIN_CHANNEL_ID = -1004325013522;
-const PLAY_GAME_URL = "https://t.me/MinerXRealmBot";
+const PLAY_GAME_URL = "https://t.me/MinerXRealmBot/app";
 const NEWS_CHANNEL_URL = "https://t.me/MinerXRealmNews";
 
 // =====================================================================
@@ -93,6 +93,30 @@ const COMBO_MAX_ATTEMPTS = 2;
 // =====================================================================
 const ADS_TASK_REWARD_COINS = 15;
 const ADS_TASK_DAILY_LIMIT = 10;
+
+// =====================================================================
+// إعدادات صفحة Friends: مكافآت الإحالة الثلاث (تسجيل + نشاط + عمولة
+// إيداع) تتجمّع كلها في users.referral_pending_earnings، ولا تُضاف لـ
+// coins إلا بالضغط على Claim صراحة (بحد أدنى REFERRAL_MIN_CLAIM_COINS).
+// "نشط" = وصول الصديق لـACTIVE_FRIEND_ADS_THRESHOLD إعلان Adsgram
+// تراكمياً مدى الحياة (ads_task_total) — منفصل تماماً عن ads_task_count
+// اليومي الذي يُصفَّر كل 00:00 UTC. مكافآت Milestone Missions تُضاف
+// مباشرة لـcoins عند الاستحقاق، ولا تمر عبر الرصيد المعلّق.
+//
+// عتبات/مكافآت Milestone Missions تُقرأ من جدول milestone_missions
+// الموجود مسبقاً بالقاعدة (وليست أرقاماً ثابتة هنا) — قابلة للتعديل من
+// القاعدة مباشرة بدون نشر كود جديد. حالة "نشط" وأرباح كل صديق تُخزَّن في
+// عمودين جديدين على جدول referrals الموجود مسبقاً (is_active, earned_coins)
+// بدل جدول منفصل، تفادياً لتكرار نفس المفهوم في مكانين. أما علم "تم
+// الاستلام" لكل عتبة (milestone_*_claimed) فبقي كأعمدة مسطّحة على users
+// (وليس جدولاً منفصلاً user_milestones) لأنها أرخص فعلياً على /api/user —
+// أكثر نقطة استدعاءً بالتطبيق — إذ لا تتطلب أي JOIN إضافي.
+// =====================================================================
+const REFERRAL_SIGNUP_BONUS_COINS = 20;
+const REFERRAL_ACTIVE_BONUS_COINS = 130;
+const REFERRAL_DEPOSIT_COMMISSION_RATE = 0.05;
+const REFERRAL_MIN_CLAIM_COINS = 5000;
+const ACTIVE_FRIEND_ADS_THRESHOLD = 10;
 
 // =====================================================================
 // إعدادات حيوانات Realm القابلة للشراء + Storage. نفس القاعدة لكل
@@ -239,6 +263,18 @@ export default {
       return handleAdsReward(url, env);
     }
 
+    if (url.pathname === "/api/friends/claim_earnings" && request.method === "POST") {
+      return handleFriendsClaimEarnings(request, env);
+    }
+
+    if (url.pathname === "/api/friends/claim_milestone" && request.method === "POST") {
+      return handleFriendsClaimMilestone(request, env);
+    }
+
+    if (url.pathname === "/api/friends/list" && request.method === "POST") {
+      return handleFriendsList(request, env);
+    }
+
     // Everything else -> serve the Mini App static files
     return env.ASSETS.fetch(request);
   }
@@ -264,6 +300,8 @@ async function handleGetUser(request, env) {
            u.last_spin_date, u.last_chest_date, u.last_giftpick_date,
            u.last_withdraw_request_at,
            u.ads_task_count, u.ads_task_date,
+           u.invites_count, u.active_referrals_count, u.referral_pending_earnings,
+           u.milestone_10_claimed, u.milestone_25_claimed, u.milestone_50_claimed, u.milestone_100_claimed,
            s.capacity_hours AS storage_capacity_hours, s.last_claim_at AS storage_last_claim_at,
            ca.attempts_used AS combo_attempts_used, ca.solved AS combo_solved
     FROM users u
@@ -281,11 +319,19 @@ async function handleGetUser(request, env) {
       "INSERT INTO users (telegram_id, username, referred_by) VALUES (?, ?, ?)"
     ).bind(telegramId, username, referredBy).run();
 
-    // لو جاء بدعوة، سجّل العلاقة بجدول referrals
+    // لو جاء بدعوة، سجّل العلاقة بجدول referrals الموجود مسبقاً + امنح
+    // مكافأة التسجيل الفورية (+20) للمُحيل — مرة واحدة فقط لكل صديق (هذا
+    // الفرع بالكامل لا يُنفَّذ إلا عند إنشاء صف المستخدم الجديد لأول مرة،
+    // فلا حاجة لأي CAS إضافي).
     if (referredBy) {
-      await env.DB.prepare(
-        "INSERT OR IGNORE INTO referrals (referrer_id, referred_id) VALUES (?, ?)"
-      ).bind(referredBy, telegramId).run();
+      await env.DB.batch([
+        env.DB.prepare(
+          "INSERT OR IGNORE INTO referrals (referrer_id, referred_id, invited_at) VALUES (?, ?, ?)"
+        ).bind(referredBy, telegramId, Date.now()),
+        env.DB.prepare(
+          "UPDATE users SET referral_pending_earnings = referral_pending_earnings + ?, invites_count = invites_count + 1 WHERE telegram_id = ?"
+        ).bind(REFERRAL_SIGNUP_BONUS_COINS, referredBy)
+      ]);
     }
 
     user = await env.DB.prepare(userQuery).bind(today, telegramId).first();
@@ -322,6 +368,20 @@ async function handleGetUser(request, env) {
   view.ads_watched_today = user.ads_task_date === today ? (user.ads_task_count || 0) : 0;
   view.ads_daily_limit = ADS_TASK_DAILY_LIMIT;
   view.ads_reward_coins = ADS_TASK_REWARD_COINS;
+
+  view.friends_invites = user.invites_count || 0;
+  view.friends_active = user.active_referrals_count || 0;
+  view.friends_pending_earnings = user.referral_pending_earnings || 0;
+  view.friends_min_claim = REFERRAL_MIN_CLAIM_COINS;
+
+  const milestonesResult = await env.DB.prepare(
+    "SELECT friends_required, reward FROM milestone_missions ORDER BY friends_required ASC"
+  ).all();
+  view.friends_milestones = (milestonesResult.results || []).map((m) => ({
+    count: m.friends_required,
+    reward: m.reward,
+    claimed: !!user[`milestone_${m.friends_required}_claimed`]
+  }));
 
   return jsonResponse({ user: view });
 }
@@ -1218,18 +1278,39 @@ export class DepositChecker {
 
             const coinsCredited = amountGram * DEPOSIT_GRAM_TO_COINS_RATE;
 
+            // عمولة إحالة 5% من قيمة الإيداع بالعملات — تُضاف لرصيد المُحيل
+            // المعلّق ضمن نفس الدفعة الذرّية أدناه (تتراجع تلقائياً معها لو
+            // فشلت الدفعة بالكامل، ولا تتكرر أبداً بفضل قيد tx_hash الفريد).
+            const depositor = await this.env.DB.prepare(
+              "SELECT referred_by FROM users WHERE telegram_id = ?"
+            ).bind(telegramId).first();
+            const referrerId = depositor?.referred_by || null;
+            const referralCommission = referrerId ? coinsCredited * REFERRAL_DEPOSIT_COMMISSION_RATE : 0;
+
+            const depositBatch = [
+              this.env.DB.prepare(
+                "INSERT INTO deposits (telegram_id, tx_hash, amount_gram, coins_credited, status, memo, created_at) VALUES (?, ?, ?, ?, 'confirmed', ?, ?)"
+              ).bind(telegramId, txHash, amountGram, coinsCredited, memo, Date.now()),
+              this.env.DB.prepare(
+                "UPDATE users SET coins = coins + ? WHERE telegram_id = ?"
+              ).bind(coinsCredited, telegramId),
+              this.env.DB.prepare(
+                "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'deposit', ?, 'coins')"
+              ).bind(telegramId, coinsCredited)
+            ];
+            if (referrerId) {
+              depositBatch.push(
+                this.env.DB.prepare(
+                  "UPDATE users SET referral_pending_earnings = referral_pending_earnings + ? WHERE telegram_id = ?"
+                ).bind(referralCommission, referrerId),
+                this.env.DB.prepare(
+                  "UPDATE referrals SET earned_coins = earned_coins + ? WHERE referrer_id = ? AND referred_id = ?"
+                ).bind(referralCommission, referrerId, telegramId)
+              );
+            }
+
             try {
-              await this.env.DB.batch([
-                this.env.DB.prepare(
-                  "INSERT INTO deposits (telegram_id, tx_hash, amount_gram, coins_credited, status, memo, created_at) VALUES (?, ?, ?, ?, 'confirmed', ?, ?)"
-                ).bind(telegramId, txHash, amountGram, coinsCredited, memo, Date.now()),
-                this.env.DB.prepare(
-                  "UPDATE users SET coins = coins + ? WHERE telegram_id = ?"
-                ).bind(coinsCredited, telegramId),
-                this.env.DB.prepare(
-                  "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'deposit', ?, 'coins')"
-                ).bind(telegramId, coinsCredited)
-              ]);
+              await this.env.DB.batch(depositBatch);
             } catch (e) {
               // D1 يُرجع الدفعة (batch) بالكامل ذرّية: لو فشل الإدراج بسبب tx_hash
               // مكرر (UNIQUE) فهذا يعني أن هذه المعاملة سُجِّلت واحتُسبت في محاولة
@@ -1455,7 +1536,7 @@ async function handleAdsReward(url, env) {
   }
 
   const row = await env.DB.prepare(
-    "SELECT ads_task_count, ads_task_date FROM users WHERE telegram_id = ?"
+    "SELECT ads_task_count, ads_task_date, ads_task_total, referred_by FROM users WHERE telegram_id = ?"
   ).bind(telegramId).first();
   if (!row) {
     return new Response("user not found", { status: 404 });
@@ -1468,21 +1549,150 @@ async function handleAdsReward(url, env) {
   }
 
   const newCount = countToday + 1;
+  const newTotal = (row.ads_task_total || 0) + 1;
 
   // شرط CAS على القيمة السابقة بالتحديد (نفس أسلوب mining_started_at) —
   // لو وصل نفس الطلب مرتين (إعادة إرسال من Adsgram) لن يُمنح إلا مرة
   // واحدة، لأن المنح والحماية في نفس عبارة UPDATE الواحدة.
   const updateStmt = env.DB.prepare(
-    `UPDATE users SET coins = coins + ?, ads_task_count = ?, ads_task_date = ?
+    `UPDATE users SET coins = coins + ?, ads_task_count = ?, ads_task_date = ?, ads_task_total = ?
      WHERE telegram_id = ? AND (ads_task_date IS NULL OR ads_task_date <> ? OR ads_task_count = ?)`
-  ).bind(ADS_TASK_REWARD_COINS, newCount, today, telegramId, today, countToday);
+  ).bind(ADS_TASK_REWARD_COINS, newCount, today, newTotal, telegramId, today, countToday);
   const txnStmt = env.DB.prepare(
     "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'ads_task', ?, 'coins')"
   ).bind(telegramId, ADS_TASK_REWARD_COINS);
 
-  await env.DB.batch([updateStmt, txnStmt]);
+  const [updateResult] = await env.DB.batch([updateStmt, txnStmt]);
+
+  // لو هذا أول عبور لعتبة "نشط" (ads_task_total تجاوز الحد للتو) ولهذا
+  // المستخدم مُحيل: امنح المُحيل مكافأة +130 مرة واحدة فقط، محمية بشرط
+  // is_active=0 في نفس عبارة UPDATE (نفس أسلوب الحماية أعلاه). is_active
+  // وearned_coins عمودان على جدول referrals الموجود مسبقاً بالقاعدة.
+  if (updateResult.meta && updateResult.meta.changes > 0 && row.referred_by && newTotal >= ACTIVE_FRIEND_ADS_THRESHOLD) {
+    const activateResult = await env.DB.prepare(
+      `UPDATE referrals SET is_active = 1, earned_coins = earned_coins + ?
+       WHERE referrer_id = ? AND referred_id = ? AND is_active = 0`
+    ).bind(REFERRAL_ACTIVE_BONUS_COINS, row.referred_by, telegramId).run();
+
+    if (activateResult.meta && activateResult.meta.changes > 0) {
+      await env.DB.prepare(
+        `UPDATE users SET referral_pending_earnings = referral_pending_earnings + ?, active_referrals_count = active_referrals_count + 1
+         WHERE telegram_id = ?`
+      ).bind(REFERRAL_ACTIVE_BONUS_COINS, row.referred_by).run();
+    }
+  }
 
   return new Response("OK", { status: 200 });
+}
+
+// =====================================================================
+// نقطة /api/friends/claim_earnings — تحوّل رصيد الإحالة المعلّق (تسجيل +
+// نشاط + عمولة إيداع) إلى coins فعلية، بشرط ألا يقل عن REFERRAL_MIN_CLAIM_COINS.
+// القيمة تُلتقَط أولاً ثم تُستخدم كشرط CAS بالتحديد في عبارة التحديث،
+// فيبقى الرقم المُرجَع (claimed) مضموناً أن يطابق ما أُضيف فعلياً.
+// =====================================================================
+async function handleFriendsClaimEarnings(request, env) {
+  const auth = await authenticateRequest(request, env);
+  if (!auth.ok) return auth.response;
+  const { telegramId } = auth;
+
+  const row = await env.DB.prepare(
+    "SELECT coins, referral_pending_earnings FROM users WHERE telegram_id = ?"
+  ).bind(telegramId).first();
+  if (!row) return jsonResponse({ error: "user_not_found" }, 404);
+
+  const pending = row.referral_pending_earnings || 0;
+  if (pending < REFERRAL_MIN_CLAIM_COINS) {
+    return jsonResponse({ error: "below_minimum", minimum: REFERRAL_MIN_CLAIM_COINS, pending }, 400);
+  }
+
+  // CAS على القيمة المعلّقة المُلتقَطة بالتحديد أعلاه — يضمن أن الرقم
+  // المُرجَع (claimed) يطابق فعلياً ما أُضيف لـcoins، حتى لو وصلت مكافأة
+  // إحالة جديدة بالتزامن (عندها فقط تفشل هذه المحاولة، ويحاول المستخدم
+  // مجدداً بالقيمة الجديدة الأحدث بدل استلام رقم غير دقيق).
+  const claimStmt = await env.DB.prepare(
+    `UPDATE users SET coins = coins + ?, referral_pending_earnings = referral_pending_earnings - ?
+     WHERE telegram_id = ? AND referral_pending_earnings = ?`
+  ).bind(pending, pending, telegramId, pending).run();
+
+  if (!claimStmt.meta || claimStmt.meta.changes === 0) {
+    return jsonResponse({ error: "try_again" }, 409);
+  }
+
+  return jsonResponse({ claimed: pending, coins: row.coins + pending });
+}
+
+// =====================================================================
+// نقطة /api/friends/claim_milestone — تمنح مكافأة عتبة "أصدقاء نشطون"
+// مباشرة كـcoins (لا تمر عبر الرصيد المعلّق). العتبة والمكافأة تُقرأان
+// من جدول milestone_missions (وليستا رقمين ثابتين)، وtier يجب أن يطابق
+// friends_required لصف موجود فعلاً قبل استخدامه في اسم العمود، فلا خطر
+// حقن SQL رغم استخدام template literal هنا.
+// =====================================================================
+async function handleFriendsClaimMilestone(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "invalid_body" }, 400);
+  }
+
+  const auth = await authenticateRequest(request, env, body);
+  if (!auth.ok) return auth.response;
+  const { telegramId } = auth;
+
+  const tier = Number(body.tier);
+  const milestone = await env.DB.prepare(
+    "SELECT friends_required, reward FROM milestone_missions WHERE friends_required = ?"
+  ).bind(tier).first();
+  if (!milestone) {
+    return jsonResponse({ error: "invalid_tier" }, 400);
+  }
+
+  const column = `milestone_${milestone.friends_required}_claimed`;
+  const claimStmt = await env.DB.prepare(
+    `UPDATE users SET coins = coins + ?, ${column} = 1
+     WHERE telegram_id = ? AND active_referrals_count >= ? AND ${column} = 0`
+  ).bind(milestone.reward, telegramId, milestone.friends_required).run();
+
+  if (!claimStmt.meta || claimStmt.meta.changes === 0) {
+    return jsonResponse({ error: "not_eligible" }, 400);
+  }
+
+  const user = await env.DB.prepare(
+    "SELECT coins FROM users WHERE telegram_id = ?"
+  ).bind(telegramId).first();
+
+  return jsonResponse({ reward: milestone.reward, coins: user.coins });
+}
+
+// =====================================================================
+// نقطة /api/friends/list — تُستدعى فقط عند ضغط المستخدم على "Show The
+// List" (وليس مع كل /api/user) لتفادي أي كلفة إضافية على أكثر نقطة
+// استدعاءً بالتطبيق. LIMIT 100 يحدّ من كلفة القراءة حتى لمُحيل ضخم جداً.
+// =====================================================================
+async function handleFriendsList(request, env) {
+  const auth = await authenticateRequest(request, env);
+  if (!auth.ok) return auth.response;
+  const { telegramId } = auth;
+
+  const result = await env.DB.prepare(
+    `SELECT u.telegram_id, u.username, u.ads_task_total, r.earned_coins, r.is_active
+     FROM referrals r
+     JOIN users u ON u.telegram_id = r.referred_id
+     WHERE r.referrer_id = ?
+     ORDER BY r.invited_at DESC
+     LIMIT 100`
+  ).bind(telegramId).all();
+
+  const friends = (result.results || []).map((r) => ({
+    name: r.username || ("User " + r.telegram_id),
+    ads_watched: r.ads_task_total || 0,
+    earned_coins: r.earned_coins || 0,
+    active: !!r.is_active
+  }));
+
+  return jsonResponse({ friends });
 }
 
 // =====================================================================

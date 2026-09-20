@@ -126,3 +126,37 @@ CREATE TABLE IF NOT EXISTS combo_attempts (
 -- ads_task_date  : تاريخ اليوم (UTC) المرتبط بالعداد أعلاه.
 ALTER TABLE users ADD COLUMN ads_task_count INTEGER DEFAULT 0;
 ALTER TABLE users ADD COLUMN ads_task_date TEXT;
+
+-- -- Friends / Referrals (مكافآت الإحالة + Milestone Missions) --
+-- ads_task_total          : إجمالي الإعلانات المُشاهَدة مدى الحياة (لا يُصفَّر
+--                            أبداً، بخلاف ads_task_count اليومي) — يُستخدم فقط
+--                            لتحديد "نشط" (10 فأكثر تراكمياً).
+-- referral_pending_earnings: رصيد أرباح الإحالة المعلّق (تسجيل +20 + نشاط
+--                            +130 + عمولة إيداع 5%) — لا يُضاف لـcoins إلا
+--                            بطلب Claim صريح (بحد أدنى 5000).
+-- invites_count            : عدّاد مُخزَّن لعدد الأصدقاء المدعوين (بدل COUNT(*)).
+-- active_referrals_count   : عدّاد مُخزَّن لعدد الأصدقاء "النشطين" فقط — أساس
+--                            تقدّم واستحقاق Milestone Missions.
+-- milestone_*_claimed      : علم واحد لكل عتبة، يُمنح مرة واحدة ويُضاف مباشرة
+--                            لـcoins (لا يمر عبر الرصيد المعلّق) — أعمدة مسطّحة
+--                            على users عمداً (أرخص من جدول منفصل لأنها لا
+--                            تتطلب أي JOIN إضافي على /api/user).
+-- ملاحظة: عتبات/مكافآت Milestone Missions نفسها تُقرأ من جدول
+-- milestone_missions الموجود مسبقاً بالقاعدة (وليست أرقاماً بالكود) — لو
+-- أضفت عتبة جديدة هناك (مثلاً 200)، يلزم أيضاً عمود milestone_200_claimed هنا.
+ALTER TABLE users ADD COLUMN ads_task_total INTEGER DEFAULT 0;
+ALTER TABLE users ADD COLUMN referral_pending_earnings REAL DEFAULT 0;
+ALTER TABLE users ADD COLUMN invites_count INTEGER DEFAULT 0;
+ALTER TABLE users ADD COLUMN active_referrals_count INTEGER DEFAULT 0;
+ALTER TABLE users ADD COLUMN milestone_10_claimed INTEGER DEFAULT 0;
+ALTER TABLE users ADD COLUMN milestone_25_claimed INTEGER DEFAULT 0;
+ALTER TABLE users ADD COLUMN milestone_50_claimed INTEGER DEFAULT 0;
+ALTER TABLE users ADD COLUMN milestone_100_claimed INTEGER DEFAULT 0;
+
+-- جدول referrals كان موجوداً مسبقاً بالقاعدة بعمودي is_active وinvited_at
+-- جاهزَين لنفس الغرض بالضبط — استخدمناهما مباشرة بدل إنشاء جدول موازٍ،
+-- وأضفنا فقط عمود earned_coins (إجمالي ما جلبه هذا الصديق تحديداً للمُحيل،
+-- لعرضه في Friends List). لا حاجة لعمود "signup_bonus_paid" لأن مكافأة
+-- التسجيل تُمنح ضمن نفس السطر الذي يُنشئ صف المستخدم الجديد لأول مرة
+-- (لا يتكرر تنفيذه إطلاقاً)، فلا داعي لعلم منفصل.
+ALTER TABLE referrals ADD COLUMN earned_coins REAL DEFAULT 0;

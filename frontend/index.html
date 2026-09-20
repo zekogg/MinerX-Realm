@@ -1186,6 +1186,17 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .friend-row__name{ font-size:13px; font-weight:700; flex:1; }
 .friend-row__meta{ font-size:10.5px; color:var(--ink-faint); font-weight:600; }
 .friend-row__earn{ font-size:12px; color:var(--c-friend-earn-text); }
+.friends-show-list-btn{
+  display:block;
+  width:45%;
+  margin:6px auto 18px;
+  padding:8px;
+  border-radius:999px;
+  background:linear-gradient(135deg, var(--c-royal-purple-2), var(--c-royal-purple-1));
+  color:#f5f3ff;
+  font-weight:800; font-size:10.5px;
+}
+.friends-empty-note{ text-align:center; font-size:10.5px; color:var(--ink-faint); font-weight:600; margin:6px 0 14px; }
 
 /* /////كود قسم Reward Tiers (صفحة Friends)///// */
 .reward-tiers{ margin:18px 0; }
@@ -1255,6 +1266,12 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   background:linear-gradient(135deg, #6fbf73, #2f7d3f);
   color:#eafdec;
   border-color:rgba(234,253,236,.4);
+  opacity:1;   /* يتجاوز button.is-claimed{opacity:.5} العام — هذا الأخضر يجب أن يظهر كاملاً */
+}
+.milestone-mission__claim.is-ready{
+  background:linear-gradient(135deg, #f0d878, #e3a542);
+  color:#2a1e08;
+  border-color:rgba(227,165,66,.5);
 }
 
 /* /////كود صفحة المحفظة (Wallet)///// */
@@ -3310,13 +3327,13 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
       <div class="card invite-box">
         <img draggable="false" class="invite-box__gift" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/d7a452799ac3bcb686ea6fafefc29bba470455e5/frontend/Friends%20icon.svg" alt="Friends">
         <div class="invite-box__title">Invite A Friend · Earn</div>
-        <div class="invite-box__amount"><span class="invite-box__tiny">Up to</span> 150<span class="invite-box__plus">+ 7%</span></div>
+        <div class="invite-box__amount"><span class="invite-box__tiny">Up to</span> 150<span class="invite-box__plus">+ 5%</span></div>
         <div class="invite-box__sub">Coins + Commission · Per Referral</div>
         <div class="invite-link">
-          <span class="invite-link__text" id="invite-link-text">t.me/MinerXRealmBot?start=ref_84213</span>
+          <span class="invite-link__text" id="invite-link-text">t.me/MinerXRealmBot/app?startapp=ref_0</span>
           <button class="invite-link__btn" id="btn-copy-link">Copy</button>
         </div>
-        <button class="invite-share-btn">Share</button>
+        <button class="invite-share-btn" id="btn-share-link">Share</button>
       </div>
 
       <div class="friend-stats">
@@ -3324,19 +3341,19 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
           <div class="stat-box__cols">
             <div class="stat-box__col">
               <div class="stat-box__label">Invites</div>
-              <div class="stat-box__val">0</div>
+              <div class="stat-box__val" id="friends-invites-val">0</div>
             </div>
             <div class="stat-box__col stat-box__col--end">
               <div class="stat-box__label">Active</div>
-              <div class="stat-box__val" style="color:#3fbfae;">0</div>
+              <div class="stat-box__val" id="friends-active-val" style="color:#3fbfae;">0</div>
             </div>
           </div>
         </div>
         <div class="card stat-box">
           <div class="stat-box__label">Referral earnings</div>
           <div class="stat-box__row">
-            <div class="stat-box__val" style="color:var(--c-friend-referral-text)">0</div>
-            <button class="stat-box__claim">Claim</button>
+            <div class="stat-box__val" id="friends-earnings-val" style="color:var(--c-friend-referral-text)">0</div>
+            <button class="stat-box__claim" id="friends-claim-btn" onclick="onClaimFriendsEarningsClick()">Claim</button>
           </div>
         </div>
       </div>
@@ -3375,10 +3392,10 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
               1K
             </span>
           </div>
-          <div class="milestone-mission__track"><div class="milestone-mission__fill" style="width:0%"></div></div>
+          <div class="milestone-mission__track"><div class="milestone-mission__fill" id="milestone-fill-10" style="width:0%"></div></div>
           <div class="milestone-mission__foot">
-            <span class="milestone-mission__count">0/10</span>
-            <button class="milestone-mission__claim" onclick="claimMilestone(this)">Claim</button>
+            <span class="milestone-mission__count" id="milestone-count-10">0/10</span>
+            <button class="milestone-mission__claim" id="milestone-claim-10" onclick="onClaimMilestoneClick(10)">Claim</button>
           </div>
         </div>
         <div class="milestone-mission">
@@ -3389,10 +3406,10 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
               2.5K
             </span>
           </div>
-          <div class="milestone-mission__track"><div class="milestone-mission__fill" style="width:0%"></div></div>
+          <div class="milestone-mission__track"><div class="milestone-mission__fill" id="milestone-fill-25" style="width:0%"></div></div>
           <div class="milestone-mission__foot">
-            <span class="milestone-mission__count">0/25</span>
-            <button class="milestone-mission__claim" onclick="claimMilestone(this)">Claim</button>
+            <span class="milestone-mission__count" id="milestone-count-25">0/25</span>
+            <button class="milestone-mission__claim" id="milestone-claim-25" onclick="onClaimMilestoneClick(25)">Claim</button>
           </div>
         </div>
         <div class="milestone-mission">
@@ -3403,10 +3420,10 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
               5K
             </span>
           </div>
-          <div class="milestone-mission__track"><div class="milestone-mission__fill" style="width:0%"></div></div>
+          <div class="milestone-mission__track"><div class="milestone-mission__fill" id="milestone-fill-50" style="width:0%"></div></div>
           <div class="milestone-mission__foot">
-            <span class="milestone-mission__count">0/50</span>
-            <button class="milestone-mission__claim" onclick="claimMilestone(this)">Claim</button>
+            <span class="milestone-mission__count" id="milestone-count-50">0/50</span>
+            <button class="milestone-mission__claim" id="milestone-claim-50" onclick="onClaimMilestoneClick(50)">Claim</button>
           </div>
         </div>
         <div class="milestone-mission">
@@ -3417,22 +3434,18 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
               10K <span style="margin-left:2px;">+ Pet Card</span>
             </span>
           </div>
-          <div class="milestone-mission__track"><div class="milestone-mission__fill" style="width:0%"></div></div>
+          <div class="milestone-mission__track"><div class="milestone-mission__fill" id="milestone-fill-100" style="width:0%"></div></div>
           <div class="milestone-mission__foot">
-            <span class="milestone-mission__count">0/100</span>
-            <button class="milestone-mission__claim" onclick="claimMilestone(this)">Claim</button>
+            <span class="milestone-mission__count" id="milestone-count-100">0/100</span>
+            <button class="milestone-mission__claim" id="milestone-claim-100" onclick="onClaimMilestoneClick(100)">Claim</button>
           </div>
         </div>
       </div>
 
       <div class="friends-list-title">Friends List</div>
 
-      <div class="card friend-row">
-        <div class="friend-row__avatar">AH</div>
-        <div class="friend-row__name">Ahmad</div>
-        <div class="friend-row__meta">0 Ads Watched</div>
-        <div class="friend-row__earn">+120 Coins</div>
-      </div>
+      <div id="friends-list-container"></div>
+      <button class="friends-show-list-btn" id="btn-show-friends-list" onclick="onShowFriendsListClick()">Show The List</button>
     </section>
 
     <!-- /////كود صفحة Wallet///// -->
@@ -4812,6 +4825,14 @@ function fetchUserData(){
       daily_limit: data.user.ads_daily_limit,
       reward_coins: data.user.ads_reward_coins
     });
+    setupInviteLink(data.user.telegram_id);
+    applyFriendsState({
+      invites: data.user.friends_invites,
+      active: data.user.friends_active,
+      pending_earnings: data.user.friends_pending_earnings,
+      min_claim: data.user.friends_min_claim,
+      milestones: data.user.friends_milestones
+    });
     applyPetsState(data.user.pets);
     applyStorageState({
       storage_has_pet: data.user.storage_has_pet,
@@ -5964,12 +5985,6 @@ function claimAmbassador(btn){
   setTimeout(function(){ btn.classList.remove('is-claimed'); }, 3000);
 }
 
-function claimMilestone(btn){
-  if (btn.classList.contains('is-claimed')) return;
-  btn.classList.add('is-claimed');
-  setTimeout(function(){ btn.classList.remove('is-claimed'); }, 3000);
-}
-
 /* -- تأثير مؤقت 4 ثواني عند شراء The Duck: علامة صح + تغيير شكل الزر -- */
 // تُستدعى بعد نجاح شراء The Duck فعلياً من السيرفر (وليس عند مجرد الضغط):
 // علامة صح مؤقتة 4 ثوانٍ، ثم يبقى الزر "Owned" ومعطّلاً دائماً (الشخصية
@@ -6286,6 +6301,220 @@ function pollAdsRewardConfirmation(baselineWatched, attempt){
     adsTaskState.busy = false;
     renderAdsTaskButton();
   });
+}
+
+/* =====================================================================
+   Friends: كل الأرقام (دعوات، نشطون، أرباح معلّقة، عتبات الإنجازات)
+   تأتي فقط من /api/user — لا حساب أو تخمين من طرف المتصفح. الأرباح
+   المعلّقة (تسجيل +20 + نشاط +130 + عمولة إيداع 5%) لا تُضاف لـCoins
+   إلا بالضغط على Claim (بحد أدنى 5000)، ومكافآت الإنجازات تُضاف مباشرة
+   عند تحقّق الشرط دون المرور عبر الرصيد المعلّق.
+   ===================================================================== */
+var friendsState = { invites: 0, active: 0, pendingEarnings: 0, minClaim: 5000, milestones: [], claimBusy: false };
+var friendsListLoaded = false;
+
+// نفس منطق formatCoinsK لكن بدون فراغ قبل الوحدة (K/M) — مطلوب لعرض
+// أرباح الإحالة بصيغة "1K"/"1.1K" تحديداً.
+function formatFriendsAmount(value){
+  value = Number(value) || 0;
+  if (value < 1000) return String(Math.floor(value));
+  var isMillion = value >= 1000000;
+  var divisor = isMillion ? 1000000 : 1000;
+  var unit = isMillion ? 'M' : 'K';
+  var scaled = Math.floor((value / divisor) * 10) / 10;
+  var text = (scaled % 1 === 0) ? scaled.toFixed(0) : scaled.toFixed(1);
+  return text + unit;
+}
+
+function setupInviteLink(telegramId){
+  var link = 'https://t.me/MinerXRealmBot/app?startapp=ref_' + telegramId;
+  var linkEl = document.getElementById('invite-link-text');
+  if (linkEl) linkEl.textContent = link;
+
+  var shareBtn = document.getElementById('btn-share-link');
+  if (shareBtn && !shareBtn._wired){
+    shareBtn._wired = true;
+    shareBtn.addEventListener('click', function(){
+      var shareUrl = 'https://t.me/share/url?url=' + encodeURIComponent(link) + '&text=' + encodeURIComponent('Join MinerX Realm and start mining!');
+      var tg = window.Telegram && window.Telegram.WebApp;
+      if (tg && tg.openTelegramLink){
+        tg.openTelegramLink(shareUrl);
+      } else {
+        window.open(shareUrl, '_blank');
+      }
+    });
+  }
+}
+
+function applyFriendsState(data){
+  friendsState.invites = data.invites || 0;
+  friendsState.active = data.active || 0;
+  friendsState.pendingEarnings = data.pending_earnings || 0;
+  friendsState.minClaim = data.min_claim || 5000;
+  friendsState.milestones = data.milestones || [];
+  renderFriendsStats();
+  renderMilestones();
+}
+
+function renderFriendsStats(){
+  var invitesEl = document.getElementById('friends-invites-val');
+  if (invitesEl) invitesEl.textContent = friendsState.invites;
+
+  var activeEl = document.getElementById('friends-active-val');
+  if (activeEl) activeEl.textContent = friendsState.active;
+
+  var earningsEl = document.getElementById('friends-earnings-val');
+  if (earningsEl) earningsEl.textContent = formatFriendsAmount(friendsState.pendingEarnings);
+
+  var claimBtn = document.getElementById('friends-claim-btn');
+  if (claimBtn){
+    var eligible = friendsState.pendingEarnings >= friendsState.minClaim && !friendsState.claimBusy;
+    claimBtn.classList.toggle('is-claimed', !eligible);
+  }
+}
+
+function renderMilestones(){
+  friendsState.milestones.forEach(function(m){
+    var fill = document.getElementById('milestone-fill-' + m.count);
+    var count = document.getElementById('milestone-count-' + m.count);
+    var btn = document.getElementById('milestone-claim-' + m.count);
+    var progress = Math.min(100, (friendsState.active / m.count) * 100);
+
+    if (fill) fill.style.width = progress + '%';
+    if (count) count.textContent = Math.min(friendsState.active, m.count) + '/' + m.count;
+    if (btn){
+      var eligible = friendsState.active >= m.count;
+      btn.textContent = m.claimed ? 'Claimed' : 'Claim';
+      btn.disabled = m.claimed || !eligible;
+      btn.classList.toggle('is-claimed', m.claimed);
+      btn.classList.toggle('is-ready', !m.claimed && eligible);
+    }
+  });
+}
+
+function onClaimFriendsEarningsClick(){
+  if (friendsState.claimBusy) return;
+  if (friendsState.pendingEarnings < friendsState.minClaim){
+    showBuyErrorToast('Minimum ' + formatFriendsAmount(friendsState.minClaim) + ' Coins required', { title: 'Cannot Claim' });
+    return;
+  }
+  var initData = getTelegramInitData();
+  if (!initData) return;
+
+  friendsState.claimBusy = true;
+  renderFriendsStats();
+
+  fetch('/api/friends/claim_earnings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: initData })
+  })
+  .then(function(res){ return res.json(); })
+  .then(function(data){
+    friendsState.claimBusy = false;
+
+    if (data.error){
+      friendsState.pendingEarnings = data.pending || friendsState.pendingEarnings;
+      renderFriendsStats();
+      showBuyErrorToast('Minimum ' + formatFriendsAmount(friendsState.minClaim) + ' Coins required', { title: 'Cannot Claim' });
+      return;
+    }
+
+    updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE });
+    friendsState.pendingEarnings = 0;
+    renderFriendsStats();
+    showAppToast({ title: 'Earnings Claimed', icon: PRIZE_ICON_URLS.coins, amount: '+' + formatFriendsAmount(data.claimed) + ' Coins' });
+  })
+  .catch(function(){
+    friendsState.claimBusy = false;
+    renderFriendsStats();
+  });
+}
+
+function onClaimMilestoneClick(tier){
+  var btn = document.getElementById('milestone-claim-' + tier);
+  if (!btn || btn.disabled) return;
+
+  var initData = getTelegramInitData();
+  if (!initData) return;
+
+  btn.disabled = true;
+
+  fetch('/api/friends/claim_milestone', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: initData, tier: tier })
+  })
+  .then(function(res){ return res.json(); })
+  .then(function(data){
+    if (data.error){
+      btn.disabled = false;
+      return;
+    }
+    updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE });
+    var m = friendsState.milestones.find(function(x){ return x.count === tier; });
+    if (m) m.claimed = true;
+    renderMilestones();
+    showAppToast({ title: 'Milestone Claimed', icon: PRIZE_ICON_URLS.coins, amount: '+' + formatFriendsAmount(data.reward) + ' Coins' });
+  })
+  .catch(function(){
+    btn.disabled = false;
+  });
+}
+
+function onShowFriendsListClick(){
+  if (friendsListLoaded) return;
+  var initData = getTelegramInitData();
+  if (!initData) return;
+
+  var btn = document.getElementById('btn-show-friends-list');
+  if (btn) btn.textContent = 'Loading...';
+
+  fetch('/api/friends/list', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: initData })
+  })
+  .then(function(res){ return res.json(); })
+  .then(function(data){
+    friendsListLoaded = true;
+    renderFriendsList(data.friends || []);
+    if (btn) btn.remove();
+  })
+  .catch(function(){
+    if (btn) btn.textContent = 'Show The List';
+  });
+}
+
+// اسم المستخدم (username) قد يحتوي أي نص يختاره المستخدم نفسه — يجب
+// تهريبه قبل إدراجه في innerHTML لمنع حقن HTML/script عبر اسم مزيّف.
+function escapeHtmlClient(text){
+  var div = document.createElement('div');
+  div.textContent = String(text);
+  return div.innerHTML;
+}
+
+function renderFriendsList(friends){
+  var container = document.getElementById('friends-list-container');
+  if (!container) return;
+
+  if (friends.length === 0){
+    container.innerHTML = '<div class="friends-empty-note">No friends invited yet</div>';
+    return;
+  }
+
+  container.innerHTML = friends.map(function(f){
+    var safeName = escapeHtmlClient(f.name);
+    var initials = String(f.name).trim().slice(0, 2).toUpperCase();
+    return (
+      '<div class="card friend-row">' +
+        '<div class="friend-row__avatar">' + escapeHtmlClient(initials) + '</div>' +
+        '<div class="friend-row__name">' + safeName + '</div>' +
+        '<div class="friend-row__meta">' + f.ads_watched + ' Ads Watched</div>' +
+        '<div class="friend-row__earn">+' + formatFriendsAmount(f.earned_coins) + ' Coins</div>' +
+      '</div>'
+    );
+  }).join('');
 }
 
 
