@@ -6185,7 +6185,7 @@ function onComboCheckClick(){
    Reward URL بعد إغلاق الإعلان). لا شيء هنا يمنح مكافأة بنفسه إطلاقاً.
    ===================================================================== */
 var ADSGRAM_BLOCK_ID = '48890';
-var ADSGRAM_DEBUG = true; // TODO: عند مغادرة Test platform في Adsgram، غيّرها إلى false فقط (لا شيء آخر يتغيّر بالكود)
+var ADSGRAM_DEBUG = false; // debug:true يمنع Adsgram من إرسال Reward URL إطلاقاً (توثيقهم الرسمي) — يجب أن تبقى false حتى أثناء استخدام Test platform حتى تعمل المكافأة الحقيقية
 var adsgramController = null;
 var adsTaskState = { watchedToday: 0, dailyLimit: 10, rewardCoins: 15, busy: false };
 
