@@ -1973,7 +1973,7 @@ async function authenticateRequest(request, env, preParsedBody) {
   const telegramId = tgUser.id;
   const username = tgUser.username || tgUser.first_name || null;
 
-  // referred_by يجي من رابط الدعوة (t.me/MinerXRealmBot?start=ref_84213) عبر start_param
+  // referred_by يجي من رابط الدعوة (t.me/MinerXRealmBot/app?startapp=ref_84213) عبر start_param
   const startParam = params.get("start_param");
   let referredBy = null;
   if (startParam && startParam.startsWith("ref_")) {
