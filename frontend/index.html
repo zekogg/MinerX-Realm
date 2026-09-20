@@ -20,6 +20,10 @@
      as a plain browser page. Wire up real Telegram logic later. -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
+<!-- Adsgram SDK — تستخدمها فقط بطاقة "Watch Adsgram Ad" الحالية (باقي
+     بطاقات Daily Ads ما زالت تصميماً ثابتاً بدون شبكة إعلانات حقيقية) -->
+<script src="https://sad.adsgram.ai/js/sad.min.js"></script>
+
 <style>
 /* /////كود الألوان والمتغيرات العامة///// */
 /* ألوان الخلفيات/النصوص مشتركة عمداً (تغييرها ينعكس بكل الصفحات). */
@@ -3121,12 +3125,12 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
           <div class="ad-task__meta">
             <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
             <span class="ad-task__reward">+15 / Ad</span>
-            <span class="ad-task__avail">Available</span>
+            <span class="ad-task__avail" id="ads-task-avail">Available</span>
           </div>
           <div class="ad-task__divider"></div>
           <div class="ad-task__footer">
-            <button class="ad-task__watch">Watch</button>
-            <span class="ad-task__counter">0 / 10</span>
+            <button class="ad-task__watch" id="ads-task-watch-btn" onclick="onWatchAdsgramClick()">Watch</button>
+            <span class="ad-task__counter" id="ads-task-counter">0 / 10</span>
           </div>
         </div>
         <div class="card ad-task">
@@ -4803,6 +4807,11 @@ function fetchUserData(){
       attempts_used: data.user.combo_attempts_used,
       max_attempts: data.user.combo_max_attempts
     });
+    applyAdsTaskState({
+      watched_today: data.user.ads_watched_today,
+      daily_limit: data.user.ads_daily_limit,
+      reward_coins: data.user.ads_reward_coins
+    });
     applyPetsState(data.user.pets);
     applyStorageState({
       storage_has_pet: data.user.storage_has_pet,
@@ -6165,6 +6174,117 @@ function onComboCheckClick(){
     console.error('combo check failed:', err);
     comboState.busy = false;
     renderComboCheckButton();
+  });
+}
+
+/* =====================================================================
+   Watch Adsgram Ad: المكافأة الحقيقية تُمنح فقط من سيرفر Adsgram مباشرة
+   لسيرفرنا (Reward URL) بعد تأكدهم من مشاهدة الإعلان بالكامل — هذا الكود
+   فقط يعرض الإعلان عبر AdsController.show() ثم "يتحقق" من وصول المكافأة
+   بإعادة قراءة /api/user عدة مرات (السيرفر قد يستغرق لحظات لاستلام
+   Reward URL بعد إغلاق الإعلان). لا شيء هنا يمنح مكافأة بنفسه إطلاقاً.
+   ===================================================================== */
+var ADSGRAM_BLOCK_ID = '48890';
+var ADSGRAM_DEBUG = true; // TODO: عند مغادرة Test platform في Adsgram، غيّرها إلى false فقط (لا شيء آخر يتغيّر بالكود)
+var adsgramController = null;
+var adsTaskState = { watchedToday: 0, dailyLimit: 10, rewardCoins: 15, busy: false };
+
+function initAdsgramController(){
+  if (window.Adsgram && !adsgramController){
+    try {
+      adsgramController = window.Adsgram.init({ blockId: ADSGRAM_BLOCK_ID, debug: ADSGRAM_DEBUG });
+    } catch (e){
+      console.error('Adsgram init failed:', e);
+    }
+  }
+}
+initAdsgramController();
+
+function applyAdsTaskState(data){
+  adsTaskState.watchedToday = data.watched_today || 0;
+  adsTaskState.dailyLimit = data.daily_limit || 10;
+  adsTaskState.rewardCoins = data.reward_coins || 15;
+  renderAdsTaskButton();
+}
+
+function renderAdsTaskButton(){
+  var btn = document.getElementById('ads-task-watch-btn');
+  var counter = document.getElementById('ads-task-counter');
+  var avail = document.getElementById('ads-task-avail');
+  if (counter) counter.textContent = adsTaskState.watchedToday + ' / ' + adsTaskState.dailyLimit;
+  if (avail) avail.textContent = adsTaskState.watchedToday >= adsTaskState.dailyLimit ? 'Come Back Tomorrow' : 'Available';
+  if (btn) btn.classList.toggle('is-claimed', adsTaskState.watchedToday >= adsTaskState.dailyLimit || adsTaskState.busy);
+}
+
+function onWatchAdsgramClick(){
+  if (adsTaskState.busy) return;
+  if (adsTaskState.watchedToday >= adsTaskState.dailyLimit){
+    showComeBackTomorrowToast();
+    return;
+  }
+  if (!adsgramController){
+    showBuyErrorToast('Ad not available right now', { title: 'Watch Ad' });
+    return;
+  }
+
+  var baselineWatched = adsTaskState.watchedToday;
+  adsTaskState.busy = true;
+  renderAdsTaskButton();
+
+  adsgramController.show().then(function(){
+    pollAdsRewardConfirmation(baselineWatched, 0);
+  }).catch(function(){
+    adsTaskState.busy = false;
+    renderAdsTaskButton();
+    showBuyErrorToast('Ad was not completed', { title: 'Watch Ad' });
+  });
+}
+
+// يعيد قراءة /api/user حتى 6 مرات (كل 1.5 ثانية) بحثاً عن ازدياد
+// ads_watched_today — يؤكد بذلك وصول Reward URL من Adsgram لسيرفرنا فعلياً
+// قبل عرض أي مكافأة للمستخدم.
+function pollAdsRewardConfirmation(baselineWatched, attempt){
+  var initData = getTelegramInitData();
+  if (!initData){
+    adsTaskState.busy = false;
+    renderAdsTaskButton();
+    return;
+  }
+
+  fetch('/api/user', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: initData })
+  })
+  .then(function(res){ return res.json(); })
+  .then(function(data){
+    if (!data.user){ throw new Error('no user in response'); }
+
+    if (data.user.ads_watched_today > baselineWatched){
+      updateBalanceDisplay(data.user);
+      applyAdsTaskState({
+        watched_today: data.user.ads_watched_today,
+        daily_limit: data.user.ads_daily_limit,
+        reward_coins: data.user.ads_reward_coins
+      });
+      showAppToast({ title: 'Ad Reward', icon: PRIZE_ICON_URLS.coins, amount: '+' + adsTaskState.rewardCoins + ' Coins' });
+      adsTaskState.busy = false;
+      renderAdsTaskButton();
+      return;
+    }
+
+    if (attempt < 6){
+      setTimeout(function(){ pollAdsRewardConfirmation(baselineWatched, attempt + 1); }, 1500);
+    } else {
+      adsTaskState.busy = false;
+      renderAdsTaskButton();
+      showBuyErrorToast('Reward is taking longer than usual, check back shortly', { title: 'Watch Ad' });
+    }
+  })
+  .catch(function(err){
+    console.error('ads reward poll failed:', err);
+    adsTaskState.busy = false;
+    renderAdsTaskButton();
   });
 }
 
