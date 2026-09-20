@@ -126,3 +126,39 @@ CREATE TABLE IF NOT EXISTS combo_attempts (
 -- ads_task_date  : تاريخ اليوم (UTC) المرتبط بالعداد أعلاه.
 ALTER TABLE users ADD COLUMN ads_task_count INTEGER DEFAULT 0;
 ALTER TABLE users ADD COLUMN ads_task_date TEXT;
+
+-- -- Friends / Referrals (مكافآت الإحالة + Milestone Missions) --
+-- ads_task_total          : إجمالي الإعلانات المُشاهَدة مدى الحياة (لا يُصفَّر
+--                            أبداً، بخلاف ads_task_count اليومي) — يُستخدم فقط
+--                            لتحديد "نشط" (10 فأكثر تراكمياً).
+-- referral_pending_earnings: رصيد أرباح الإحالة المعلّق (تسجيل +20 + نشاط
+--                            +130 + عمولة إيداع 5%) — لا يُضاف لـcoins إلا
+--                            بطلب Claim صريح (بحد أدنى 5000).
+-- invites_count            : عدّاد مُخزَّن لعدد الأصدقاء المدعوين (بدل COUNT(*)).
+-- active_referrals_count   : عدّاد مُخزَّن لعدد الأصدقاء "النشطين" فقط — أساس
+--                            تقدّم واستحقاق Milestone Missions.
+-- milestone_*_claimed      : علم واحد لكل عتبة (10/25/50/100)، يُمنح مرة واحدة
+--                            ويُضاف مباشرة لـcoins (لا يمر عبر الرصيد المعلّق).
+ALTER TABLE users ADD COLUMN ads_task_total INTEGER DEFAULT 0;
+ALTER TABLE users ADD COLUMN referral_pending_earnings REAL DEFAULT 0;
+ALTER TABLE users ADD COLUMN invites_count INTEGER DEFAULT 0;
+ALTER TABLE users ADD COLUMN active_referrals_count INTEGER DEFAULT 0;
+ALTER TABLE users ADD COLUMN milestone_10_claimed INTEGER DEFAULT 0;
+ALTER TABLE users ADD COLUMN milestone_25_claimed INTEGER DEFAULT 0;
+ALTER TABLE users ADD COLUMN milestone_50_claimed INTEGER DEFAULT 0;
+ALTER TABLE users ADD COLUMN milestone_100_claimed INTEGER DEFAULT 0;
+
+-- referral_status: حالة كل علاقة إحالة على حدة — جدول جديد منفصل تماماً عن
+-- جدول referrals القديم (لتفادي أي افتراض حول مخططه الفعلي على D1 الحي).
+-- يتتبع هل دُفعت مكافأة التسجيل/النشاط لهذا الصديق تحديداً، وإجمالي ما
+-- جلبه هذا الصديق تحديداً للمُحيل (لعرضه في Friends List).
+CREATE TABLE IF NOT EXISTS referral_status (
+  referrer_id INTEGER NOT NULL,
+  referred_id INTEGER NOT NULL,
+  signup_bonus_paid INTEGER NOT NULL DEFAULT 0,
+  active_bonus_paid INTEGER NOT NULL DEFAULT 0,
+  earned_coins REAL NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (referrer_id, referred_id)
+);
+CREATE INDEX IF NOT EXISTS idx_referral_status_referrer ON referral_status(referrer_id);
