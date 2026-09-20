@@ -117,3 +117,12 @@ CREATE TABLE IF NOT EXISTS combo_attempts (
   solved INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (telegram_id, date)
 );
+
+-- -- Watch Adsgram Ad (أول بطاقة حقيقية في Daily Ads، حد أقصى 10/يوم) --
+-- ads_task_count : عدد الإعلانات المُشاهَدة والمُكافأة فعلياً "لليوم
+--                   المسجَّل في ads_task_date" — يُصفَّر ضمنياً (بدون أي
+--                   كتابة) عند أي طلب في يوم UTC مختلف، نفس أسلوب باقي
+--                   الميزات اليومية (Start Mining, Spin, ...).
+-- ads_task_date  : تاريخ اليوم (UTC) المرتبط بالعداد أعلاه.
+ALTER TABLE users ADD COLUMN ads_task_count INTEGER DEFAULT 0;
+ALTER TABLE users ADD COLUMN ads_task_date TEXT;

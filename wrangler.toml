@@ -30,3 +30,7 @@ crons = ["0 0 * * *"]
 # DEPOSIT_ADDRESS و TONCENTER_API_KEY (اختياري) يُضبطان كـ Cloudflare Secrets
 # لا كـ [vars] — عبر: wrangler secret put DEPOSIT_ADDRESS
 # (نفس أسلوب البوت السابق؛ env.DEPOSIT_ADDRESS يعمل بنفس الطريقة تماماً)
+
+# ADSGRAM_REWARD_SECRET يُضبط كـ Cloudflare Secret أيضاً — عبر:
+# wrangler secret put ADSGRAM_REWARD_SECRET
+# نفس القيمة المُدرَجة في حقل Reward URL بلوحة تحكم Adsgram (?secret=...)

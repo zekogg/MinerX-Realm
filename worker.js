@@ -84,6 +84,17 @@ const COMBO_REWARD_COINS = 100;
 const COMBO_MAX_ATTEMPTS = 2;
 
 // =====================================================================
+// إعدادات مهمة "Watch Adsgram Ad" (بطاقة Daily Ads الوحيدة المربوطة
+// بشبكة إعلانات حقيقية حالياً — باقي البطاقات ما زالت تصميماً ثابتاً).
+// المكافأة تُمنح فقط عند استدعاء Adsgram الفعلي لـ Reward URL من
+// سيرفرهم (server-to-server) بعد تأكدهم من مشاهدة الإعلان بالكامل —
+// لا شيء يُمنح بناءً على أي شيء يرسله المتصفح مباشرة، ومحمي بالرمز
+// السري ADSGRAM_REWARD_SECRET (Cloudflare Secret).
+// =====================================================================
+const ADS_TASK_REWARD_COINS = 15;
+const ADS_TASK_DAILY_LIMIT = 10;
+
+// =====================================================================
 // إعدادات حيوانات Realm القابلة للشراء + Storage. نفس القاعدة لكل
 // الحيوانات الستة (مطابقة لما طُبِّق على The Duck):
 // - السرعة عند الشراء (Lv.1) = basespeed الخاص بالحيوان، وكل مستوى يضيف
@@ -222,6 +233,12 @@ export default {
       return handleComboCheck(request, env);
     }
 
+    // يُستدعى من سيرفر Adsgram مباشرة (server-to-server)، وليس من واجهتنا —
+    // بدون initData، محمي فقط بمعامل secret (انظر handleAdsReward).
+    if (url.pathname === "/api/ads/reward" && request.method === "GET") {
+      return handleAdsReward(url, env);
+    }
+
     // Everything else -> serve the Mini App static files
     return env.ASSETS.fetch(request);
   }
@@ -246,6 +263,7 @@ async function handleGetUser(request, env) {
            u.streak_day, u.streak_last_claim_date,
            u.last_spin_date, u.last_chest_date, u.last_giftpick_date,
            u.last_withdraw_request_at,
+           u.ads_task_count, u.ads_task_date,
            s.capacity_hours AS storage_capacity_hours, s.last_claim_at AS storage_last_claim_at,
            ca.attempts_used AS combo_attempts_used, ca.solved AS combo_solved
     FROM users u
@@ -300,6 +318,10 @@ async function handleGetUser(request, env) {
   view.combo_solved_today = !!user.combo_solved;
   view.combo_attempts_used = user.combo_attempts_used || 0;
   view.combo_max_attempts = COMBO_MAX_ATTEMPTS;
+
+  view.ads_watched_today = user.ads_task_date === today ? (user.ads_task_count || 0) : 0;
+  view.ads_daily_limit = ADS_TASK_DAILY_LIMIT;
+  view.ads_reward_coins = ADS_TASK_REWARD_COINS;
 
   return jsonResponse({ user: view });
 }
@@ -1412,6 +1434,55 @@ async function handleWalletHistory(request, env) {
   items.sort((a, b) => b.created_at - a.created_at);
 
   return jsonResponse({ items: items.slice(0, 10) });
+}
+
+// =====================================================================
+// نقطة /api/ads/reward — يستدعيها سيرفر Adsgram مباشرة (server-to-server،
+// GET request) بعد تأكدهم فعلياً من مشاهدة المستخدم للإعلان بالكامل.
+// هذا هو المصدر الوحيد لمنح مكافأة هذه المهمة — لا شيء في الواجهة يستطيع
+// منحها بنفسه. الحماية: معامل secret يجب أن يطابق ADSGRAM_REWARD_SECRET
+// (Cloudflare Secret) بالضبط، وإلا يُرفض الطلب فوراً بدون أي تأثير.
+// =====================================================================
+async function handleAdsReward(url, env) {
+  const secret = url.searchParams.get("secret");
+  if (!env.ADSGRAM_REWARD_SECRET || secret !== env.ADSGRAM_REWARD_SECRET) {
+    return new Response("forbidden", { status: 403 });
+  }
+
+  const telegramId = parseInt(url.searchParams.get("userid"), 10);
+  if (!Number.isFinite(telegramId)) {
+    return new Response("bad request", { status: 400 });
+  }
+
+  const row = await env.DB.prepare(
+    "SELECT ads_task_count, ads_task_date FROM users WHERE telegram_id = ?"
+  ).bind(telegramId).first();
+  if (!row) {
+    return new Response("user not found", { status: 404 });
+  }
+
+  const today = todayUTC();
+  const countToday = row.ads_task_date === today ? (row.ads_task_count || 0) : 0;
+  if (countToday >= ADS_TASK_DAILY_LIMIT) {
+    return new Response("limit reached", { status: 200 });
+  }
+
+  const newCount = countToday + 1;
+
+  // شرط CAS على القيمة السابقة بالتحديد (نفس أسلوب mining_started_at) —
+  // لو وصل نفس الطلب مرتين (إعادة إرسال من Adsgram) لن يُمنح إلا مرة
+  // واحدة، لأن المنح والحماية في نفس عبارة UPDATE الواحدة.
+  const updateStmt = env.DB.prepare(
+    `UPDATE users SET coins = coins + ?, ads_task_count = ?, ads_task_date = ?
+     WHERE telegram_id = ? AND (ads_task_date IS NULL OR ads_task_date <> ? OR ads_task_count = ?)`
+  ).bind(ADS_TASK_REWARD_COINS, newCount, today, telegramId, today, countToday);
+  const txnStmt = env.DB.prepare(
+    "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'ads_task', ?, 'coins')"
+  ).bind(telegramId, ADS_TASK_REWARD_COINS);
+
+  await env.DB.batch([updateStmt, txnStmt]);
+
+  return new Response("OK", { status: 200 });
 }
 
 // =====================================================================
