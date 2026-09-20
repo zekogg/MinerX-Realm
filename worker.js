@@ -119,6 +119,29 @@ const REFERRAL_MIN_CLAIM_COINS = 5000;
 const ACTIVE_FRIEND_ADS_THRESHOLD = 10;
 
 // =====================================================================
+// إعدادات مهام Check-in الأربع اليومية (تُصفَّر 00:00 UTC، نفس أسلوب باقي
+// الميزات اليومية). المهمتان 1 و2 بدون أي تحقق حقيقي (النقر على الرابط ثم
+// انتظار 5 ثوانٍ فقط من الواجهة). المهمتان 3 و4 لهما تحقق حقيقي من طرف
+// السيرفر قبل السماح بالاستلام:
+// - المهمة 3: هل يحتوي اسم المستخدم الظاهر (first_name+last_name، يصل مع
+//   كل initData) على "@MinerXRealmBot"؟
+// - المهمة 4: هل تحتوي نبذته (bio) — عبر Telegram getChat، تُرجع bio
+//   للمحادثات الخاصة — على رابط إحالته الخاص "ref_<telegram_id>" تحديداً؟
+// =====================================================================
+const CHECKIN_TASK_REWARDS = { 1: 10, 2: 10, 3: 20, 4: 20 };
+
+// =====================================================================
+// إعدادات "Bonus AD Every 1H": إعلان Adsgram إضافي كل ساعة، بحد أقصى
+// 5 مرات باليوم. يستخدم Block منفصل تماماً عن Watch Adsgram Ad اليومية
+// (Reward URL مختلف يحمل ?task=bonus_ad) لأن Adsgram لا يرسل أي شيء غير
+// userid في نداء Reward URL، فلا توجد طريقة أخرى للتمييز بين الميزتين
+// على مستوى السيرفر.
+// =====================================================================
+const BONUS_AD_REWARD_COINS = 15;
+const BONUS_AD_DAILY_LIMIT = 5;
+const BONUS_AD_COOLDOWN_MS = 60 * 60 * 1000; // ساعة واحدة بين كل إعلان والتالي
+
+// =====================================================================
 // إعدادات حيوانات Realm القابلة للشراء + Storage. نفس القاعدة لكل
 // الحيوانات الستة (مطابقة لما طُبِّق على The Duck):
 // - السرعة عند الشراء (Lv.1) = basespeed الخاص بالحيوان، وكل مستوى يضيف
@@ -275,6 +298,22 @@ export default {
       return handleFriendsList(request, env);
     }
 
+    if (url.pathname === "/api/checkin/claim" && request.method === "POST") {
+      return handleCheckinClaim(request, env);
+    }
+
+    if (url.pathname === "/api/checkin/verify" && request.method === "POST") {
+      return handleCheckinVerify(request, env);
+    }
+
+    if (url.pathname === "/api/tasks/list" && request.method === "POST") {
+      return handleTasksList(request, env);
+    }
+
+    if (url.pathname === "/api/tasks/claim" && request.method === "POST") {
+      return handleTasksClaim(request, env);
+    }
+
     // Everything else -> serve the Mini App static files
     return env.ASSETS.fetch(request);
   }
@@ -302,6 +341,8 @@ async function handleGetUser(request, env) {
            u.ads_task_count, u.ads_task_date,
            u.invites_count, u.active_referrals_count, u.referral_pending_earnings,
            u.milestone_10_claimed, u.milestone_25_claimed, u.milestone_50_claimed, u.milestone_100_claimed,
+           u.checkin1_claimed_date, u.checkin2_claimed_date, u.checkin3_claimed_date, u.checkin4_claimed_date,
+           u.bonus_ad_count_today, u.bonus_ad_date, u.bonus_ad_last_watched_at,
            s.capacity_hours AS storage_capacity_hours, s.last_claim_at AS storage_last_claim_at,
            ca.attempts_used AS combo_attempts_used, ca.solved AS combo_solved
     FROM users u
@@ -382,6 +423,21 @@ async function handleGetUser(request, env) {
     reward: m.reward,
     claimed: !!user[`milestone_${m.friends_required}_claimed`]
   }));
+
+  view.checkin_claimed_today = {
+    1: user.checkin1_claimed_date === today,
+    2: user.checkin2_claimed_date === today,
+    3: user.checkin3_claimed_date === today,
+    4: user.checkin4_claimed_date === today
+  };
+  view.checkin_rewards = CHECKIN_TASK_REWARDS;
+
+  view.bonus_ad_watched_today = user.bonus_ad_date === today ? (user.bonus_ad_count_today || 0) : 0;
+  view.bonus_ad_daily_limit = BONUS_AD_DAILY_LIMIT;
+  view.bonus_ad_reward_coins = BONUS_AD_REWARD_COINS;
+  view.bonus_ad_next_available_at = user.bonus_ad_last_watched_at
+    ? user.bonus_ad_last_watched_at + BONUS_AD_COOLDOWN_MS
+    : null;
 
   return jsonResponse({ user: view });
 }
@@ -1535,6 +1591,12 @@ async function handleAdsReward(url, env) {
     return new Response("bad request", { status: 400 });
   }
 
+  // "Bonus AD Every 1H" يستخدم Block منفصل تماماً (Reward URL يحمل
+  // ?task=bonus_ad) — منطق مختلف بالكامل (تبريد ساعة + حد 5/يوم بدل 10/يوم).
+  if (url.searchParams.get("task") === "bonus_ad") {
+    return handleBonusAdReward(telegramId, env);
+  }
+
   const row = await env.DB.prepare(
     "SELECT ads_task_count, ads_task_date, ads_task_total, referred_by FROM users WHERE telegram_id = ?"
   ).bind(telegramId).first();
@@ -1581,6 +1643,49 @@ async function handleAdsReward(url, env) {
       ).bind(REFERRAL_ACTIVE_BONUS_COINS, row.referred_by).run();
     }
   }
+
+  return new Response("OK", { status: 200 });
+}
+
+// =====================================================================
+// منطق "Bonus AD Every 1H" — إعلان إضافي كل ساعة، بحد أقصى 5/يوم. شرط
+// CAS يجمع ثلاثة أمور في عبارة UPDATE واحدة: القيمة السابقة بالتحديد
+// لـbonus_ad_last_watched_at (يمنع الاستلام المضاعف من نفس النداء
+// المكرر)، تصفير العداد اليومي ضمنياً عند تغيّر اليوم، والحد الأقصى 5.
+// =====================================================================
+async function handleBonusAdReward(telegramId, env) {
+  const row = await env.DB.prepare(
+    "SELECT bonus_ad_count_today, bonus_ad_date, bonus_ad_last_watched_at FROM users WHERE telegram_id = ?"
+  ).bind(telegramId).first();
+  if (!row) {
+    return new Response("user not found", { status: 404 });
+  }
+
+  const today = todayUTC();
+  const countToday = row.bonus_ad_date === today ? (row.bonus_ad_count_today || 0) : 0;
+  if (countToday >= BONUS_AD_DAILY_LIMIT) {
+    return new Response("limit reached", { status: 200 });
+  }
+
+  const now = Date.now();
+  const oldLastWatchedAt = row.bonus_ad_last_watched_at || null;
+  if (oldLastWatchedAt && (now - oldLastWatchedAt) < BONUS_AD_COOLDOWN_MS) {
+    return new Response("cooldown active", { status: 200 });
+  }
+
+  const newCount = countToday + 1;
+
+  const updateStmt = env.DB.prepare(
+    `UPDATE users SET coins = coins + ?, bonus_ad_count_today = ?, bonus_ad_date = ?, bonus_ad_last_watched_at = ?
+     WHERE telegram_id = ?
+       AND (bonus_ad_last_watched_at IS NULL OR bonus_ad_last_watched_at = ?)
+       AND (bonus_ad_date IS NULL OR bonus_ad_date <> ? OR bonus_ad_count_today = ?)`
+  ).bind(BONUS_AD_REWARD_COINS, newCount, today, now, telegramId, oldLastWatchedAt, today, countToday);
+  const txnStmt = env.DB.prepare(
+    "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'bonus_ad', ?, 'coins')"
+  ).bind(telegramId, BONUS_AD_REWARD_COINS);
+
+  await env.DB.batch([updateStmt, txnStmt]);
 
   return new Response("OK", { status: 200 });
 }
@@ -1693,6 +1798,225 @@ async function handleFriendsList(request, env) {
   }));
 
   return jsonResponse({ friends });
+}
+
+// يهرّب أي نص قبل إرساله كمعامل URL لطلب Telegram API — يمنع أي حقن أو
+// كسر تنسيق الرابط.
+function telegramApiUrl(env, method, params) {
+  const url = new URL(`https://api.telegram.org/bot${env.BOT_TOKEN}/${method}`);
+  for (const [key, value] of Object.entries(params)) {
+    url.searchParams.set(key, String(value));
+  }
+  return url.toString();
+}
+
+// تحقق حقيقي: هل يحتوي الاسم الظاهر (يصل مع initData في كل طلب، ولا حاجة
+// لأي استدعاء إضافي لتيليجرام) على "@MinerXRealmBot"؟
+function verifyNameContainsBotMention(auth) {
+  const fullName = `${auth.firstName || ""} ${auth.lastName || ""}`.toLowerCase();
+  return fullName.includes("@minerxrealmbot") || fullName.includes("minerxrealmbot");
+}
+
+// تحقق حقيقي: getChat تُرجع حقل bio للمحادثات الخاصة (طالما المستخدم لم
+// يحظر البوت، وهو محقَّق هنا لأنه فتح البوت أصلاً ليشغّل التطبيق) — نتأكد
+// أن الـbio يحتوي رابط إحالة هذا المستخدم تحديداً وليس أي رابط عشوائي.
+async function verifyBioContainsReferralLink(env, telegramId) {
+  try {
+    const res = await fetch(telegramApiUrl(env, "getChat", { chat_id: telegramId }));
+    const data = await res.json();
+    const bio = data?.result?.bio || "";
+    return bio.includes(`ref_${telegramId}`);
+  } catch (e) {
+    console.error("getChat bio check failed:", e?.message || e);
+    return false;
+  }
+}
+
+// =====================================================================
+// نقطة /api/checkin/claim — تستلم مكافأة إحدى مهام Check-in الأربع
+// اليومية. الحماية: عبارة UPDATE واحدة تجمع بين التحقق من التاريخ (لم
+// تُستلَم اليوم) ومنح المكافأة معاً، فلا خطر من استلام مضاعف حتى لو تكرر
+// نفس الطلب بسرعة.
+// =====================================================================
+async function handleCheckinClaim(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "invalid_body" }, 400);
+  }
+
+  const auth = await authenticateRequest(request, env, body);
+  if (!auth.ok) return auth.response;
+  const { telegramId } = auth;
+
+  const task = Number(body.task);
+  const reward = CHECKIN_TASK_REWARDS[task];
+  if (!reward) {
+    return jsonResponse({ error: "invalid_task" }, 400);
+  }
+  const column = `checkin${task}_claimed_date`;
+
+  if (task === 3 && !verifyNameContainsBotMention(auth)) {
+    return jsonResponse({ error: "not_verified" }, 400);
+  }
+  if (task === 4 && !(await verifyBioContainsReferralLink(env, telegramId))) {
+    return jsonResponse({ error: "not_verified" }, 400);
+  }
+
+  const today = todayUTC();
+  const updateStmt = env.DB.prepare(
+    `UPDATE users SET coins = coins + ?, ${column} = ?
+     WHERE telegram_id = ? AND (${column} IS NULL OR ${column} <> ?)`
+  ).bind(reward, today, telegramId, today);
+  const txnStmt = env.DB.prepare(
+    "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, ?, ?, 'coins')"
+  ).bind(telegramId, `checkin_task_${task}`, reward);
+
+  const [result] = await env.DB.batch([updateStmt, txnStmt]);
+  if (!result.meta || result.meta.changes === 0) {
+    return jsonResponse({ error: "already_claimed_today" }, 409);
+  }
+
+  const user = await env.DB.prepare("SELECT coins FROM users WHERE telegram_id = ?").bind(telegramId).first();
+  return jsonResponse({ reward, coins: user.coins });
+}
+
+// =====================================================================
+// نقطة /api/checkin/verify — تحقق فقط (بدون منح أي مكافأة) لمهام 3/4،
+// تُستخدم لإظهار زر Claim للمستخدم فقط بعد إتمام الشرط فعلياً. الحماية
+// الحقيقية تبقى في handleCheckinClaim نفسه الذي يعيد التحقق قبل المنح،
+// فحتى لو تلاعب أحدهم بالواجهة فلن يحصل على المكافأة دون تحقق حقيقي.
+// =====================================================================
+async function handleCheckinVerify(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "invalid_body" }, 400);
+  }
+
+  const auth = await authenticateRequest(request, env, body);
+  if (!auth.ok) return auth.response;
+  const { telegramId } = auth;
+
+  const task = Number(body.task);
+  if (task !== 3 && task !== 4) {
+    return jsonResponse({ error: "invalid_task" }, 400);
+  }
+
+  const verified = task === 3
+    ? verifyNameContainsBotMention(auth)
+    : await verifyBioContainsReferralLink(env, telegramId);
+
+  return jsonResponse({ verified });
+}
+
+// =====================================================================
+// نقطة /api/tasks/list — تُرجع مهام Partner أو Special الفعّالة من جدول
+// admin_tasks (يُدار حالياً يدوياً عبر D1 Console، ولاحقاً من لوحة أدمن)
+// مع حالة "تم الاستلام؟" لكل مهمة بالنسبة لهذا المستخدم تحديداً.
+// =====================================================================
+async function handleTasksList(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "invalid_body" }, 400);
+  }
+
+  const auth = await authenticateRequest(request, env, body);
+  if (!auth.ok) return auth.response;
+  const { telegramId } = auth;
+
+  const section = body.section === "special" ? "special" : "partner";
+
+  const result = await env.DB.prepare(
+    `SELECT t.id, t.title, t.icon_url, t.reward_coins, t.link, t.channel_id,
+            c.telegram_id AS claimed
+     FROM admin_tasks t
+     LEFT JOIN admin_task_claims c ON c.task_id = t.id AND c.telegram_id = ?
+     WHERE t.section = ? AND t.is_active = 1
+     ORDER BY t.display_order ASC, t.id ASC`
+  ).bind(telegramId, section).all();
+
+  const tasks = (result.results || []).map((t) => ({
+    id: t.id,
+    title: t.title,
+    icon_url: t.icon_url,
+    reward: t.reward_coins,
+    link: t.link,
+    requires_membership: !!t.channel_id,
+    claimed: !!t.claimed
+  }));
+
+  return jsonResponse({ tasks });
+}
+
+// =====================================================================
+// نقطة /api/tasks/claim — تمنح مكافأة مهمة Partner/Special واحدة (مرة
+// واحدة فقط مدى الحياة، وليست يومية). لو كانت المهمة مرتبطة بقناة
+// (channel_id)، تُتحقَّق العضوية فعلياً عبر getChatMember قبل المنح.
+// الحماية من الاستلام المضاعف: INSERT OR IGNORE في admin_task_claims
+// يُنفَّذ بمفرده أولاً (قيد UNIQUE هو الـCAS)، ولا يُمنح أي عملة إلا لو
+// نجح هذا الإدراج بالتحديد.
+// =====================================================================
+async function handleTasksClaim(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "invalid_body" }, 400);
+  }
+
+  const auth = await authenticateRequest(request, env, body);
+  if (!auth.ok) return auth.response;
+  const { telegramId } = auth;
+
+  const taskId = Number(body.task_id);
+  const task = await env.DB.prepare(
+    "SELECT id, reward_coins, channel_id FROM admin_tasks WHERE id = ? AND is_active = 1"
+  ).bind(taskId).first();
+  if (!task) {
+    return jsonResponse({ error: "invalid_task" }, 400);
+  }
+
+  if (task.channel_id) {
+    const isMember = await checkChannelMembership(env, task.channel_id, telegramId);
+    if (!isMember) {
+      return jsonResponse({ error: "not_member" }, 400);
+    }
+  }
+
+  const insertResult = await env.DB.prepare(
+    "INSERT OR IGNORE INTO admin_task_claims (telegram_id, task_id, claimed_at) VALUES (?, ?, ?)"
+  ).bind(telegramId, taskId, Date.now()).run();
+
+  if (!insertResult.meta || insertResult.meta.changes === 0) {
+    return jsonResponse({ error: "already_claimed" }, 409);
+  }
+
+  await env.DB.batch([
+    env.DB.prepare("UPDATE users SET coins = coins + ? WHERE telegram_id = ?").bind(task.reward_coins, telegramId),
+    env.DB.prepare(
+      "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'admin_task', ?, 'coins')"
+    ).bind(telegramId, task.reward_coins)
+  ]);
+
+  const user = await env.DB.prepare("SELECT coins FROM users WHERE telegram_id = ?").bind(telegramId).first();
+  return jsonResponse({ reward: task.reward_coins, coins: user.coins });
+}
+
+async function checkChannelMembership(env, channelId, telegramId) {
+  try {
+    const res = await fetch(telegramApiUrl(env, "getChatMember", { chat_id: channelId, user_id: telegramId }));
+    const data = await res.json();
+    const status = data?.result?.status;
+    return status === "member" || status === "administrator" || status === "creator";
+  } catch (e) {
+    console.error("getChatMember check failed:", e?.message || e);
+    return false;
+  }
 }
 
 // =====================================================================
@@ -1990,6 +2314,7 @@ async function authenticateRequest(request, env, preParsedBody) {
     username,
     rawUsername: tgUser.username || null,
     firstName: tgUser.first_name || null,
+    lastName: tgUser.last_name || null,
     referredBy
   };
 }

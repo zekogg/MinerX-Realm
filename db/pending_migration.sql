@@ -160,3 +160,58 @@ ALTER TABLE users ADD COLUMN milestone_100_claimed INTEGER DEFAULT 0;
 -- التسجيل تُمنح ضمن نفس السطر الذي يُنشئ صف المستخدم الجديد لأول مرة
 -- (لا يتكرر تنفيذه إطلاقاً)، فلا داعي لعلم منفصل.
 ALTER TABLE referrals ADD COLUMN earned_coins REAL DEFAULT 0;
+
+-- -- Check-in (4 مهام يومية، Reset 00:00 UTC) --
+-- checkin1..4_claimed_date: تاريخ آخر استلام ناجح لكل مهمة على حدة (نفس
+-- أسلوب last_spin_date). المهمتان 1 و2 بلا تحقق سيرفري حقيقي (فتح رابط +
+-- انتظار 5 ثوانٍ من الواجهة فقط). المهمة 3 يتحقق السيرفر أن الاسم الظاهر
+-- يحتوي "@MinerXRealmBot"، والمهمة 4 يتحقق عبر Telegram getChat أن الـbio
+-- يحتوي رابط إحالة هذا المستخدم تحديداً.
+ALTER TABLE users ADD COLUMN checkin1_claimed_date TEXT;
+ALTER TABLE users ADD COLUMN checkin2_claimed_date TEXT;
+ALTER TABLE users ADD COLUMN checkin3_claimed_date TEXT;
+ALTER TABLE users ADD COLUMN checkin4_claimed_date TEXT;
+
+-- -- Bonus AD Every 1H (إعلان Adsgram إضافي، منفصل عن Watch Adsgram Ad اليومية) --
+-- bonus_ad_count_today   : عدد المرات المُكافأة اليوم (حد أقصى 5).
+-- bonus_ad_date          : تاريخ اليوم (UTC) المرتبط بالعداد أعلاه.
+-- bonus_ad_last_watched_at: وقت آخر مشاهدة ناجحة (مللي ثانية) — أساس
+--                           تبريد الساعة الواحدة بين كل إعلان والتالي.
+ALTER TABLE users ADD COLUMN bonus_ad_count_today INTEGER DEFAULT 0;
+ALTER TABLE users ADD COLUMN bonus_ad_date TEXT;
+ALTER TABLE users ADD COLUMN bonus_ad_last_watched_at INTEGER;
+
+-- -- Partner / Special (مهام يديرها الأدمن من D1 حالياً، ولاحقاً من لوحة أدمن) --
+-- admin_tasks: صف واحد لكل مهمة. section = 'partner' أو 'special'.
+-- channel_id (اختياري): معرّف/اسم قناة تيليجرام — إن وُجد، يُتحقَّق فعلياً
+-- من عضوية المستخدم فيها عبر getChatMember قبل منح المكافأة؛ إن كان
+-- فارغاً (مهمة بلا تحقق آلي، مثل "شارك المنشور")، تُمنح المكافأة مباشرة
+-- عند الضغط. is_active يسمح بإخفاء مهمة دون حذفها. display_order يتحكم
+-- بترتيب الظهور.
+CREATE TABLE IF NOT EXISTS admin_tasks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  section TEXT NOT NULL,
+  title TEXT NOT NULL,
+  icon_url TEXT,
+  reward_coins INTEGER NOT NULL,
+  link TEXT NOT NULL,
+  channel_id TEXT,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  display_order INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_admin_tasks_section ON admin_tasks(section, is_active, display_order);
+
+-- admin_task_claims: استلام واحد فقط مدى الحياة لكل مستخدم × كل مهمة
+-- (وليست يومية، بخلاف Check-in) — قيد PRIMARY KEY هو الـCAS الذي يمنع أي
+-- استلام مضاعف.
+CREATE TABLE IF NOT EXISTS admin_task_claims (
+  telegram_id INTEGER NOT NULL,
+  task_id INTEGER NOT NULL,
+  claimed_at INTEGER NOT NULL,
+  PRIMARY KEY (telegram_id, task_id)
+);
+
+-- مثال لإضافة مهمة جديدة يدوياً في قسم Partner (استبدل القيم):
+-- INSERT INTO admin_tasks (section, title, icon_url, reward_coins, link, channel_id, display_order, created_at)
+-- VALUES ('partner', 'Join This Channel', 'https://.../icon.svg', 10, 'https://t.me/YourChannel', '@YourChannel', 0, strftime('%s','now') * 1000);
