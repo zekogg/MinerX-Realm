@@ -2653,21 +2653,41 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 }
 
 /* /////كود نافذة Profile — ملكي فاخر///// */
+/* -- Bottom Sheet: تنزلق من أسفل الشاشة وتتوقف عند منتصفها تقريباً، بخلاف
+      بقية النوافذ التي تظهر كبطاقة في المنتصف -- */
+#modal-profile{
+  display:flex;   /* تبقى في الـDOM دائماً (بدل display:none) ليعمل انتقال الانزلاق */
+  align-items:flex-end;
+  padding:0 18px;
+  background:rgba(8,6,14,0);
+  visibility:hidden;
+  pointer-events:none;
+  transition:background .32s ease, visibility 0s linear .32s;
+}
+#modal-profile.is-open{
+  visibility:visible;
+  pointer-events:auto;
+  background:rgba(8,6,14,.72);
+  transition:background .32s ease, visibility 0s linear 0s;
+}
 .pf-sheet{
   position:relative;
-  width:100%; max-width:360px; max-height:none; overflow-y:visible; overflow-x:hidden;
-  margin:24px 18px;
+  width:100%; max-width:360px; max-height:50vh; overflow-y:auto; overflow-x:hidden;
+  margin:0;
   padding:28px 20px 22px;
-  border-radius:26px;
+  border-radius:26px 26px 0 0;
   background:
     radial-gradient(220px 200px at 50% 0%, rgba(227,165,66,.14), transparent 70%),
     radial-gradient(180px 160px at 100% 100%, rgba(165,108,240,.14), transparent 70%),
     linear-gradient(165deg, #1c1130, #0c0815 75%);
-  box-shadow:0 30px 60px -20px rgba(0,0,0,.85);
+  box-shadow:0 -20px 50px -20px rgba(0,0,0,.85);
+  transform:translateY(100%);
+  transition:transform .32s cubic-bezier(.22,.9,.32,1);
 }
+#modal-profile.is-open .pf-sheet{ transform:translateY(0); }
 .pf-sheet::before{
   content:"";
-  position:absolute; inset:0; border-radius:26px; padding:1.6px;
+  position:absolute; inset:0; border-radius:26px 26px 0 0; padding:1.6px;
   background:linear-gradient(135deg, #f0d878 0%, #a9701f 28%, var(--c-royal-purple-2) 55%, #f0d878 100%);
   -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite:xor; mask-composite:exclude;
