@@ -2045,6 +2045,13 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 }
 .price-tooltip.is-visible{ opacity:1; }
 .price-tooltip--wide{ width:150px; white-space:normal; line-height:1.5; text-align:center; }
+/* -- نسخة تظهر للأسفل بدل الأعلى (للعناصر القريبة من أعلى الشاشة، مثل
+      رقم العملات بالشريط العلوي، حيث يظهر التلميح الأصلي خارج الشاشة) -- */
+.price-tooltip--below{ bottom:auto; top:100%; transform:translateX(-50%) translateY(6px); }
+.price-tooltip--below::after{
+  top:auto; bottom:100%;
+  border-top:none; border-bottom:4px solid rgba(227,165,66,.55);
+}
 /* -- حاوية مرجعية لأي شارة "؟" ثابتة الموضع (position:static) بحيث يتموضع
       التلميح المنبثق بداخلها بشكل صحيح دون التأثير على تخطيط الشارة نفسها -- */
 .help-tooltip-anchor{ position:relative; display:inline-flex; }
@@ -2620,21 +2627,39 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .lb-row__coins svg{ width:12px; height:12px; flex-shrink:0; }
 
 /* /////كود نافذة The Mysterious Free Pet — تصميم ملكي/فاخر مستقل عن كل النوافذ الأخرى///// */
+/* -- تحويلها إلى Bottom Sheet (نفس آلية Profile/Exchange/Deposit/Withdraw):
+      تنزلق من الأسفل، حواف علوية مستديرة فقط. محتواها قصير فيظهر كاملاً
+      بلا حاجة للتمرير؛ max-height/overflow-y هنا فقط شبكة أمان -- */
+#modal-free-pet{
+  display:flex; align-items:flex-end; padding:0;
+  background:rgba(8,6,14,0);
+  visibility:hidden; pointer-events:none;
+  transition:background .32s ease, visibility 0s linear .32s;
+}
+#modal-free-pet.is-open{
+  visibility:visible; pointer-events:auto;
+  background:rgba(8,6,14,.72);
+  transition:background .32s ease, visibility 0s linear 0s;
+}
 .fp-sheet{
   position:relative;
-  width:100%; max-width:340px; overflow:visible;
-  margin:24px 18px;
+  width:100%; max-width:none; overflow:visible;
+  margin:0;
   padding:30px 22px 24px;
-  border-radius:30px;
+  border-radius:26px 26px 0 0;
   background:
     radial-gradient(220px 200px at 50% 0%, rgba(227,165,66,.14), transparent 70%),
     radial-gradient(180px 160px at 100% 100%, rgba(165,108,240,.14), transparent 70%),
     linear-gradient(165deg, #1c1130, #0c0815 75%);
-  box-shadow:0 30px 60px -20px rgba(0,0,0,.85);
+  box-shadow:0 -20px 50px -20px rgba(0,0,0,.85);
+  max-height:92vh; overflow-y:auto;
+  transform:translateY(100%);
+  transition:transform .32s cubic-bezier(.22,.9,.32,1);
 }
+#modal-free-pet.is-open .fp-sheet{ transform:translateY(0); }
 .fp-sheet::before{
   content:"";
-  position:absolute; inset:0; border-radius:30px; padding:1.6px;
+  position:absolute; inset:0; border-radius:inherit; padding:1.6px;
   background:linear-gradient(135deg, #f0d878 0%, #a9701f 28%, var(--c-royal-purple-2) 55%, #f0d878 100%);
   -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite:xor; mask-composite:exclude;
@@ -2673,7 +2698,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .fp-pet-slot{
   width:140px; height:140px; margin:0 auto 22px;
   display:flex; align-items:center; justify-content:center;
-  box-shadow:0 0 26px rgba(165,108,240,.3), inset 0 0 22px rgba(0,0,0,.35);
+  box-shadow:0 0 26px rgba(227,165,66,.3), inset 0 0 22px rgba(0,0,0,.35);
 }
 .fp-pet-slot__emoji{ font-size:76px; line-height:1; }
 .fp-desc{ text-align:center; font-size:12.5px; color:var(--ink-dim); line-height:1.65; margin-bottom:22px; }
@@ -2688,7 +2713,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 }
 .fp-progress-fill{
   height:100%; border-radius:999px;
-  background:linear-gradient(90deg, var(--c-royal-purple-1), #f0d878);
+  background:linear-gradient(90deg, #a9701f, #ffe9b8 45%, #f0d878 55%, #a9701f);
 }
 .fp-claim-btn{
   width:100%; padding:14px; border-radius:16px;
@@ -2898,7 +2923,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         <div class="topbar-coin-card__text">
           <span class="topbar-coin-card__num" style="position:relative; cursor:pointer;" onclick="togglePriceTooltip('topbar-coins-exact-tooltip')">
             <span id="display-coins-topbar">00</span>
-            <span class="price-tooltip" id="topbar-coins-exact-tooltip">0 Coins</span>
+            <span class="price-tooltip price-tooltip--below" id="topbar-coins-exact-tooltip">0 Coins</span>
           </span>
           <div class="topbar-coin-card__gram" id="display-gram-equiv-topbar">≈ $0.0000 Gram</div>
         </div>
@@ -3925,8 +3950,6 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
     <div class="fp-sheet">
       <span class="fp-corner fp-corner--tl"></span>
       <span class="fp-corner fp-corner--tr"></span>
-      <span class="fp-corner fp-corner--bl"></span>
-      <span class="fp-corner fp-corner--br"></span>
       <button class="fp-close" onclick="closeModal('modal-free-pet')">✕</button>
 
       <div class="fp-title">The Mysterious Free Pet</div>
@@ -7439,7 +7462,10 @@ function updateExchange(){
   }
 }
 function setMaxExchange(){
-  document.getElementById('exchange-input').value = CURRENT_COINS_BALANCE;
+  // CURRENT_COINS_BALANCE قد يحمل كسوراً عشرية دقيقة جداً (تراكم فوارق
+  // الفاصلة العائمة من مكافآت/عمولات سابقة) — Coins عملة صحيحة دائماً في
+  // كل مكان آخر بالواجهة، فنُطابقها هنا بـMath.floor بدل عرض الرقم الخام.
+  document.getElementById('exchange-input').value = Math.floor(CURRENT_COINS_BALANCE);
   updateExchange();
 }
 
