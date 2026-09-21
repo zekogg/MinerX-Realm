@@ -2889,7 +2889,10 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
           <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:28px;height:28px;">
         </div>
         <div class="topbar-coin-card__text">
-          <span class="topbar-coin-card__num" id="display-coins-topbar">00</span>
+          <span class="topbar-coin-card__num" style="position:relative; cursor:pointer;" onclick="togglePriceTooltip('topbar-coins-exact-tooltip')">
+            <span id="display-coins-topbar">00</span>
+            <span class="price-tooltip" id="topbar-coins-exact-tooltip">0 Coins</span>
+          </span>
           <div class="topbar-coin-card__gram" id="display-gram-equiv-topbar">≈ $0.0000 Gram</div>
         </div>
       </div>
@@ -4903,6 +4906,9 @@ function updateBalanceDisplay(u){
 
   var elTopbarCoins = document.getElementById('display-coins-topbar');
   if (elTopbarCoins) elTopbarCoins.textContent = formatCoinsK(u.coins);
+
+  var elTopbarCoinsTooltip = document.getElementById('topbar-coins-exact-tooltip');
+  if (elTopbarCoinsTooltip) elTopbarCoinsTooltip.textContent = coinsWhole + ' Coins';
 
   var elTopbarGram = document.getElementById('display-gram-topbar');
   if (elTopbarGram) elTopbarGram.textContent = gramText;
