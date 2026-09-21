@@ -34,3 +34,7 @@ crons = ["0 0 * * *"]
 # ADSGRAM_REWARD_SECRET يُضبط كـ Cloudflare Secret أيضاً — عبر:
 # wrangler secret put ADSGRAM_REWARD_SECRET
 # نفس القيمة المُدرَجة في حقل Reward URL بلوحة تحكم Adsgram (?secret=...)
+
+# GIGAPUB_POSTBACK_SECRET يُضبط كـ Cloudflare Secret أيضاً — عبر:
+# wrangler secret put GIGAPUB_POSTBACK_SECRET
+# نفس القيمة المُدرَجة في رابط Postback المُعطى لدعم GigaPub (&secret=...)
