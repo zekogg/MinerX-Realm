@@ -2841,7 +2841,10 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   <header class="topbar">
     <!-- عمود البروفايل: الدائرة فقط، بدون اسم أو معرّف -->
     <div class="profile">
-      <div class="profile__avatar" onclick="openProfileModal()" style="cursor:pointer;">👤</div>
+      <div class="profile__avatar" onclick="openProfileModal()" style="cursor:pointer;">
+        <img draggable="false" id="topbar-avatar-img" alt="" style="display:none;width:100%;height:100%;border-radius:50%;object-fit:cover;">
+        <span id="topbar-avatar-emoji">👤</span>
+      </div>
     </div>
 
     <!-- لوغو البوت في الفراغ الأوسط — موضع مطلق فقط، لا يشارك بتخطيط Flexbox -->
@@ -3934,10 +3937,13 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 
       <div class="pf-scroll">
         <div class="pf-avatar-wrap">
-          <div class="pf-avatar">👤</div>
+          <div class="pf-avatar">
+            <img draggable="false" id="pf-avatar-img" alt="" style="display:none;width:100%;height:100%;border-radius:50%;object-fit:cover;">
+            <span id="pf-avatar-emoji">👤</span>
+          </div>
         </div>
-        <div class="pf-name">Name</div>
-        <div class="pf-username">@Username</div>
+        <div class="pf-name" id="pf-name">Name</div>
+        <div class="pf-username" id="pf-username">@Username</div>
 
         <div class="pf-divider"></div>
 
@@ -3958,17 +3964,15 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         </div>
 
         <div class="pf-stats">
-          <div class="pf-stat-row"><span class="pf-stat-label">ID</span><span class="pf-stat-val">000000</span></div>
-          <div class="pf-stat-row"><span class="pf-stat-label">Registered Date</span><span class="pf-stat-val">01-01-2026</span></div>
-          <div class="pf-stat-row"><span class="pf-stat-label">Pet Cards</span><span class="pf-stat-val">0</span></div>
-          <div class="pf-stat-row"><span class="pf-stat-label">Exclusive Cards</span><span class="pf-stat-val">0</span></div>
-          <div class="pf-stat-row"><span class="pf-stat-label">Referrals</span><span class="pf-stat-val">0</span></div>
-          <div class="pf-stat-row"><span class="pf-stat-label">Active Referrals</span><span class="pf-stat-val">0</span></div>
-          <div class="pf-stat-row"><span class="pf-stat-label">Coins Balance</span><span class="pf-stat-val">0</span></div>
-          <div class="pf-stat-row"><span class="pf-stat-label">Gram Balance</span><span class="pf-stat-val">0</span></div>
-          <div class="pf-stat-row"><span class="pf-stat-label">Total Speed</span><span class="pf-stat-val">+00000 Coins/hr</span></div>
-          <div class="pf-stat-row"><span class="pf-stat-label">Total Deposit</span><span class="pf-stat-val">0</span></div>
-          <div class="pf-stat-row"><span class="pf-stat-label">Total Withdraw</span><span class="pf-stat-val">0</span></div>
+          <div class="pf-stat-row"><span class="pf-stat-label">ID</span><span class="pf-stat-val" id="pf-stat-id">000000</span></div>
+          <div class="pf-stat-row"><span class="pf-stat-label">Registered Date</span><span class="pf-stat-val" id="pf-stat-registered">01-01-2026</span></div>
+          <div class="pf-stat-row"><span class="pf-stat-label">Referrals</span><span class="pf-stat-val" id="pf-stat-referrals">0</span></div>
+          <div class="pf-stat-row"><span class="pf-stat-label">Active Referrals</span><span class="pf-stat-val" id="pf-stat-active-referrals">0</span></div>
+          <div class="pf-stat-row"><span class="pf-stat-label">Coins Balance</span><span class="pf-stat-val" id="pf-stat-coins">0</span></div>
+          <div class="pf-stat-row"><span class="pf-stat-label">Gram Balance</span><span class="pf-stat-val" id="pf-stat-gram">0</span></div>
+          <div class="pf-stat-row"><span class="pf-stat-label">Total Speed</span><span class="pf-stat-val" id="pf-stat-speed">+00000 Coins/hr</span></div>
+          <div class="pf-stat-row"><span class="pf-stat-label">Total Deposit</span><span class="pf-stat-val" id="pf-stat-deposit">0</span></div>
+          <div class="pf-stat-row"><span class="pf-stat-label">Total Withdraw</span><span class="pf-stat-val" id="pf-stat-withdraw">0</span></div>
         </div>
       </div>
     </div>
@@ -4797,6 +4801,34 @@ function getTelegramInitData(){
   }catch(e){}
   return '';
 }
+
+// صورة البروفايل الحقيقية من تيليجرام تصل جاهزة ضمن initDataUnsafe.user
+// (لا حاجة لأي استدعاء Bot API من الواجهة) — تُستخدم مباشرة لعرض الصورة
+// في الشريط العلوي ونافذة Profile، مع رجوع للإيموجي 👤 لو لم توجد صورة
+// عامة للمستخدم أو فشل تحميلها. السيرفر يخزّن نسخة منها بشكل مستقل
+// (انظر handleGetUser) لأماكن أخرى تحتاج صور مستخدمين غير الحالي.
+function setupProfilePhoto(){
+  var photoUrl = null;
+  try{
+    if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user){
+      photoUrl = window.Telegram.WebApp.initDataUnsafe.user.photo_url || null;
+    }
+  }catch(e){}
+  if (!photoUrl) return;
+
+  [
+    { img: 'topbar-avatar-img', emoji: 'topbar-avatar-emoji' },
+    { img: 'pf-avatar-img', emoji: 'pf-avatar-emoji' }
+  ].forEach(function(pair){
+    var img = document.getElementById(pair.img);
+    var emoji = document.getElementById(pair.emoji);
+    if (!img || !emoji) return;
+    img.onload = function(){ img.style.display = 'block'; emoji.style.display = 'none'; };
+    img.onerror = function(){ img.style.display = 'none'; emoji.style.display = ''; };
+    img.src = photoUrl;
+  });
+}
+setupProfilePhoto();
 
 // سعر صرف Coins <-> Gram الافتراضي (يُستبدل بالقيمة الحقيقية القادمة من
 // /api/user فور توفرها — يبقى هذا فقط احتياطياً قبل أول تحميل).
@@ -5976,6 +6008,55 @@ function openQuickFreePetModal(){
 
 function openProfileModal(){
   openModal('modal-profile');
+
+  var initData = getTelegramInitData();
+  if (!initData) return;
+
+  fetch('/api/profile', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: initData })
+  })
+  .then(function(res){ return res.json(); })
+  .then(function(data){
+    if (data.error) return;
+
+    var nameEl = document.getElementById('pf-name');
+    if (nameEl) nameEl.textContent = data.display_name;
+
+    var usernameEl = document.getElementById('pf-username');
+    if (usernameEl) usernameEl.textContent = data.username ? ('@' + data.username) : 'No username';
+
+    var idEl = document.getElementById('pf-stat-id');
+    if (idEl) idEl.textContent = data.telegram_id;
+
+    var registeredEl = document.getElementById('pf-stat-registered');
+    if (registeredEl) registeredEl.textContent = data.registered_date;
+
+    var referralsEl = document.getElementById('pf-stat-referrals');
+    if (referralsEl) referralsEl.textContent = data.invites;
+
+    var activeReferralsEl = document.getElementById('pf-stat-active-referrals');
+    if (activeReferralsEl) activeReferralsEl.textContent = data.active_invites;
+
+    var coinsEl = document.getElementById('pf-stat-coins');
+    if (coinsEl) coinsEl.textContent = Number(data.coins).toLocaleString('en-US', { maximumFractionDigits: 0 });
+
+    var gramEl = document.getElementById('pf-stat-gram');
+    if (gramEl) gramEl.textContent = Number(data.gram).toFixed(3);
+
+    var speedEl = document.getElementById('pf-stat-speed');
+    if (speedEl) speedEl.textContent = '+' + Number(data.total_speed).toLocaleString('en-US', { maximumFractionDigits: 0 }) + ' Coins/hr';
+
+    var depositEl = document.getElementById('pf-stat-deposit');
+    if (depositEl) depositEl.textContent = Number(data.total_deposit_gram).toFixed(3) + ' Gram';
+
+    var withdrawEl = document.getElementById('pf-stat-withdraw');
+    if (withdrawEl) withdrawEl.textContent = Number(data.total_withdraw_gram).toFixed(3) + ' Gram';
+  })
+  .catch(function(err){
+    console.error('fetch profile failed:', err);
+  });
 }
 
 function openWithdrawReqModal(){
