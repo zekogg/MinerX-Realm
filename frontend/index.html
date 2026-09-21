@@ -6583,14 +6583,13 @@ function pollBonusAdRewardConfirmation(baselineWatched, attempt){
 }
 
 /* =====================================================================
-   Watch gigapub ads: بخلاف Adsgram/Bonus AD، GigaPub لا يوفّر لهذا النوع
-   من الإعلان (وليس Offerwall) أي تأكيد حقيقي من سيرفره لسيرفرنا حالياً
-   (بانتظار موافقتهم على طلب Postback URL) — window.showGiga().then()
-   يُحسم بالكامل في المتصفح. الحماية الوحيدة المتاحة: توكن مؤقت واحد
-   الاستخدام من /api/gigapub/start يجب إرساله لـ/api/gigapub/reward بعد
-   نجاح then()، والذي يتحقق منه ضمن CAS واحد مع الحد اليومي — تحدّ من
-   الاستغلال دون أن تؤكد فعلياً مشاهدة الإعلان. سكربت GigaPub نفسه
-   (per-id بالرابط) لا يُحمَّل إطلاقاً إلا بمعرّف رقمي حقيقي في
+   Watch gigapub ads: GigaPub أكّد دعمه Postback URL حقيقي (server-to-
+   server، أعطيناه رابط /api/gigapub/postback) — نفس مبدأ Adsgram تماماً:
+   المكافأة تُمنح فقط من سيرفرهم لسيرفرنا مباشرة، وهذا الكود فقط "يعرض"
+   الإعلان عبر showGiga() ثم "يتحقق" من وصول المكافأة بإعادة قراءة
+   /api/user عدة مرات (قد يستغرق السيرفر لحظات لاستلام الـPostback بعد
+   إغلاق الإعلان). لا شيء هنا يمنح مكافأة بنفسه إطلاقاً. سكربت GigaPub
+   نفسه (per-id بالرابط) لا يُحمَّل إطلاقاً إلا بمعرّف رقمي حقيقي في
    GIGAPUB_PUBLISHER_ID (الزر يظهر كـ"Soon" لو بقي Placeholder)،
    والاستدعاء window.showGiga('main') يمرّر اسم الـPlacement 'main'
    تحديداً كما ورد في كود التكامل من لوحة GigaPub.
@@ -6598,7 +6597,6 @@ function pollBonusAdRewardConfirmation(baselineWatched, attempt){
 var GIGAPUB_PUBLISHER_ID = '8282'; // معرّف حساب GigaPub الحقيقي (تمت الموافقة عليه)
 var gigapubReady = false;
 var gigapubState = { watchedToday: 0, dailyLimit: 8, rewardCoins: 15, busy: false };
-var GIGAPUB_MIN_AD_DURATION_MS = 15000; // أقل وقت مقبول بين الضغط ونجاح then() لاعتبار الإعلان حقيقياً
 
 function isValidGigapubId(id){
   return /^\d+$/.test(String(id));
@@ -6676,62 +6674,28 @@ function onWatchGigapubClick(){
     showComeBackTomorrowToast();
     return;
   }
+  if (typeof window.showGiga !== 'function'){
+    showBuyErrorToast('Ad not available right now', { title: 'Watch gigapub ads' });
+    return;
+  }
 
-  var initData = getTelegramInitData();
-  if (!initData) return;
-
+  var baselineWatched = gigapubState.watchedToday;
   gigapubState.busy = true;
   renderGigapubButton();
 
-  fetch('/api/gigapub/start', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData: initData })
-  })
-  .then(function(res){ return res.json().then(function(data){ return { ok: res.ok, data: data }; }); })
-  .then(function(r){
-    if (!r.ok || !r.data.token){
-      gigapubState.busy = false;
-      renderGigapubButton();
-      if (r.data.error === 'daily_limit_reached') showComeBackTomorrowToast();
-      return;
-    }
-
-    if (typeof window.showGiga !== 'function'){
-      gigapubState.busy = false;
-      renderGigapubButton();
-      showBuyErrorToast('Ad not available right now', { title: 'Watch gigapub ads' });
-      return;
-    }
-
-    // بلا Postback حقيقي، then() قد ينجح حتى لو أغلق المستخدم الإعلان
-    // فوراً (يعتمد على الشبكة الفائزة بالمزاد لحظتها، مثل Monetag) — نقيس
-    // الوقت الفعلي المنقضي، ولا نمنح المكافأة إلا إذا اقترب من مدة إعلان
-    // حقيقي (GIGAPUB_MIN_AD_DURATION_MS)، كأقوى تخفيف ممكن من طرف العميل.
-    var adStartedAt = Date.now();
-    window.showGiga('main').then(function(){
-      var elapsed = Date.now() - adStartedAt;
-      if (elapsed < GIGAPUB_MIN_AD_DURATION_MS){
-        gigapubState.busy = false;
-        renderGigapubButton();
-        showBuyErrorToast('Ad was not completed', { title: 'Watch gigapub ads' });
-        return;
-      }
-      claimGigapubReward(r.data.token);
-    }).catch(function(){
-      gigapubState.busy = false;
-      renderGigapubButton();
-      showBuyErrorToast('Ad was not completed', { title: 'Watch gigapub ads' });
-    });
-  })
-  .catch(function(err){
-    console.error('gigapub start failed:', err);
+  window.showGiga('main').then(function(){
+    pollGigapubRewardConfirmation(baselineWatched, 0);
+  }).catch(function(){
     gigapubState.busy = false;
     renderGigapubButton();
+    showBuyErrorToast('Ad was not completed', { title: 'Watch gigapub ads' });
   });
 }
 
-function claimGigapubReward(token){
+// يعيد قراءة /api/user حتى 6 مرات (كل 1.5 ثانية) بحثاً عن ازدياد
+// gigapub_watched_today — يؤكد بذلك وصول Postback من GigaPub لسيرفرنا
+// فعلياً قبل عرض أي مكافأة للمستخدم (نفس أسلوب pollAdsRewardConfirmation).
+function pollGigapubRewardConfirmation(baselineWatched, attempt){
   var initData = getTelegramInitData();
   if (!initData){
     gigapubState.busy = false;
@@ -6739,27 +6703,38 @@ function claimGigapubReward(token){
     return;
   }
 
-  fetch('/api/gigapub/reward', {
+  fetch('/api/user', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData: initData, token: token })
+    body: JSON.stringify({ initData: initData })
   })
-  .then(function(res){ return res.json().then(function(data){ return { ok: res.ok, data: data }; }); })
-  .then(function(r){
-    gigapubState.busy = false;
-    if (!r.ok){
+  .then(function(res){ return res.json(); })
+  .then(function(data){
+    if (!data.user){ throw new Error('no user in response'); }
+
+    if (data.user.gigapub_watched_today > baselineWatched){
+      updateBalanceDisplay(data.user);
+      applyGigapubState({
+        watched_today: data.user.gigapub_watched_today,
+        daily_limit: data.user.gigapub_daily_limit,
+        reward_coins: data.user.gigapub_reward_coins
+      });
+      showAppToast({ title: 'Watch gigapub ads', icon: PRIZE_ICON_URLS.coins, amount: '+' + gigapubState.rewardCoins + ' Coins' });
+      gigapubState.busy = false;
       renderGigapubButton();
-      showBuyErrorToast('Try again later', { title: 'Watch gigapub ads' });
       return;
     }
 
-    gigapubState.watchedToday = Math.min(gigapubState.watchedToday + 1, gigapubState.dailyLimit);
-    updateBalanceDisplay({ coins: r.data.coins, gram: CURRENT_GRAM_BALANCE });
-    showAppToast({ title: 'Watch gigapub ads', icon: PRIZE_ICON_URLS.coins, amount: '+' + r.data.reward + ' Coins' });
-    renderGigapubButton();
+    if (attempt < 6){
+      setTimeout(function(){ pollGigapubRewardConfirmation(baselineWatched, attempt + 1); }, 1500);
+    } else {
+      gigapubState.busy = false;
+      renderGigapubButton();
+      showBuyErrorToast('Reward is taking longer than usual, check back shortly', { title: 'Watch gigapub ads' });
+    }
   })
   .catch(function(err){
-    console.error('gigapub reward claim failed:', err);
+    console.error('gigapub reward poll failed:', err);
     gigapubState.busy = false;
     renderGigapubButton();
   });
