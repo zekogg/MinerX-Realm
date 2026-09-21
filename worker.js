@@ -331,6 +331,13 @@ export default {
       return handleGigapubPostback(url, env);
     }
 
+    // نقطة منفصلة عن /api/user عمداً — تُستدعى فقط عند فتح نافذة Profile
+    // فعلياً (وليس في كل تحديث دوري)، لأنها تحتوي استعلامات SUM إضافية
+    // (إجمالي الإيداع/السحب) لا حاجة لتكرارها في أكثر نقطة استدعاءً بالتطبيق.
+    if (url.pathname === "/api/profile" && request.method === "POST") {
+      return handleProfile(request, env);
+    }
+
     // Everything else -> serve the Mini App static files. الصفحة الرئيسية
     // (index.html) تُعاد دائماً بلا أي Cache — متصفح Telegram الداخلي
     // (WebView) يخزّنها بقوة أحياناً حتى مع تحديثات فعلية على السيرفر،
@@ -354,7 +361,7 @@ export default {
 async function handleGetUser(request, env) {
   const auth = await authenticateRequest(request, env);
   if (!auth.ok) return auth.response;
-  const { telegramId, username, referredBy } = auth;
+  const { telegramId, username, referredBy, photoUrl } = auth;
 
   const today = todayUTC();
 
@@ -369,7 +376,7 @@ async function handleGetUser(request, env) {
            u.milestone_10_claimed, u.milestone_25_claimed, u.milestone_50_claimed, u.milestone_100_claimed,
            u.checkin1_claimed_date, u.checkin2_claimed_date, u.checkin3_claimed_date, u.checkin4_claimed_date,
            u.bonus_ad_count_today, u.bonus_ad_date, u.bonus_ad_last_watched_at,
-           u.gigapub_task_count, u.gigapub_task_date,
+           u.gigapub_task_count, u.gigapub_task_date, u.photo_url,
            s.capacity_hours AS storage_capacity_hours, s.last_claim_at AS storage_last_claim_at,
            ca.attempts_used AS combo_attempts_used, ca.solved AS combo_solved
     FROM users u
@@ -384,8 +391,8 @@ async function handleGetUser(request, env) {
   if (!user) {
     // أول مرة يفتح التطبيق — أنشئ له صف جديد
     await env.DB.prepare(
-      "INSERT INTO users (telegram_id, username, referred_by) VALUES (?, ?, ?)"
-    ).bind(telegramId, username, referredBy).run();
+      "INSERT INTO users (telegram_id, username, referred_by, created_at, photo_url) VALUES (?, ?, ?, ?, ?)"
+    ).bind(telegramId, username, referredBy, Date.now(), photoUrl).run();
 
     // لو جاء بدعوة، سجّل العلاقة بجدول referrals الموجود مسبقاً + امنح
     // مكافأة التسجيل الفورية (+20) للمُحيل — مرة واحدة فقط لكل صديق (هذا
@@ -403,6 +410,11 @@ async function handleGetUser(request, env) {
     }
 
     user = await env.DB.prepare(userQuery).bind(today, telegramId).first();
+  } else if (photoUrl && photoUrl !== user.photo_url) {
+    // تحديث الصورة المخزَّنة فقط لو تغيّرت فعلاً (نادر) — تفيد لاحقاً بعرض
+    // صور الأصدقاء بأماكن كقائمة Friends التي لا تملك initData الخاص بهم.
+    await env.DB.prepare("UPDATE users SET photo_url = ? WHERE telegram_id = ?").bind(photoUrl, telegramId).run();
+    user.photo_url = photoUrl;
   }
 
   // كل الحيوانات المملوكة (قد يكون أكثر من واحد الآن) — استعلام منفصل
@@ -1772,6 +1784,49 @@ async function handleGigapubPostback(url, env) {
 }
 
 // =====================================================================
+// نقطة /api/profile — تُستدعى فقط عند فتح نافذة Profile فعلياً. تُرجع
+// بيانات لا تحتاجها /api/user في كل استدعاء (إجمالي الإيداع/السحب
+// الحقيقيين، تاريخ التسجيل) لتوفير قراءات D1 على أكثر نقطة استدعاءً
+// بالتطبيق. Total Withdraw يحسب فقط السحوبات المُعتمَدة (status='approved')
+// وليس Pending/Rejected.
+// =====================================================================
+async function handleProfile(request, env) {
+  const auth = await authenticateRequest(request, env);
+  if (!auth.ok) return auth.response;
+  const { telegramId, rawUsername, firstName, lastName } = auth;
+
+  const [user, depositResult, withdrawResult] = await Promise.all([
+    env.DB.prepare(
+      "SELECT coins, gram, total_speed, invites_count, active_referrals_count, created_at FROM users WHERE telegram_id = ?"
+    ).bind(telegramId).first(),
+    env.DB.prepare(
+      "SELECT COALESCE(SUM(amount_gram), 0) AS total FROM deposits WHERE telegram_id = ? AND status = 'confirmed'"
+    ).bind(telegramId).first(),
+    env.DB.prepare(
+      "SELECT COALESCE(SUM(net_gram), 0) AS total FROM withdrawals WHERE telegram_id = ? AND status = 'approved'"
+    ).bind(telegramId).first()
+  ]);
+
+  if (!user) {
+    return jsonResponse({ error: "user_not_found" }, 404);
+  }
+
+  return jsonResponse({
+    telegram_id: telegramId,
+    display_name: [firstName, lastName].filter(Boolean).join(" ") || "Player",
+    username: rawUsername,
+    registered_date: user.created_at ? formatDateDDMMYYYY(user.created_at) : "—",
+    invites: user.invites_count || 0,
+    active_invites: user.active_referrals_count || 0,
+    coins: user.coins,
+    gram: user.gram,
+    total_speed: user.total_speed,
+    total_deposit_gram: depositResult.total || 0,
+    total_withdraw_gram: withdrawResult.total || 0
+  });
+}
+
+// =====================================================================
 // نقطة /api/friends/claim_earnings — تحوّل رصيد الإحالة المعلّق (تسجيل +
 // نشاط + عمولة إيداع) إلى coins فعلية، بشرط ألا يقل عن REFERRAL_MIN_CLAIM_COINS.
 // القيمة تُلتقَط أولاً ثم تُستخدم كشرط CAS بالتحديد في عبارة التحديث،
@@ -2331,6 +2386,15 @@ function todayUTC() {
   return new Date().toISOString().slice(0, 10);
 }
 
+// يحوّل created_at (مللي ثانية) إلى صيغة DD-MM-YYYY لعرضها في نافذة Profile
+function formatDateDDMMYYYY(ms) {
+  const d = new Date(ms);
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const yyyy = d.getUTCFullYear();
+  return `${dd}-${mm}-${yyyy}`;
+}
+
 // يحوّل صف المستخدم الخام إلى شكل يراعي "التصفير الكسول" لعداد الدورات
 // اليومي بدون أي كتابة لقاعدة البيانات (يُحسب فقط عند العرض).
 function withMiningView(user) {
@@ -2396,6 +2460,7 @@ async function authenticateRequest(request, env, preParsedBody) {
     rawUsername: tgUser.username || null,
     firstName: tgUser.first_name || null,
     lastName: tgUser.last_name || null,
+    photoUrl: tgUser.photo_url || null,
     referredBy
   };
 }

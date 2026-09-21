@@ -216,12 +216,24 @@ CREATE TABLE IF NOT EXISTS admin_task_claims (
 -- INSERT INTO admin_tasks (section, title, icon_url, reward_coins, link, channel_id, display_order, created_at)
 -- VALUES ('partner', 'Join This Channel', 'https://.../icon.svg', 10, 'https://t.me/YourChannel', '@YourChannel', 0, strftime('%s','now') * 1000);
 
--- -- Watch gigapub ads (بانتظار موافقة GigaPub على Postback URL حقيقي) --
--- gigapub_task_count/date : عدّاد يومي (نفس أسلوب ads_task_count).
--- gigapub_pending_token/expires: توكن مؤقت واحد الاستخدام يصدره
--- /api/gigapub/start قبل عرض الإعلان، ويُستهلك في /api/gigapub/reward —
--- الحماية الوحيدة الممكنة حالياً بانتظار Postback حقيقي من GigaPub.
+-- -- Watch gigapub ads --
+-- gigapub_task_count/date : عدّاد يومي (نفس أسلوب ads_task_count) —
+-- يُمنح فقط عبر Postback حقيقي من GigaPub (/api/gigapub/postback).
+-- ملاحظة: gigapub_pending_token/expires كانا لآلية توكن مؤقتة أُستخدمت
+-- قبل توفّر Postback حقيقي، وأصبحا غير مُستخدَمين في الكود الحالي (تُركا
+-- في القاعدة بلا ضرر بدل حذفهما).
 ALTER TABLE users ADD COLUMN gigapub_task_count INTEGER DEFAULT 0;
 ALTER TABLE users ADD COLUMN gigapub_task_date TEXT;
 ALTER TABLE users ADD COLUMN gigapub_pending_token TEXT;
 ALTER TABLE users ADD COLUMN gigapub_pending_expires INTEGER;
+
+-- -- نافذة Profile (تاريخ التسجيل + صورة تيليجرام الحقيقية) --
+-- created_at : وقت إنشاء صف المستخدم لأول مرة (مللي ثانية) — يُعرض بصيغة
+-- DD-MM-YYYY في نافذة Profile. المستخدمون الموجودون قبل هذا التحديث
+-- حُدِّث لهم created_at لتاريخ تطبيق التحديث نفسه (انظر migration_profile.sql).
+-- photo_url : آخر رابط صورة بروفايل تيليجرام معروف لهذا المستخدم، يُخزَّن
+-- من initData الموثَّق فقط (وليس من أي مصدر آخر) — يفيد لاحقاً بعرض صور
+-- الأصدقاء بأماكن كقائمة Friends التي لا تملك initData الخاص بغير المستخدم
+-- الحالي نفسه.
+ALTER TABLE users ADD COLUMN created_at INTEGER;
+ALTER TABLE users ADD COLUMN photo_url TEXT;
