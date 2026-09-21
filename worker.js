@@ -172,7 +172,7 @@ const PETS = {
 };
 const PET_MAX_LEVEL = 30;
 const PET_SPEED_INCREMENT_RATIO = 0.10;
-const PET_UPGRADE_COST_RATIO = 0.10;
+const PET_UPGRADE_COST_COINS = 40000; // ثابت لكل الشخصيات الست ولكل مستوى (كان 10% من سعر الشراء)
 const STORAGE_DEFAULT_CAPACITY_HOURS = 6;
 const STORAGE_MIN_CLAIM_COINS = 10;
 
@@ -182,7 +182,7 @@ function petSpeedForLevel(petId, level) {
 }
 
 function petUpgradeCost(petId) {
-  return Math.round(PETS[petId].price * PET_UPGRADE_COST_RATIO);
+  return PET_UPGRADE_COST_COINS;
 }
 
 // مستويات مدة التخزين (Storage) بالساعات — الفهرس 0 = Lv.1 (الافتراضي عند
