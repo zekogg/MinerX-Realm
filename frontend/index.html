@@ -4067,10 +4067,9 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M19 5a12 12 0 0 1 0 14M15.5 8.5a7 7 0 0 1 0 7"/></svg>
             <span>Sound</span>
           </button>
-          <button class="pf-lang-selector">
-            <span class="pf-lang-selector__flag">🇬🇧</span>
-            <span class="pf-lang-selector__text">En</span>
-            <svg class="pf-lang-selector__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+          <button class="pf-toggle-btn" onclick="openSupportChat()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3ZM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3Z"/></svg>
+            <span>Support</span>
           </button>
         </div>
 
@@ -5704,6 +5703,7 @@ function onGiftOpenClick(){
 // تُستخدم هنا فقط لعرض معاينة صحيحة في نافذة الترقية قبل إرسال الطلب؛
 // القرار والتحقق الفعليان يبقيان بالكامل من طرف السيرفر.
 var PET_MAX_LEVEL = 30; // نفس الحد الأقصى لكل الحيوانات
+var PET_UPGRADE_COST_COINS = 40000; // ثابت لكل الشخصيات ولكل مستوى (كان 10% من سعر الشراء) — يجب مطابقته دائماً لقيمة PET_UPGRADE_COST_COINS في worker.js
 var PET_DEFS = [
   { id: 'duck',         basespeed: 114,   price: 300000,   name: 'The Duck',       lvId: 'duck-lv-badge',         rateId: 'duck-rate-text',         buyBtnId: 'pet-card-btn',         upgradeBtnId: 'duck-upgrade-btn' },
   { id: 'polar_bear',   basespeed: 191,   price: 500000,   name: 'The Polar Bear', lvId: 'bear-lv-badge',         rateId: 'bear-rate-text',         buyBtnId: 'bear-buy-btn',         upgradeBtnId: 'bear-upgrade-btn' },
@@ -6116,6 +6116,20 @@ function openQuickFreePetModal(){
   openModal('modal-quick-free-pet');
 }
 
+// زر Support بنافذة Profile — يفتح محادثة الدعم على تيليجرام مباشرة.
+// SUPPORT_TELEGRAM_USERNAME لا يزال Placeholder؛ يجب استبداله باليوزرنيم
+// الحقيقي لحساب الدعم قبل أن يعمل هذا الزر فعلياً.
+var SUPPORT_TELEGRAM_USERNAME = 'REPLACE_WITH_SUPPORT_USERNAME';
+function openSupportChat(){
+  var url = 'https://t.me/' + SUPPORT_TELEGRAM_USERNAME;
+  var tg = window.Telegram && window.Telegram.WebApp;
+  if (tg && tg.openTelegramLink){
+    tg.openTelegramLink(url);
+  } else {
+    window.open(url, '_blank');
+  }
+}
+
 function openProfileModal(){
   openModal('modal-profile');
 
@@ -6181,7 +6195,7 @@ function openUpgradePetModal(petId){
   activeUpgradePetId = petId;
   var newLevel = state.level + 1;
   var newSpeed = petSpeedForLevel(petId, newLevel);
-  var upgradeCost = Math.round(def.price * 0.10);
+  var upgradeCost = PET_UPGRADE_COST_COINS;
 
   var titleEl = document.getElementById('pet-upgrade-title');
   var lvCurrent = document.getElementById('pet-upgrade-lv-current');
