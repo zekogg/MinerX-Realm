@@ -330,7 +330,7 @@ img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
   transition:opacity .4s ease;
 }
 .loading-screen.is-hidden{ opacity:0; pointer-events:none; }
-.loading-screen__logo{ width:min(82vw, 380px); height:auto; object-fit:contain; margin-bottom:28px; }
+.loading-screen__logo{ width:min(94vw, 532px); height:auto; object-fit:contain; margin-bottom:28px; }
 .loading-screen__bar{ width:180px; }
 
 /* /////كود حبات الضوء الذهبية المتطايرة (Fireflies)///// */
@@ -6568,10 +6568,12 @@ function pollBonusAdRewardConfirmation(baselineWatched, attempt){
    الاستخدام من /api/gigapub/start يجب إرساله لـ/api/gigapub/reward بعد
    نجاح then()، والذي يتحقق منه ضمن CAS واحد مع الحد اليومي — تحدّ من
    الاستغلال دون أن تؤكد فعلياً مشاهدة الإعلان. سكربت GigaPub نفسه
-   (per-id بالرابط) لا يُحمَّل إطلاقاً قبل استبدال GIGAPUB_PUBLISHER_ID
-   بمعرّف حقيقي من لوحة GigaPub، ويظهر الزر كـ"Soon" حتى ذلك الحين.
+   (per-id بالرابط) لا يُحمَّل إطلاقاً إلا بمعرّف رقمي حقيقي في
+   GIGAPUB_PUBLISHER_ID (الزر يظهر كـ"Soon" لو بقي Placeholder)،
+   والاستدعاء window.showGiga('main') يمرّر اسم الـPlacement 'main'
+   تحديداً كما ورد في كود التكامل من لوحة GigaPub.
    ===================================================================== */
-var GIGAPUB_PUBLISHER_ID = 'REPLACE_WITH_REAL_GIGAPUB_ID'; // المعرّف الحقيقي من لوحة GigaPub بعد الموافقة على الحساب
+var GIGAPUB_PUBLISHER_ID = '8282'; // معرّف حساب GigaPub الحقيقي (تمت الموافقة عليه)
 var gigapubReady = false;
 var gigapubState = { watchedToday: 0, dailyLimit: 8, rewardCoins: 15, busy: false };
 
@@ -6679,7 +6681,7 @@ function onWatchGigapubClick(){
       return;
     }
 
-    window.showGiga().then(function(){
+    window.showGiga('main').then(function(){
       claimGigapubReward(r.data.token);
     }).catch(function(){
       gigapubState.busy = false;
