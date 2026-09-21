@@ -330,7 +330,7 @@ img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
   transition:opacity .4s ease;
 }
 .loading-screen.is-hidden{ opacity:0; pointer-events:none; }
-.loading-screen__logo{ width:min(94vw, 532px); height:auto; object-fit:contain; margin-bottom:28px; }
+.loading-screen__logo{ width:min(98vw, 620px); height:auto; object-fit:contain; margin-bottom:28px; }
 .loading-screen__bar{ width:180px; }
 
 /* /////كود حبات الضوء الذهبية المتطايرة (Fireflies)///// */
@@ -379,14 +379,15 @@ img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
 }
 
 /* -- لوغو البوت في الفراغ الحقيقي بين البروفايل وبطاقة Coins — موضوع بشكل
-   مطلق خارج تدفّق Flexbox عمداً فلا يؤثر أو يحرّك أي عنصر آخر. مُثبَّت من
-   طرف اليسار (بعد دائرة البروفايل مباشرة: 16px padding + 33.6px قطر
-   الدائرة) وليس بمنتصف الشريط كله، لأن عمود topbar-right (Coins+Gram+لغة)
-   عريض ويأخذ أغلب الجهة اليمنى، فمنتصف الشريط الكامل يقع داخله فعلياً
-   وليس في الفراغ الفعلي بين العمودين -- */
+   مطلق خارج تدفّق Flexbox عمداً فلا يؤثر أو يحرّك أي عنصر آخر. عمود
+   topbar-right (Coins+Gram+لغة) عريض ومتغيّر العرض حسب الشاشة، فلا يمكن
+   تحديد منتصف الفراغ الحقيقي بنسبة % ثابتة أو left px ثابت — يُحسَب هذا
+   بجافاسكريبت (positionTopbarLogo) من العرض الفعلي المُقاس لكل عمود،
+   ويُعاد حسابه عند تغيّر حجم الشاشة. left هنا قيمة احتياطية فقط قبل تشغيل
+   الحساب الفعلي -- */
 .topbar-logo{
   position:absolute; top:50%; left:56px;
-  transform:translateY(-50%);
+  transform:translate(-50%, -50%);
   height:52.8px; width:auto;   /* الصورة نفسها فيها فراغ يمين/يسار، فالحجم الظاهر أصغر فعلياً */
   pointer-events:none;
 }
@@ -4766,6 +4767,27 @@ var MAINTENANCE_ADMIN_ID = 1018495986;   // معرّف تيليجرام (Telegra
   }, LOADING_SCREEN_DURATION_MS);
 })();
 
+/* /////كود توسيط لوغو الشريط العلوي في الفراغ الحقيقي بين البروفايل وعمود
+   Coins/Gram/اللغة — يُحسَب من العرض الفعلي المُقاس لكل عمود (وليس نسبة %
+   أو left px ثابت)، لأن عمود topbar-right متغيّر العرض حسب الشاشة، فمنتصف
+   الشريط الكامل لا يساوي منتصف الفراغ الفعلي بينهما///// */
+function positionTopbarLogo(){
+  var logo = document.querySelector('.topbar-logo');
+  var topbar = document.querySelector('.topbar');
+  var profile = document.querySelector('.profile');
+  var right = document.querySelector('.topbar-right');
+  if (!logo || !topbar || !profile || !right) return;
+
+  var topbarRect = topbar.getBoundingClientRect();
+  var profileRect = profile.getBoundingClientRect();
+  var rightRect = right.getBoundingClientRect();
+  var midpoint = (profileRect.right + rightRect.left) / 2 - topbarRect.left;
+  logo.style.left = midpoint + 'px';
+}
+window.addEventListener('resize', positionTopbarLogo);
+positionTopbarLogo();
+setTimeout(positionTopbarLogo, 300); // إعادة حساب بعد استقرار الخطوط/الأرقام المعروضة
+
 /* /////كود جلب رصيد المستخدم الحقيقي من الـWorker عند فتح التطبيق///// */
 function getTelegramInitData(){
   try{
@@ -6576,6 +6598,7 @@ function pollBonusAdRewardConfirmation(baselineWatched, attempt){
 var GIGAPUB_PUBLISHER_ID = '8282'; // معرّف حساب GigaPub الحقيقي (تمت الموافقة عليه)
 var gigapubReady = false;
 var gigapubState = { watchedToday: 0, dailyLimit: 8, rewardCoins: 15, busy: false };
+var GIGAPUB_MIN_AD_DURATION_MS = 15000; // أقل وقت مقبول بين الضغط ونجاح then() لاعتبار الإعلان حقيقياً
 
 function isValidGigapubId(id){
   return /^\d+$/.test(String(id));
@@ -6681,7 +6704,19 @@ function onWatchGigapubClick(){
       return;
     }
 
+    // بلا Postback حقيقي، then() قد ينجح حتى لو أغلق المستخدم الإعلان
+    // فوراً (يعتمد على الشبكة الفائزة بالمزاد لحظتها، مثل Monetag) — نقيس
+    // الوقت الفعلي المنقضي، ولا نمنح المكافأة إلا إذا اقترب من مدة إعلان
+    // حقيقي (GIGAPUB_MIN_AD_DURATION_MS)، كأقوى تخفيف ممكن من طرف العميل.
+    var adStartedAt = Date.now();
     window.showGiga('main').then(function(){
+      var elapsed = Date.now() - adStartedAt;
+      if (elapsed < GIGAPUB_MIN_AD_DURATION_MS){
+        gigapubState.busy = false;
+        renderGigapubButton();
+        showBuyErrorToast('Ad was not completed', { title: 'Watch gigapub ads' });
+        return;
+      }
       claimGigapubReward(r.data.token);
     }).catch(function(){
       gigapubState.busy = false;
