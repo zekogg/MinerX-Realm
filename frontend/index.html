@@ -4745,7 +4745,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 
       <button class="modal-cta" id="withdraw-cta" onclick="submitWithdrawRequest()" disabled>Withdraw</button>
       <div class="modal-footnote">
-        Fee: <b id="withdraw-fee-label">0.03</b> Gram<br>
+        Fee: <b id="withdraw-fee-label">0.02</b> Gram<br>
         Withdrawals usually take several minutes, but sometimes up to 24 hours.
       </div>
       <div class="modal-notice">
@@ -7680,7 +7680,7 @@ function pollDepositStatus(initData){
 }
 
 /* -- Withdraw -- */
-var WITHDRAW_FLAT_FEE = 0.03;
+var WITHDRAW_FLAT_FEE = 0.02;
 var WITHDRAW_MIN_GRAM = 0.1;
 var NEXT_WITHDRAW_ALLOWED_AT = null;
 var withdrawCooldownTimer = null;

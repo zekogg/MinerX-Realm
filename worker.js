@@ -62,7 +62,7 @@ const DEPOSIT_CHECK_RETRY_DELAY_MS = 15_000;
 // (Net) بعد خصم الرسوم — هو الرقم الذي يجب على الأدمن إرساله فعلياً.
 // =====================================================================
 const WITHDRAW_MIN_GRAM = 0.1;
-const WITHDRAW_FEE_GRAM = 0.03;
+const WITHDRAW_FEE_GRAM = 0.02;
 const WITHDRAW_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 ساعة، تبدأ فور الطلب بغض النظر عن النتيجة
 const ADMIN_TELEGRAM_ID = 1018495986;
 const ADMIN_CHANNEL_ID = -1004325013522;
