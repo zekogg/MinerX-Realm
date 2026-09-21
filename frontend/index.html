@@ -2264,6 +2264,38 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   -webkit-mask-composite:xor; mask-composite:exclude;
   pointer-events:none;
 }
+
+/* -- تحويل Exchange/Deposit/Withdraw/شروط السحب إلى Bottom Sheet (نفس آلية
+      نافذة Profile: تنزلق من الأسفل، حواف علوية مستديرة فقط) — بلا ارتفاع
+      أقصى قسري أو تمرير داخلي مقصود، لأن محتوى هذه النوافذ قصير بما يكفي
+      ليظهر كاملاً دون أي حاجة للتمرير. max-height/overflow-y هنا فقط شبكة
+      أمان لحالات نادرة (شاشة صغيرة جداً + لوحة مفاتيح مفتوحة)، وليسا جزءاً
+      من التصميم المقصود -- */
+#modal-exchange, #modal-deposit, #modal-withdraw, #modal-withdraw-req{
+  display:flex; align-items:flex-end; padding:0;
+  background:rgba(8,6,14,0);
+  visibility:hidden; pointer-events:none;
+  transition:background .32s ease, visibility 0s linear .32s;
+}
+#modal-exchange.is-open, #modal-deposit.is-open, #modal-withdraw.is-open, #modal-withdraw-req.is-open{
+  visibility:visible; pointer-events:auto;
+  background:rgba(8,6,14,.72);
+  transition:background .32s ease, visibility 0s linear 0s;
+}
+#modal-exchange .modal-sheet, #modal-deposit .modal-sheet, #modal-withdraw .modal-sheet, #modal-withdraw-req .modal-sheet{
+  width:100%; max-width:none; margin:0;
+  max-height:92vh; overflow-y:auto;
+  border-radius:26px 26px 0 0;
+  box-shadow:0 -20px 50px -20px rgba(0,0,0,.85);
+  transform:translateY(100%);
+  transition:transform .32s cubic-bezier(.22,.9,.32,1);
+}
+#modal-exchange.is-open .modal-sheet,
+#modal-deposit.is-open .modal-sheet,
+#modal-withdraw.is-open .modal-sheet,
+#modal-withdraw-req.is-open .modal-sheet{
+  transform:translateY(0);
+}
 .modal-head{
   display:flex; align-items:center; justify-content:space-between;
   margin-bottom:18px; padding-bottom:14px; border-bottom:1px solid var(--stone-border);
@@ -3912,8 +3944,6 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
     <div class="modal-sheet wd-req-sheet">
       <span class="fp-corner fp-corner--tl"></span>
       <span class="fp-corner fp-corner--tr"></span>
-      <span class="fp-corner fp-corner--bl"></span>
-      <span class="fp-corner fp-corner--br"></span>
       <div class="modal-head">
         <div class="modal-head__title">To Withdraw :</div>
         <button class="modal-close" onclick="closeModal('modal-withdraw-req')">✕</button>
@@ -4586,8 +4616,6 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
     <div class="modal-sheet">
       <span class="fp-corner fp-corner--tl"></span>
       <span class="fp-corner fp-corner--tr"></span>
-      <span class="fp-corner fp-corner--bl"></span>
-      <span class="fp-corner fp-corner--br"></span>
       <div class="modal-head">
         <div class="modal-head__title-wrap">
           <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/bd0f38f5b1b335a06503dbede5e266d49fbbfe4a/frontend/Exchange%20icon%20.svg" alt="Exchange" style="width:30px;height:30px;flex-shrink:0;">
@@ -4649,8 +4677,6 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
     <div class="modal-sheet">
       <span class="fp-corner fp-corner--tl"></span>
       <span class="fp-corner fp-corner--tr"></span>
-      <span class="fp-corner fp-corner--bl"></span>
-      <span class="fp-corner fp-corner--br"></span>
       <div class="modal-head">
         <div class="modal-head__title">Deposit</div>
         <button class="modal-close" onclick="closeModal('modal-deposit')">✕</button>
@@ -4693,8 +4719,6 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
     <div class="modal-sheet">
       <span class="fp-corner fp-corner--tl"></span>
       <span class="fp-corner fp-corner--tr"></span>
-      <span class="fp-corner fp-corner--bl"></span>
-      <span class="fp-corner fp-corner--br"></span>
       <div class="modal-head">
         <div class="modal-head__title">Withdraw</div>
         <button class="modal-close" onclick="closeModal('modal-withdraw')">✕</button>
