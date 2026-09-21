@@ -330,7 +330,7 @@ img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
   transition:opacity .4s ease;
 }
 .loading-screen.is-hidden{ opacity:0; pointer-events:none; }
-.loading-screen__logo{ width:120px; height:120px; object-fit:contain; margin-bottom:28px; }
+.loading-screen__logo{ width:min(82vw, 380px); height:auto; object-fit:contain; margin-bottom:28px; }
 .loading-screen__bar{ width:180px; }
 
 /* /////كود حبات الضوء الذهبية المتطايرة (Fireflies)///// */
@@ -378,13 +378,16 @@ img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
   gap:8px;
 }
 
-/* -- لوغو البوت في الفراغ بين البروفايل وبطاقة Coins — موضوع بشكل مطلق
-   خارج تدفّق Flexbox عمداً، حتى لا يؤثر أو يتحرّك أي عنصر آخر بجانبه
-   بتغيّر عرض الشاشة (نفس فكرة الفراغ المرن في .topbar) -- */
+/* -- لوغو البوت في الفراغ الحقيقي بين البروفايل وبطاقة Coins — موضوع بشكل
+   مطلق خارج تدفّق Flexbox عمداً فلا يؤثر أو يحرّك أي عنصر آخر. مُثبَّت من
+   طرف اليسار (بعد دائرة البروفايل مباشرة: 16px padding + 33.6px قطر
+   الدائرة) وليس بمنتصف الشريط كله، لأن عمود topbar-right (Coins+Gram+لغة)
+   عريض ويأخذ أغلب الجهة اليمنى، فمنتصف الشريط الكامل يقع داخله فعلياً
+   وليس في الفراغ الفعلي بين العمودين -- */
 .topbar-logo{
-  position:absolute; top:50%; left:50%;
-  transform:translate(-50%, -50%);
-  height:46px; width:auto;   /* الصورة نفسها فيها فراغ يمين/يسار، فالحجم الظاهر أصغر فعلياً */
+  position:absolute; top:50%; left:56px;
+  transform:translateY(-50%);
+  height:44px; width:auto;   /* الصورة نفسها فيها فراغ يمين/يسار، فالحجم الظاهر أصغر فعلياً */
   pointer-events:none;
 }
 
