@@ -142,6 +142,19 @@ const BONUS_AD_DAILY_LIMIT = 5;
 const BONUS_AD_COOLDOWN_MS = 60 * 60 * 1000; // ساعة واحدة بين كل إعلان والتالي
 
 // =====================================================================
+// إعدادات "Watch gigapub ads": بخلاف Adsgram، لا يوفّر GigaPub (لهذا
+// النوع البسيط من الإعلان المُجزي، وليس Offerwall) أي تأكيد حقيقي من
+// سيرفره لسيرفرنا (Server-to-Server) — الوعد showGiga().then() يُحسم في
+// متصفح المستخدم نفسه، فقابل نظرياً للتلاعب من مستخدم متمرّس. بانتظار
+// موافقة GigaPub على طلب Postback URL الحقيقي، اعتمدنا الحماية الوحيدة
+// الممكنة حالياً: توكن مؤقت يُصدره السيرفر فقط (GIGAPUB_TOKEN_TTL_MS)،
+// استخدام واحد فقط، وحد يومي — وليست حماية كاملة، فقط تحدّ من الاستغلال.
+// =====================================================================
+const GIGAPUB_REWARD_COINS = 15;
+const GIGAPUB_DAILY_LIMIT = 8;
+const GIGAPUB_TOKEN_TTL_MS = 2 * 60 * 1000; // دقيقتان — وقت كافٍ لعرض الإعلان وإغلاقه
+
+// =====================================================================
 // إعدادات حيوانات Realm القابلة للشراء + Storage. نفس القاعدة لكل
 // الحيوانات الستة (مطابقة لما طُبِّق على The Duck):
 // - السرعة عند الشراء (Lv.1) = basespeed الخاص بالحيوان، وكل مستوى يضيف
@@ -314,6 +327,14 @@ export default {
       return handleTasksClaim(request, env);
     }
 
+    if (url.pathname === "/api/gigapub/start" && request.method === "POST") {
+      return handleGigapubStart(request, env);
+    }
+
+    if (url.pathname === "/api/gigapub/reward" && request.method === "POST") {
+      return handleGigapubReward(request, env);
+    }
+
     // Everything else -> serve the Mini App static files
     return env.ASSETS.fetch(request);
   }
@@ -343,6 +364,7 @@ async function handleGetUser(request, env) {
            u.milestone_10_claimed, u.milestone_25_claimed, u.milestone_50_claimed, u.milestone_100_claimed,
            u.checkin1_claimed_date, u.checkin2_claimed_date, u.checkin3_claimed_date, u.checkin4_claimed_date,
            u.bonus_ad_count_today, u.bonus_ad_date, u.bonus_ad_last_watched_at,
+           u.gigapub_task_count, u.gigapub_task_date,
            s.capacity_hours AS storage_capacity_hours, s.last_claim_at AS storage_last_claim_at,
            ca.attempts_used AS combo_attempts_used, ca.solved AS combo_solved
     FROM users u
@@ -438,6 +460,10 @@ async function handleGetUser(request, env) {
   view.bonus_ad_next_available_at = user.bonus_ad_last_watched_at
     ? user.bonus_ad_last_watched_at + BONUS_AD_COOLDOWN_MS
     : null;
+
+  view.gigapub_watched_today = user.gigapub_task_date === today ? (user.gigapub_task_count || 0) : 0;
+  view.gigapub_daily_limit = GIGAPUB_DAILY_LIMIT;
+  view.gigapub_reward_coins = GIGAPUB_REWARD_COINS;
 
   return jsonResponse({ user: view });
 }
@@ -1688,6 +1714,95 @@ async function handleBonusAdReward(telegramId, env) {
   await env.DB.batch([updateStmt, txnStmt]);
 
   return new Response("OK", { status: 200 });
+}
+
+// =====================================================================
+// منطق "Watch gigapub ads" — بخلاف Adsgram/Bonus AD، GigaPub (لهذا النوع
+// من الإعلان) لا يملك تأكيداً حقيقياً من سيرفره لسيرفرنا حالياً (بانتظار
+// موافقتهم على طلب Postback URL). الحماية المتاحة فقط: توكن مؤقت واحد
+// الاستخدام يصدره /api/gigapub/start (لا يمنح أي عملة بنفسه)، ثم
+// /api/gigapub/reward يتحقق من تطابقه وعدم انتهائه ضمن نفس عبارة UPDATE
+// التي تمنح المكافأة — نفس نمط CAS المستخدم بباقي الميزات، لكنه هنا لا
+// يؤكد فعلياً أن الإعلان شُوهد، فقط يمنع تكرار/استغلال الطلب نفسه ويطبّق
+// الحد اليومي بأمان. يجب تحديثه لاحقاً لاستخدام Postback حقيقي فور توفره.
+// =====================================================================
+async function handleGigapubStart(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "invalid_body" }, 400);
+  }
+
+  const auth = await authenticateRequest(request, env, body);
+  if (!auth.ok) return auth.response;
+  const { telegramId } = auth;
+
+  const row = await env.DB.prepare(
+    "SELECT gigapub_task_count, gigapub_task_date FROM users WHERE telegram_id = ?"
+  ).bind(telegramId).first();
+  if (!row) {
+    return jsonResponse({ error: "user_not_found" }, 404);
+  }
+
+  const today = todayUTC();
+  const countToday = row.gigapub_task_date === today ? (row.gigapub_task_count || 0) : 0;
+  if (countToday >= GIGAPUB_DAILY_LIMIT) {
+    return jsonResponse({ error: "daily_limit_reached" }, 409);
+  }
+
+  const token = crypto.randomUUID();
+  const expires = Date.now() + GIGAPUB_TOKEN_TTL_MS;
+
+  await env.DB.prepare(
+    "UPDATE users SET gigapub_pending_token = ?, gigapub_pending_expires = ? WHERE telegram_id = ?"
+  ).bind(token, expires, telegramId).run();
+
+  return jsonResponse({ token });
+}
+
+async function handleGigapubReward(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "invalid_body" }, 400);
+  }
+
+  const auth = await authenticateRequest(request, env, body);
+  if (!auth.ok) return auth.response;
+  const { telegramId } = auth;
+
+  const token = body.token;
+  if (!token) {
+    return jsonResponse({ error: "invalid_body" }, 400);
+  }
+
+  const today = todayUTC();
+  const now = Date.now();
+
+  const updateStmt = env.DB.prepare(
+    `UPDATE users SET coins = coins + ?,
+       gigapub_task_count = CASE WHEN gigapub_task_date = ? THEN gigapub_task_count + 1 ELSE 1 END,
+       gigapub_task_date = ?,
+       gigapub_pending_token = NULL,
+       gigapub_pending_expires = NULL
+     WHERE telegram_id = ?
+       AND gigapub_pending_token = ?
+       AND gigapub_pending_expires > ?
+       AND (gigapub_task_date IS NULL OR gigapub_task_date <> ? OR gigapub_task_count < ?)`
+  ).bind(GIGAPUB_REWARD_COINS, today, today, telegramId, token, now, today, GIGAPUB_DAILY_LIMIT);
+  const txnStmt = env.DB.prepare(
+    "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'gigapub_ad', ?, 'coins')"
+  ).bind(telegramId, GIGAPUB_REWARD_COINS);
+
+  const [result] = await env.DB.batch([updateStmt, txnStmt]);
+  if (!result.meta || result.meta.changes === 0) {
+    return jsonResponse({ error: "invalid_or_expired_token" }, 409);
+  }
+
+  const user = await env.DB.prepare("SELECT coins FROM users WHERE telegram_id = ?").bind(telegramId).first();
+  return jsonResponse({ reward: GIGAPUB_REWARD_COINS, coins: user.coins });
 }
 
 // =====================================================================
