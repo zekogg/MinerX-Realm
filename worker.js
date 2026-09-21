@@ -335,8 +335,17 @@ export default {
       return handleGigapubReward(request, env);
     }
 
-    // Everything else -> serve the Mini App static files
-    return env.ASSETS.fetch(request);
+    // Everything else -> serve the Mini App static files. الصفحة الرئيسية
+    // (index.html) تُعاد دائماً بلا أي Cache — متصفح Telegram الداخلي
+    // (WebView) يخزّنها بقوة أحياناً حتى مع تحديثات فعلية على السيرفر،
+    // فيظهر للمستخدم كود قديم رغم نشر تعديل حقيقي؛ فرض no-store يمنع ذلك.
+    const assetResponse = await env.ASSETS.fetch(request);
+    if (url.pathname === "/" || url.pathname === "/index.html") {
+      const noCacheResponse = new Response(assetResponse.body, assetResponse);
+      noCacheResponse.headers.set("Cache-Control", "no-store, must-revalidate");
+      return noCacheResponse;
+    }
+    return assetResponse;
   }
 };
 
