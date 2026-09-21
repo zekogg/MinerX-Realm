@@ -215,3 +215,13 @@ CREATE TABLE IF NOT EXISTS admin_task_claims (
 -- مثال لإضافة مهمة جديدة يدوياً في قسم Partner (استبدل القيم):
 -- INSERT INTO admin_tasks (section, title, icon_url, reward_coins, link, channel_id, display_order, created_at)
 -- VALUES ('partner', 'Join This Channel', 'https://.../icon.svg', 10, 'https://t.me/YourChannel', '@YourChannel', 0, strftime('%s','now') * 1000);
+
+-- -- Watch gigapub ads (بانتظار موافقة GigaPub على Postback URL حقيقي) --
+-- gigapub_task_count/date : عدّاد يومي (نفس أسلوب ads_task_count).
+-- gigapub_pending_token/expires: توكن مؤقت واحد الاستخدام يصدره
+-- /api/gigapub/start قبل عرض الإعلان، ويُستهلك في /api/gigapub/reward —
+-- الحماية الوحيدة الممكنة حالياً بانتظار Postback حقيقي من GigaPub.
+ALTER TABLE users ADD COLUMN gigapub_task_count INTEGER DEFAULT 0;
+ALTER TABLE users ADD COLUMN gigapub_task_date TEXT;
+ALTER TABLE users ADD COLUMN gigapub_pending_token TEXT;
+ALTER TABLE users ADD COLUMN gigapub_pending_expires INTEGER;
