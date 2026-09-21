@@ -319,6 +319,20 @@ img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
 }
 .maintenance-screen__text{ font-size:13px; color:var(--ink-dim); line-height:1.7; max-width:300px; }
 
+/* /////كود شاشة التحميل الوهمية عند فتح البوت (4 ثوانٍ)///// */
+.loading-screen{
+  position:absolute; inset:0; z-index:1000;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding:32px;
+  background:
+    radial-gradient(600px 380px at 50% 20%, var(--bg-glow-1), transparent 60%),
+    var(--bg);
+  transition:opacity .4s ease;
+}
+.loading-screen.is-hidden{ opacity:0; pointer-events:none; }
+.loading-screen__logo{ width:120px; height:120px; object-fit:contain; margin-bottom:28px; }
+.loading-screen__bar{ width:180px; }
+
 /* /////كود حبات الضوء الذهبية المتطايرة (Fireflies)///// */
 /* طبقة شفافة فوق الخلفية مباشرة، خلف كل محتوى الواجهة (topbar بـ z-index:2) */
 .fireflies{
@@ -362,6 +376,16 @@ img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
   align-items:center;
   justify-content:space-between;
   gap:8px;
+}
+
+/* -- لوغو البوت في الفراغ بين البروفايل وبطاقة Coins — موضوع بشكل مطلق
+   خارج تدفّق Flexbox عمداً، حتى لا يؤثر أو يتحرّك أي عنصر آخر بجانبه
+   بتغيّر عرض الشاشة (نفس فكرة الفراغ المرن في .topbar) -- */
+.topbar-logo{
+  position:absolute; top:50%; left:50%;
+  transform:translate(-50%, -50%);
+  height:46px; width:auto;   /* الصورة نفسها فيها فراغ يمين/يسار، فالحجم الظاهر أصغر فعلياً */
+  pointer-events:none;
 }
 
 /* -- عمود البروفايل (يسار) — الدائرة فقط، مكبّرة 5% -- */
@@ -2784,6 +2808,12 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
     <div class="maintenance-screen__text">MinerX Realm is getting a quick upgrade.<br>We'll be back online shortly — thanks for your patience!</div>
   </div>
 
+  <!-- /////كود شاشة التحميل الوهمية عند فتح البوت (4 ثوانٍ)///// -->
+  <div class="loading-screen" id="loading-screen">
+    <img draggable="false" class="loading-screen__logo" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/MinerXRealm%20Logo.webp" alt="MinerX Realm">
+    <div class="progress-track loading-screen__bar"><div class="progress-fill" id="loading-screen-fill" style="width:0%"></div></div>
+  </div>
+
   <!-- ///// حبات ضوء ذهبية متطايرة (Fireflies) فوق خلفية الغابة ///// -->
   <div class="fireflies" aria-hidden="true">
       <span class="firefly" style="left:62.5%; bottom:-8.2px; width:2.6px; height:2.6px; --drift:-16.5px; animation-duration:23.2s,3.9s; animation-delay:-3.5s,-3.5s;"></span>
@@ -2809,6 +2839,9 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
     <div class="profile">
       <div class="profile__avatar" onclick="openProfileModal()" style="cursor:pointer;">👤</div>
     </div>
+
+    <!-- لوغو البوت في الفراغ الأوسط — موضع مطلق فقط، لا يشارك بتخطيط Flexbox -->
+    <img draggable="false" class="topbar-logo" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/MinerXRealm%20Logo.webp" alt="MinerX Realm">
 
     <!-- عمود الحقوق: بطاقة Coins/Gram — بادج الرصيد — محدد اللغة -->
     <div class="topbar-right">
@@ -3191,7 +3224,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         </div>
         <div class="card ad-task">
           <div class="ad-task__icon">
-            <svg viewBox="0 0 24 24" fill="var(--c-ad-watch-1)" stroke="none"><path d="M8 5l12 7-12 7z"/></svg>
+            <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Adsgram%20Bonus%20Ad%20icon%20.webp" alt="Bonus AD" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">
           </div>
           <div class="ad-task__title">Bonus AD Every 1H</div>
           <div class="ad-task__meta">
@@ -4709,6 +4742,27 @@ var MAINTENANCE_ADMIN_ID = 1018495986;   // معرّف تيليجرام (Telegra
   }
 })();
 
+/* /////كود شاشة التحميل الوهمية: 4 ثوانٍ ثابتة عند كل فتح للتطبيق، لا علاقة
+   لها بجلب البيانات الحقيقية (fetchUserData يعمل بالتوازي في الخلفية)///// */
+(function(){
+  var LOADING_SCREEN_DURATION_MS = 4000;
+  var screen = document.getElementById('loading-screen');
+  var fill = document.getElementById('loading-screen-fill');
+  if (!screen) return;
+
+  if (fill){
+    requestAnimationFrame(function(){
+      fill.style.transition = 'width ' + LOADING_SCREEN_DURATION_MS + 'ms linear';
+      fill.style.width = '100%';
+    });
+  }
+
+  setTimeout(function(){
+    screen.classList.add('is-hidden');
+    setTimeout(function(){ screen.style.display = 'none'; }, 400);
+  }, LOADING_SCREEN_DURATION_MS);
+})();
+
 /* /////كود جلب رصيد المستخدم الحقيقي من الـWorker عند فتح التطبيق///// */
 function getTelegramInitData(){
   try{
@@ -4767,7 +4821,7 @@ function updateBalanceDisplay(u){
   }
 
   var elTopbarCoins = document.getElementById('display-coins-topbar');
-  if (elTopbarCoins) elTopbarCoins.textContent = coinsWhole;
+  if (elTopbarCoins) elTopbarCoins.textContent = formatCoinsK(u.coins);
 
   var elTopbarGram = document.getElementById('display-gram-topbar');
   if (elTopbarGram) elTopbarGram.textContent = gramText;
