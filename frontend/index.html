@@ -398,8 +398,15 @@ img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
   width:33.6px; height:33.6px; border-radius:50%;   /* كانت 32px — كبرت 5% */
   display:flex; align-items:center; justify-content:center;
   background:var(--stone-2);
-  border:1px solid var(--c-profile-ring);
+  border:1.5px solid transparent;
+  background-clip:padding-box;
   font-size:15.75px; flex-shrink:0;
+  position:relative;
+  box-shadow:0 0 9px rgba(227,165,66,.3);   /* نفس توهّج .pf-avatar بنافذة Profile، مصغّر بنسبة الحجم */
+}
+.profile__avatar::before{
+  content:""; position:absolute; inset:-1.5px; border-radius:50%; z-index:-1;
+  background:linear-gradient(135deg, #f0d878, #a9701f 40%, var(--c-royal-purple-2) 75%, #f0d878);
 }
 
 /* -- عمود الحقوق: بطاقة Coins/Gram + بادج الرصيد + محدد اللغة -- */
@@ -2264,6 +2271,38 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   -webkit-mask-composite:xor; mask-composite:exclude;
   pointer-events:none;
 }
+
+/* -- تحويل Exchange/Deposit/Withdraw/شروط السحب إلى Bottom Sheet (نفس آلية
+      نافذة Profile: تنزلق من الأسفل، حواف علوية مستديرة فقط) — بلا ارتفاع
+      أقصى قسري أو تمرير داخلي مقصود، لأن محتوى هذه النوافذ قصير بما يكفي
+      ليظهر كاملاً دون أي حاجة للتمرير. max-height/overflow-y هنا فقط شبكة
+      أمان لحالات نادرة (شاشة صغيرة جداً + لوحة مفاتيح مفتوحة)، وليسا جزءاً
+      من التصميم المقصود -- */
+#modal-exchange, #modal-deposit, #modal-withdraw, #modal-withdraw-req{
+  display:flex; align-items:flex-end; padding:0;
+  background:rgba(8,6,14,0);
+  visibility:hidden; pointer-events:none;
+  transition:background .32s ease, visibility 0s linear .32s;
+}
+#modal-exchange.is-open, #modal-deposit.is-open, #modal-withdraw.is-open, #modal-withdraw-req.is-open{
+  visibility:visible; pointer-events:auto;
+  background:rgba(8,6,14,.72);
+  transition:background .32s ease, visibility 0s linear 0s;
+}
+#modal-exchange .modal-sheet, #modal-deposit .modal-sheet, #modal-withdraw .modal-sheet, #modal-withdraw-req .modal-sheet{
+  width:100%; max-width:none; margin:0;
+  max-height:92vh; overflow-y:auto;
+  border-radius:26px 26px 0 0;
+  box-shadow:0 -20px 50px -20px rgba(0,0,0,.85);
+  transform:translateY(100%);
+  transition:transform .32s cubic-bezier(.22,.9,.32,1);
+}
+#modal-exchange.is-open .modal-sheet,
+#modal-deposit.is-open .modal-sheet,
+#modal-withdraw.is-open .modal-sheet,
+#modal-withdraw-req.is-open .modal-sheet{
+  transform:translateY(0);
+}
 .modal-head{
   display:flex; align-items:center; justify-content:space-between;
   margin-bottom:18px; padding-bottom:14px; border-bottom:1px solid var(--stone-border);
@@ -2857,7 +2896,10 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
           <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:28px;height:28px;">
         </div>
         <div class="topbar-coin-card__text">
-          <span class="topbar-coin-card__num" id="display-coins-topbar">00</span>
+          <span class="topbar-coin-card__num" style="position:relative; cursor:pointer;" onclick="togglePriceTooltip('topbar-coins-exact-tooltip')">
+            <span id="display-coins-topbar">00</span>
+            <span class="price-tooltip" id="topbar-coins-exact-tooltip">0 Coins</span>
+          </span>
           <div class="topbar-coin-card__gram" id="display-gram-equiv-topbar">≈ $0.0000 Gram</div>
         </div>
       </div>
@@ -3912,8 +3954,6 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
     <div class="modal-sheet wd-req-sheet">
       <span class="fp-corner fp-corner--tl"></span>
       <span class="fp-corner fp-corner--tr"></span>
-      <span class="fp-corner fp-corner--bl"></span>
-      <span class="fp-corner fp-corner--br"></span>
       <div class="modal-head">
         <div class="modal-head__title">To Withdraw :</div>
         <button class="modal-close" onclick="closeModal('modal-withdraw-req')">✕</button>
@@ -4586,8 +4626,6 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
     <div class="modal-sheet">
       <span class="fp-corner fp-corner--tl"></span>
       <span class="fp-corner fp-corner--tr"></span>
-      <span class="fp-corner fp-corner--bl"></span>
-      <span class="fp-corner fp-corner--br"></span>
       <div class="modal-head">
         <div class="modal-head__title-wrap">
           <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/bd0f38f5b1b335a06503dbede5e266d49fbbfe4a/frontend/Exchange%20icon%20.svg" alt="Exchange" style="width:30px;height:30px;flex-shrink:0;">
@@ -4649,8 +4687,6 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
     <div class="modal-sheet">
       <span class="fp-corner fp-corner--tl"></span>
       <span class="fp-corner fp-corner--tr"></span>
-      <span class="fp-corner fp-corner--bl"></span>
-      <span class="fp-corner fp-corner--br"></span>
       <div class="modal-head">
         <div class="modal-head__title">Deposit</div>
         <button class="modal-close" onclick="closeModal('modal-deposit')">✕</button>
@@ -4693,8 +4729,6 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
     <div class="modal-sheet">
       <span class="fp-corner fp-corner--tl"></span>
       <span class="fp-corner fp-corner--tr"></span>
-      <span class="fp-corner fp-corner--bl"></span>
-      <span class="fp-corner fp-corner--br"></span>
       <div class="modal-head">
         <div class="modal-head__title">Withdraw</div>
         <button class="modal-close" onclick="closeModal('modal-withdraw')">✕</button>
@@ -4718,7 +4752,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 
       <button class="modal-cta" id="withdraw-cta" onclick="submitWithdrawRequest()" disabled>Withdraw</button>
       <div class="modal-footnote">
-        Fee: <b id="withdraw-fee-label">0.03</b> Gram<br>
+        Fee: <b id="withdraw-fee-label">0.02</b> Gram<br>
         Withdrawals usually take several minutes, but sometimes up to 24 hours.
       </div>
       <div class="modal-notice">
@@ -4753,7 +4787,7 @@ var MAINTENANCE_ADMIN_ID = 1018495986;   // معرّف تيليجرام (Telegra
 /* /////كود شاشة التحميل الوهمية: 4 ثوانٍ ثابتة عند كل فتح للتطبيق، لا علاقة
    لها بجلب البيانات الحقيقية (fetchUserData يعمل بالتوازي في الخلفية)///// */
 (function(){
-  var LOADING_SCREEN_DURATION_MS = 4000;
+  var LOADING_SCREEN_DURATION_MS = 3000;
   var screen = document.getElementById('loading-screen');
   var fill = document.getElementById('loading-screen-fill');
   if (!screen) return;
@@ -4879,6 +4913,9 @@ function updateBalanceDisplay(u){
 
   var elTopbarCoins = document.getElementById('display-coins-topbar');
   if (elTopbarCoins) elTopbarCoins.textContent = formatCoinsK(u.coins);
+
+  var elTopbarCoinsTooltip = document.getElementById('topbar-coins-exact-tooltip');
+  if (elTopbarCoinsTooltip) elTopbarCoinsTooltip.textContent = coinsWhole + ' Coins';
 
   var elTopbarGram = document.getElementById('display-gram-topbar');
   if (elTopbarGram) elTopbarGram.textContent = gramText;
@@ -7650,7 +7687,7 @@ function pollDepositStatus(initData){
 }
 
 /* -- Withdraw -- */
-var WITHDRAW_FLAT_FEE = 0.03;
+var WITHDRAW_FLAT_FEE = 0.02;
 var WITHDRAW_MIN_GRAM = 0.1;
 var NEXT_WITHDRAW_ALLOWED_AT = null;
 var withdrawCooldownTimer = null;
