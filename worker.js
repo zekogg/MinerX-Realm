@@ -113,7 +113,7 @@ const ADS_TASK_DAILY_LIMIT = 10;
 // أكثر نقطة استدعاءً بالتطبيق — إذ لا تتطلب أي JOIN إضافي.
 // =====================================================================
 const REFERRAL_SIGNUP_BONUS_COINS = 20;
-const REFERRAL_ACTIVE_BONUS_COINS = 130;
+const REFERRAL_ACTIVE_BONUS_COINS = 180;
 const REFERRAL_DEPOSIT_COMMISSION_RATE = 0.05;
 const REFERRAL_MIN_CLAIM_COINS = 5000;
 const ACTIVE_FRIEND_ADS_THRESHOLD = 10;

@@ -2278,25 +2278,41 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   -webkit-mask-composite:xor; mask-composite:exclude;
   pointer-events:none;
 }
+/* -- Free Pet Tasks (من Quick Actions): نفس ألوان باقي النوافذ الذهبية/البنفسجية -- */
+#modal-quick-free-pet .modal-sheet{
+  background:
+    radial-gradient(220px 200px at 50% 0%, rgba(227,165,66,.14), transparent 70%),
+    radial-gradient(180px 160px at 100% 100%, rgba(165,108,240,.14), transparent 70%),
+    linear-gradient(165deg, #1c1130, #0c0815 75%);
+  border:1px solid transparent;
+}
+#modal-quick-free-pet .modal-sheet::before{
+  top:auto; left:auto; right:auto; height:auto; inset:0; border-radius:inherit; padding:1.6px;
+  background:linear-gradient(135deg, #f0d878 0%, #a9701f 28%, var(--c-royal-purple-2) 55%, #f0d878 100%);
+  box-shadow:none;
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor; mask-composite:exclude;
+  pointer-events:none;
+}
 
-/* -- تحويل Exchange/Deposit/Withdraw/شروط السحب إلى Bottom Sheet (نفس آلية
-      نافذة Profile: تنزلق من الأسفل، حواف علوية مستديرة فقط) — بلا ارتفاع
-      أقصى قسري أو تمرير داخلي مقصود، لأن محتوى هذه النوافذ قصير بما يكفي
-      ليظهر كاملاً دون أي حاجة للتمرير. max-height/overflow-y هنا فقط شبكة
-      أمان لحالات نادرة (شاشة صغيرة جداً + لوحة مفاتيح مفتوحة)، وليسا جزءاً
-      من التصميم المقصود -- */
-#modal-exchange, #modal-deposit, #modal-withdraw, #modal-withdraw-req{
+/* -- تحويل Exchange/Deposit/Withdraw/شروط السحب/Free Pet Tasks إلى Bottom
+      Sheet (نفس آلية نافذة Profile: تنزلق من الأسفل، حواف علوية مستديرة
+      فقط) — بلا ارتفاع أقصى قسري أو تمرير داخلي مقصود، لأن محتوى هذه
+      النوافذ قصير بما يكفي ليظهر كاملاً دون أي حاجة للتمرير. max-height/
+      overflow-y هنا فقط شبكة أمان لحالات نادرة (شاشة صغيرة جداً + لوحة
+      مفاتيح مفتوحة)، وليسا جزءاً من التصميم المقصود -- */
+#modal-exchange, #modal-deposit, #modal-withdraw, #modal-withdraw-req, #modal-quick-free-pet{
   display:flex; align-items:flex-end; padding:0;
   background:rgba(8,6,14,0);
   visibility:hidden; pointer-events:none;
   transition:background .32s ease, visibility 0s linear .32s;
 }
-#modal-exchange.is-open, #modal-deposit.is-open, #modal-withdraw.is-open, #modal-withdraw-req.is-open{
+#modal-exchange.is-open, #modal-deposit.is-open, #modal-withdraw.is-open, #modal-withdraw-req.is-open, #modal-quick-free-pet.is-open{
   visibility:visible; pointer-events:auto;
   background:rgba(8,6,14,.72);
   transition:background .32s ease, visibility 0s linear 0s;
 }
-#modal-exchange .modal-sheet, #modal-deposit .modal-sheet, #modal-withdraw .modal-sheet, #modal-withdraw-req .modal-sheet{
+#modal-exchange .modal-sheet, #modal-deposit .modal-sheet, #modal-withdraw .modal-sheet, #modal-withdraw-req .modal-sheet, #modal-quick-free-pet .modal-sheet{
   width:100%; max-width:none; margin:0;
   max-height:92vh; overflow-y:auto;
   border-radius:26px 26px 0 0;
@@ -2307,7 +2323,8 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 #modal-exchange.is-open .modal-sheet,
 #modal-deposit.is-open .modal-sheet,
 #modal-withdraw.is-open .modal-sheet,
-#modal-withdraw-req.is-open .modal-sheet{
+#modal-withdraw-req.is-open .modal-sheet,
+#modal-quick-free-pet.is-open .modal-sheet{
   transform:translateY(0);
 }
 .modal-head{
@@ -2536,7 +2553,38 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .modal-footnote b{ color:var(--ink); }
 
 /* /////كود نافذة Leaderboard///// */
-.lb-sheet{ max-width:420px; }
+/* -- تحويلها إلى Bottom Sheet (نفس آلية Profile) مع الحفاظ على ألوانها
+      الحالية كما هي بالضبط (لم نُعدِّل background/border، فقط الشكل/الحركة).
+      القائمة طويلة فعلياً (حتى 20 لاعباً) فتحتاج تمريراً داخلياً حقيقياً،
+      بعكس النوافذ الأخرى القصيرة — نفس بنية .pf-scroll تماماً (flex child
+      بـmin-height:0 بدل نسبة % لا تُحسب بشكل موثوق ضد أب max-height فقط) -- */
+#modal-leaderboard{
+  display:flex; align-items:flex-end; padding:0;
+  background:rgba(8,6,14,0);
+  visibility:hidden; pointer-events:none;
+  transition:background .32s ease, visibility 0s linear .32s;
+}
+#modal-leaderboard.is-open{
+  visibility:visible; pointer-events:auto;
+  background:rgba(8,6,14,.72);
+  transition:background .32s ease, visibility 0s linear 0s;
+}
+.lb-sheet{
+  max-width:none; width:100%; margin:0;
+  max-height:80vh; overflow:hidden;
+  display:flex; flex-direction:column;
+  border-radius:26px 26px 0 0;
+  transform:translateY(100%);
+  transition:transform .32s cubic-bezier(.22,.9,.32,1);
+}
+#modal-leaderboard.is-open .lb-sheet{ transform:translateY(0); }
+.lb-scroll{
+  flex:1 1 auto;
+  min-height:0;
+  overflow-y:auto;
+  overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;
+}
 .lb-rewards-badge{
   text-align:center; margin:0 auto 14px; display:table;
   padding:5px 14px; border-radius:999px;
@@ -2741,7 +2789,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   height:5px; border-radius:999px; background:var(--stone); border:1px solid var(--stone-border);
   overflow:hidden; margin-top:6px;
 }
-.qfp-task__progress-fill{ height:100%; border-radius:999px; background:linear-gradient(90deg, var(--c-royal-purple-1), #f0d878); }
+.qfp-task__progress-fill{ height:100%; border-radius:999px; background:linear-gradient(90deg, #a9701f, #ffe9b8 45%, #f0d878 55%, #a9701f); }
 .qfp-task__progress-label{ font-size:8.5px; color:var(--ink-faint); margin-top:3px; }
 .qfp-task__reward{
   flex-shrink:0; padding:4px 9px; border-radius:999px;
@@ -3450,7 +3498,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
       <div class="card invite-box">
         <img draggable="false" class="invite-box__gift" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/d7a452799ac3bcb686ea6fafefc29bba470455e5/frontend/Friends%20icon.svg" alt="Friends">
         <div class="invite-box__title">Invite A Friend · Earn</div>
-        <div class="invite-box__amount"><span class="invite-box__tiny">Up to</span> 150<span class="invite-box__plus">+ 5%</span></div>
+        <div class="invite-box__amount"><span class="invite-box__tiny">Up to</span> 200<span class="invite-box__plus">+ 5%</span></div>
         <div class="invite-box__sub">Coins + Commission · Per Referral</div>
         <div class="invite-link">
           <span class="invite-link__text" id="invite-link-text">t.me/MinerXRealmBot/app?startapp=ref_0</span>
@@ -3492,7 +3540,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
           </div>
           <div class="card reward-tier is-featured">
             <svg class="reward-tier__icon" viewBox="0 0 24 24" fill="var(--c-reward-tier-icon-bolt)" stroke="none"><path d="M13 2 L4 14 L11 14 L10 22 L20 9 L13 9 Z"/></svg>
-            <div class="reward-tier__val">+130</div>
+            <div class="reward-tier__val">+180</div>
             <div class="reward-tier__label">When active</div>
           </div>
           <div class="card reward-tier">
@@ -4175,6 +4223,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         <button class="modal-close" onclick="closeModal('modal-leaderboard')">✕</button>
       </div>
 
+      <div class="lb-scroll">
       <div class="lb-rewards-badge">Rewards in 35D :00:00</div>
 
       <div class="lb-tabs">
@@ -4637,9 +4686,10 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
               <div class="lb-row__name">Player</div>
               <div class="lb-row__meta">Active Referrals: 0</div>
             </div>
-            
+
           </div>
         </div>
+      </div>
       </div>
     </div>
   </div>
@@ -4810,7 +4860,7 @@ var MAINTENANCE_ADMIN_ID = 1018495986;   // معرّف تيليجرام (Telegra
 /* /////كود شاشة التحميل الوهمية: 4 ثوانٍ ثابتة عند كل فتح للتطبيق، لا علاقة
    لها بجلب البيانات الحقيقية (fetchUserData يعمل بالتوازي في الخلفية)///// */
 (function(){
-  var LOADING_SCREEN_DURATION_MS = 3000;
+  var LOADING_SCREEN_DURATION_MS = 2000;
   var screen = document.getElementById('loading-screen');
   var fill = document.getElementById('loading-screen-fill');
   if (!screen) return;
