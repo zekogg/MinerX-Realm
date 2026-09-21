@@ -2045,6 +2045,13 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 }
 .price-tooltip.is-visible{ opacity:1; }
 .price-tooltip--wide{ width:150px; white-space:normal; line-height:1.5; text-align:center; }
+/* -- نسخة تظهر للأسفل بدل الأعلى (للعناصر القريبة من أعلى الشاشة، مثل
+      رقم العملات بالشريط العلوي، حيث يظهر التلميح الأصلي خارج الشاشة) -- */
+.price-tooltip--below{ bottom:auto; top:100%; transform:translateX(-50%) translateY(6px); }
+.price-tooltip--below::after{
+  top:auto; bottom:100%;
+  border-top:none; border-bottom:4px solid rgba(227,165,66,.55);
+}
 /* -- حاوية مرجعية لأي شارة "؟" ثابتة الموضع (position:static) بحيث يتموضع
       التلميح المنبثق بداخلها بشكل صحيح دون التأثير على تخطيط الشارة نفسها -- */
 .help-tooltip-anchor{ position:relative; display:inline-flex; }
@@ -2916,7 +2923,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         <div class="topbar-coin-card__text">
           <span class="topbar-coin-card__num" style="position:relative; cursor:pointer;" onclick="togglePriceTooltip('topbar-coins-exact-tooltip')">
             <span id="display-coins-topbar">00</span>
-            <span class="price-tooltip" id="topbar-coins-exact-tooltip">0 Coins</span>
+            <span class="price-tooltip price-tooltip--below" id="topbar-coins-exact-tooltip">0 Coins</span>
           </span>
           <div class="topbar-coin-card__gram" id="display-gram-equiv-topbar">≈ $0.0000 Gram</div>
         </div>
