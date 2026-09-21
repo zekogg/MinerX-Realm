@@ -6576,6 +6576,7 @@ function pollBonusAdRewardConfirmation(baselineWatched, attempt){
 var GIGAPUB_PUBLISHER_ID = '8282'; // معرّف حساب GigaPub الحقيقي (تمت الموافقة عليه)
 var gigapubReady = false;
 var gigapubState = { watchedToday: 0, dailyLimit: 8, rewardCoins: 15, busy: false };
+var GIGAPUB_MIN_AD_DURATION_MS = 15000; // أقل وقت مقبول بين الضغط ونجاح then() لاعتبار الإعلان حقيقياً
 
 function isValidGigapubId(id){
   return /^\d+$/.test(String(id));
@@ -6681,7 +6682,19 @@ function onWatchGigapubClick(){
       return;
     }
 
+    // بلا Postback حقيقي، then() قد ينجح حتى لو أغلق المستخدم الإعلان
+    // فوراً (يعتمد على الشبكة الفائزة بالمزاد لحظتها، مثل Monetag) — نقيس
+    // الوقت الفعلي المنقضي، ولا نمنح المكافأة إلا إذا اقترب من مدة إعلان
+    // حقيقي (GIGAPUB_MIN_AD_DURATION_MS)، كأقوى تخفيف ممكن من طرف العميل.
+    var adStartedAt = Date.now();
     window.showGiga('main').then(function(){
+      var elapsed = Date.now() - adStartedAt;
+      if (elapsed < GIGAPUB_MIN_AD_DURATION_MS){
+        gigapubState.busy = false;
+        renderGigapubButton();
+        showBuyErrorToast('Ad was not completed', { title: 'Watch gigapub ads' });
+        return;
+      }
       claimGigapubReward(r.data.token);
     }).catch(function(){
       gigapubState.busy = false;
