@@ -398,8 +398,15 @@ img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
   width:33.6px; height:33.6px; border-radius:50%;   /* كانت 32px — كبرت 5% */
   display:flex; align-items:center; justify-content:center;
   background:var(--stone-2);
-  border:1px solid var(--c-profile-ring);
+  border:1.5px solid transparent;
+  background-clip:padding-box;
   font-size:15.75px; flex-shrink:0;
+  position:relative;
+  box-shadow:0 0 9px rgba(227,165,66,.3);   /* نفس توهّج .pf-avatar بنافذة Profile، مصغّر بنسبة الحجم */
+}
+.profile__avatar::before{
+  content:""; position:absolute; inset:-1.5px; border-radius:50%; z-index:-1;
+  background:linear-gradient(135deg, #f0d878, #a9701f 40%, var(--c-royal-purple-2) 75%, #f0d878);
 }
 
 /* -- عمود الحقوق: بطاقة Coins/Gram + بادج الرصيد + محدد اللغة -- */
