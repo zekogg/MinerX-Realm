@@ -7136,7 +7136,8 @@ function runAdGateGigapubFallback(onSuccess, onFail){
    /api/monetix/reward المحمي بـinitData الموثّق من تيليجرام، والسيرفر هو
    من يحسم الحد اليومي والمنح بشرط CAS — لا الواجهة تمنح شيئاً بنفسها.
    ===================================================================== */
-var monetixState = { watchedToday: 0, dailyLimit: 10, rewardCoins: 15, busy: false };
+var monetixState = { watchedToday: 0, dailyLimit: 10, rewardCoins: 15, busy: false, cooldownUntil: 0 };
+var monetixTaskCooldownTimer = null;
 
 function applyMonetixState(data){
   monetixState.watchedToday = data.watched_today || 0;
@@ -7153,14 +7154,31 @@ function renderMonetixButton(){
 
   var dailyDone = monetixState.watchedToday >= monetixState.dailyLimit;
   if (avail) avail.textContent = dailyDone ? 'Come Back Tomorrow' : 'Available';
+
+  var cooldownRemaining = Math.ceil((monetixState.cooldownUntil - Date.now()) / 1000);
+  var inCooldown = cooldownRemaining > 0;
   if (btn){
-    btn.textContent = 'Watch';
-    btn.classList.toggle('is-claimed', dailyDone || monetixState.busy);
+    btn.textContent = inCooldown ? String(cooldownRemaining) : 'Watch';
+    btn.classList.toggle('is-claimed', dailyDone || monetixState.busy || inCooldown);
   }
 }
 
+// بعد كل مشاهدة ناجحة: قفل الزر 10 ثوانٍ (عداد تنازلي داخل الزر نفسه)
+// قبل السماح بالضغط مجدداً — نفس أسلوب Adsgram/GigaPub بالضبط.
+function startMonetixTaskCooldown(){
+  monetixState.cooldownUntil = Date.now() + 10000;
+  clearInterval(monetixTaskCooldownTimer);
+  renderMonetixButton();
+  monetixTaskCooldownTimer = setInterval(function(){
+    if (Date.now() >= monetixState.cooldownUntil){
+      clearInterval(monetixTaskCooldownTimer);
+    }
+    renderMonetixButton();
+  }, 1000);
+}
+
 function onWatchMonetixClick(){
-  if (monetixState.busy) return;
+  if (monetixState.busy || Date.now() < monetixState.cooldownUntil) return;
   if (monetixState.watchedToday >= monetixState.dailyLimit){
     showComeBackTomorrowToast();
     return;
@@ -7212,7 +7230,7 @@ function creditMonetixReward(){
     applyMonetixState({ watched_today: data.watched_today, daily_limit: data.daily_limit, reward_coins: data.reward_coins });
     showAppToast({ title: 'Watch MonetixAds', icon: PRIZE_ICON_URLS.coins, amount: '+' + monetixState.rewardCoins + ' Coins' });
     monetixState.busy = false;
-    renderMonetixButton();
+    startMonetixTaskCooldown();
   })
   .catch(function(err){
     console.error('monetix reward request failed:', err);
