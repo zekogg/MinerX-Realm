@@ -1594,8 +1594,16 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   background:rgba(0,0,0,.5); border:1px solid rgba(255,247,230,.55);
   color:#fff7e6; font-size:6px; font-weight:800;
 }
-.hd-friend-badge{
+.hd-bottom-left-stack{
   position:absolute; bottom:8px; left:8px; z-index:4;
+  display:flex; flex-direction:column; align-items:flex-start; gap:4px;
+}
+.hd-progress-badge{
+  padding:1.35px 4.5px; border-radius:999px;
+  background:rgba(0,0,0,.5); border:1px solid rgba(255,247,230,.55);
+  color:#fff7e6; font-family:var(--font-display); font-weight:800; font-size:4.4px;
+}
+.hd-friend-badge{
   padding:1.35px 4.5px; border-radius:999px;
   background:rgba(0,0,0,.5); border:1px solid rgba(255,247,230,.55);
   color:#fff7e6; font-family:var(--font-display); font-weight:800; font-size:4.4px;
@@ -1646,6 +1654,12 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   box-shadow:0 0 8px rgba(239,68,68,.4);
 }
 .tg-count-badge{
+  padding:1.35px 4.5px; border-radius:999px;
+  background:rgba(0,0,0,.5); border:1px solid rgba(255,255,255,.4);
+  color:#ffffff; font-family:var(--font-display); font-weight:800; font-size:4.4px;
+}
+.tg-progress-badge{
+  position:absolute; bottom:8px; left:8px; z-index:4;
   padding:1.35px 4.5px; border-radius:999px;
   background:rgba(0,0,0,.5); border:1px solid rgba(255,255,255,.4);
   color:#ffffff; font-family:var(--font-display); font-weight:800; font-size:4.4px;
@@ -3906,7 +3920,10 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
               <span class="hd-animated-badge">Animated</span>
             </div>
             <span class="hd-help-badge">?</span>
-            <span class="hd-friend-badge">100 Active Friend</span>
+            <div class="hd-bottom-left-stack">
+              <span class="hd-progress-badge">(0/100) Active</span>
+              <span class="hd-friend-badge">100 Active Friend</span>
+            </div>
             <div class="hd-right-stack">
               <div class="hd-speed">
                 <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:11px;height:11px;flex-shrink:0;vertical-align:middle;">
@@ -3927,6 +3944,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
               <span class="tg-legend-badge">Ads Legend 👑</span>
               <span class="tg-count-badge">4K Ads</span>
             </div>
+            <span class="tg-progress-badge">AD (0/4000)</span>
             <div class="tg-right-stack">
               <div class="tg-speed">
                 <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:11px;height:11px;flex-shrink:0;vertical-align:middle;">
