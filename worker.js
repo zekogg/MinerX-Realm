@@ -181,7 +181,7 @@ const PETS = {
   dancing_bear: { basespeed: 3788,  price: 10000000 },
   the_cat:      { basespeed: 18940, price: 50000000 }
 };
-const PET_MAX_LEVEL = 30;
+const PET_MAX_LEVEL = 50;
 const PET_SPEED_INCREMENT_RATIO = 0.10;
 const PET_UPGRADE_COST_RATIO = 0.10;
 const STORAGE_DEFAULT_CAPACITY_HOURS = 6;
