@@ -333,6 +333,29 @@ img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
 .loading-screen__logo{ width:min(70vw, 400px); height:auto; object-fit:contain; margin-bottom:28px; }
 .loading-screen__bar{ width:180px; }
 
+/* /////نافذة تحميل الإعلان المنبثقة (بوابات GigaPub)///// */
+.ad-loading-overlay{
+  position:fixed; inset:0; z-index:9999;
+  display:flex; align-items:center; justify-content:center;
+  background:rgba(0,0,0,.55);
+  opacity:0; visibility:hidden; pointer-events:none;
+  transition:opacity .2s ease;
+}
+.ad-loading-overlay.is-visible{ opacity:1; visibility:visible; pointer-events:auto; }
+.ad-loading-overlay__box{
+  display:flex; flex-direction:column; align-items:center; gap:10px;
+  padding:22px 30px; border-radius:16px;
+  background:rgba(20,16,30,.94); border:1px solid rgba(255,255,255,.12);
+}
+.ad-loading-overlay__spinner{
+  width:32px; height:32px; border-radius:50%;
+  border:3px solid rgba(255,255,255,.2);
+  border-top-color:#ffffff;
+  animation:spin .8s linear infinite;
+}
+.ad-loading-overlay__text{ font-family:var(--font-display); font-weight:800; font-size:14px; color:#ffffff; }
+.ad-loading-overlay__via{ font-size:11px; color:rgba(255,255,255,.55); }
+
 /* /////كود حبات الضوء الذهبية المتطايرة (Fireflies)///// */
 /* طبقة شفافة فوق الخلفية مباشرة، خلف كل محتوى الواجهة (topbar بـ z-index:2) */
 .fireflies{
@@ -2939,6 +2962,15 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
     <div class="progress-track loading-screen__bar"><div class="progress-fill" id="loading-screen-fill" style="width:0%"></div></div>
   </div>
 
+  <!-- /////نافذة تحميل الإعلان المنبثقة (بوابات GigaPub قبل: Start Mining، Claim Daily Rewards، Chest، Spin، Gift، Promo Redeem)///// -->
+  <div class="ad-loading-overlay" id="ad-loading-overlay">
+    <div class="ad-loading-overlay__box">
+      <div class="ad-loading-overlay__spinner"></div>
+      <div class="ad-loading-overlay__text">Loading Ad...</div>
+      <div class="ad-loading-overlay__via">via GigaPub</div>
+    </div>
+  </div>
+
   <!-- ///// حبات ضوء ذهبية متطايرة (Fireflies) فوق خلفية الغابة ///// -->
   <div class="fireflies" aria-hidden="true">
       <span class="firefly" style="left:62.5%; bottom:-8.2px; width:2.6px; height:2.6px; --drift:-16.5px; animation-duration:23.2s,3.9s; animation-delay:-3.5s,-3.5s;"></span>
@@ -3345,12 +3377,12 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
           <div class="ad-task__meta">
             <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
             <span class="ad-task__reward">+15 / Ad</span>
-            <span class="ad-task__avail" id="ads-task-avail">Available</span>
+            <span class="ad-task__avail">Coming Soon</span>
           </div>
           <div class="ad-task__divider"></div>
           <div class="ad-task__footer">
-            <button class="ad-task__watch" id="ads-task-watch-btn" onclick="onWatchAdsgramClick()">Watch</button>
-            <span class="ad-task__counter" id="ads-task-counter">0 / 10</span>
+            <button class="ad-task__watch is-claimed">Soon</button>
+            <span class="ad-task__counter">0 / 10</span>
           </div>
         </div>
         <div class="card ad-task">
@@ -5230,6 +5262,16 @@ function onMiningButtonClick(){
   var isReadyToClaim = miningState.startedAt &&
     (Date.now() - miningState.startedAt.getTime()) / 1000 >= miningState.cycleDurationSec;
 
+  // إعلان قبل بدء دورة تعدين جديدة فقط — Claim Reward بدون إعلان.
+  if (isReadyToClaim){
+    runMiningRequest(true);
+  } else {
+    miningBusy = true;
+    runGigapubGate(function(){ runMiningRequest(false); }, function(){ miningBusy = false; });
+  }
+}
+
+function runMiningRequest(isReadyToClaim){
   miningBusy = true;
   var request = isReadyToClaim ? callMiningApi('/api/mine/claim') : callMiningApi('/api/mine/start');
 
@@ -5353,6 +5395,10 @@ function onStreakClaimClick(){
   }
 
   streakBusy = true;
+  runGigapubGate(function(){ runStreakClaimRequest(initData); }, function(){ streakBusy = false; });
+}
+
+function runStreakClaimRequest(initData){
   fetch('/api/streak/claim', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -5521,6 +5567,11 @@ function onSpinButtonClick(){
 
   var btn = document.getElementById('btn-spin');
   spinBusy = true;
+
+  runGigapubGate(function(){ runSpinClaimRequest(initData, btn); }, function(){ spinBusy = false; });
+}
+
+function runSpinClaimRequest(initData, btn){
   if (btn) btn.disabled = true;
 
   fetch('/api/spin/claim', {
@@ -5592,6 +5643,10 @@ function onChestOpenClick(){
   }
 
   chestBusy = true;
+  runGigapubGate(function(){ runChestClaimRequest(initData); }, function(){ chestBusy = false; });
+}
+
+function runChestClaimRequest(initData){
   var btn = document.getElementById('btn-open-chest');
   if (btn) btn.disabled = true;
 
@@ -5675,6 +5730,10 @@ function onGiftOpenClick(){
   }
 
   giftPickBusy = true;
+  runGigapubGate(function(){ runGiftClaimRequest(initData, selectedBox); }, function(){ giftPickBusy = false; });
+}
+
+function runGiftClaimRequest(initData, selectedBox){
   var btn = document.getElementById('btn-gift-open');
   if (btn) btn.disabled = true;
 
@@ -6992,6 +7051,46 @@ function pollGigapubRewardConfirmation(baselineWatched, attempt){
 }
 
 /* =====================================================================
+   بوابة إعلان GigaPub أمام مميزات موجودة أصلاً (Start Mining، Claim Daily
+   Rewards، Chest، Spin، Gift، Promo Redeem) — لا تمنح مكافأة بنفسها (لا
+   Reward URL فعّال، سيرفرنا يرد 200 فقط على استدعاء task=gate)، فقط شرط
+   عرض أمام فعل مسموح للمستخدم أصلاً. النافذة المنبثقة تظهر فوراً عند
+   الضغط، وتُغلق فور نجاح/فشل مشاهدة الإعلان.
+   ===================================================================== */
+var GIGAPUB_GATE_PLACEMENT = 'gate';
+
+function showAdLoadingOverlay(){
+  var el = document.getElementById('ad-loading-overlay');
+  if (el) el.classList.add('is-visible');
+}
+
+function hideAdLoadingOverlay(){
+  var el = document.getElementById('ad-loading-overlay');
+  if (el) el.classList.remove('is-visible');
+}
+
+// onSuccess يُستدعى فقط بعد نجاح مشاهدة الإعلان بالكامل؛ onFail (اختياري)
+// يُستدعى عند فشل/عدم توفر الإعلان، ليتيح لكل زر إعادة تعيين حالته
+// (busy=false، تفعيل الزر...) بدل أن يبقى معلّقاً للأبد.
+function runGigapubGate(onSuccess, onFail){
+  if (!gigapubReady || typeof window.showGiga !== 'function'){
+    showBuyErrorToast('Ad not available right now', { title: 'Ad Required' });
+    if (onFail) onFail();
+    return;
+  }
+
+  showAdLoadingOverlay();
+  window.showGiga(GIGAPUB_GATE_PLACEMENT).then(function(){
+    hideAdLoadingOverlay();
+    onSuccess();
+  }).catch(function(){
+    hideAdLoadingOverlay();
+    showBuyErrorToast('Ad was not completed', { title: 'Ad Required' });
+    if (onFail) onFail();
+  });
+}
+
+/* =====================================================================
    Check-in اليومي (4 مهام): مهمتا 1/2 تفتحان رابطاً ثم تُظهران عداد 5
    ثوانٍ قبل السماح بالـClaim (السيرفر هو من يمنح المكافأة عبر
    /api/checkin/claim، هذا فقط شرط واجهة). مهمتا 3/4 تحتاجان تحقّقاً
@@ -7646,6 +7745,10 @@ function onPromoRedeemClick(){
   }
 
   promoRedeemBusy = true;
+  runGigapubGate(function(){ runPromoRedeemRequest(initData, code, input); }, function(){ promoRedeemBusy = false; });
+}
+
+function runPromoRedeemRequest(initData, code, input){
   fetch('/api/promo/redeem', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
