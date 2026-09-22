@@ -152,6 +152,17 @@ const GIGAPUB_REWARD_COINS = 15;
 const GIGAPUB_DAILY_LIMIT = 8;
 
 // =====================================================================
+// إعدادات "Watch MonetixAds": MonetixAds لا يوفّر Postback/Reward URL من
+// سيرفره — التأكيد بالكامل من طرف العميل (window.showRewardAd(callback))
+// حسب تعليماتهم الرسمية. لتقليل خطر التلاعب قدر الإمكان بدون Postback:
+// هذه النقطة POST محمية بـinitData الموثّق من تيليجرام (توقيع حقيقي لا
+// يمكن تزويره من Console)، والسيرفر هو من يحسم الحد اليومي والمكافأة
+// بشرط CAS، لا الواجهة.
+// =====================================================================
+const MONETIX_REWARD_COINS = 15;
+const MONETIX_DAILY_LIMIT = 10;
+
+// =====================================================================
 // إعدادات حيوانات Realm القابلة للشراء + Storage. نفس القاعدة لكل
 // الحيوانات الستة (مطابقة لما طُبِّق على The Duck):
 // - السرعة عند الشراء (Lv.1) = basespeed الخاص بالحيوان، وكل مستوى يضيف
@@ -331,6 +342,10 @@ export default {
       return handleGigapubPostback(url, env);
     }
 
+    if (url.pathname === "/api/monetix/reward" && request.method === "POST") {
+      return handleMonetixReward(request, env);
+    }
+
     // نقطة منفصلة عن /api/user عمداً — تُستدعى فقط عند فتح نافذة Profile
     // فعلياً (وليس في كل تحديث دوري)، لأنها تحتوي استعلامات SUM إضافية
     // (إجمالي الإيداع/السحب) لا حاجة لتكرارها في أكثر نقطة استدعاءً بالتطبيق.
@@ -377,6 +392,7 @@ async function handleGetUser(request, env) {
            u.checkin1_claimed_date, u.checkin2_claimed_date, u.checkin3_claimed_date, u.checkin4_claimed_date,
            u.bonus_ad_count_today, u.bonus_ad_date, u.bonus_ad_last_watched_at,
            u.gigapub_task_count, u.gigapub_task_date, u.photo_url,
+           u.monetix_task_count, u.monetix_task_date,
            s.capacity_hours AS storage_capacity_hours, s.last_claim_at AS storage_last_claim_at,
            ca.attempts_used AS combo_attempts_used, ca.solved AS combo_solved
     FROM users u
@@ -481,6 +497,10 @@ async function handleGetUser(request, env) {
   view.gigapub_watched_today = user.gigapub_task_date === today ? (user.gigapub_task_count || 0) : 0;
   view.gigapub_daily_limit = GIGAPUB_DAILY_LIMIT;
   view.gigapub_reward_coins = GIGAPUB_REWARD_COINS;
+
+  view.monetix_watched_today = user.monetix_task_date === today ? (user.monetix_task_count || 0) : 0;
+  view.monetix_daily_limit = MONETIX_DAILY_LIMIT;
+  view.monetix_reward_coins = MONETIX_REWARD_COINS;
 
   return jsonResponse({ user: view });
 }
@@ -1789,6 +1809,52 @@ async function handleGigapubPostback(url, env) {
   await env.DB.batch([updateStmt, txnStmt]);
 
   return new Response("OK", { status: 200 });
+}
+
+// =====================================================================
+// نقطة /api/monetix/reward — تُستدعى من واجهتنا نفسها بعد نجاح
+// window.showRewardAd().then(status: completed/closed) (لا يوجد Postback
+// من سيرفر MonetixAds). محمية بـinitData الموثّق من تيليجرام (توقيع لا
+// يمكن تزويره من Console)، والسيرفر هو من يحسم الحد اليومي والمنح بشرط
+// CAS — أقوى ما يمكن تحقيقه بدون تأكيد خارجي من MonetixAds نفسها.
+// =====================================================================
+async function handleMonetixReward(request, env) {
+  const auth = await authenticateRequest(request, env);
+  if (!auth.ok) return auth.response;
+  const { telegramId } = auth;
+
+  const row = await env.DB.prepare(
+    "SELECT coins, monetix_task_count, monetix_task_date FROM users WHERE telegram_id = ?"
+  ).bind(telegramId).first();
+  if (!row) return jsonResponse({ error: "user_not_found" }, 404);
+
+  const today = todayUTC();
+  const countToday = row.monetix_task_date === today ? (row.monetix_task_count || 0) : 0;
+  if (countToday >= MONETIX_DAILY_LIMIT) {
+    return jsonResponse({ error: "daily_limit_reached", watched_today: countToday, daily_limit: MONETIX_DAILY_LIMIT }, 409);
+  }
+
+  const newCount = countToday + 1;
+
+  const updateStmt = env.DB.prepare(
+    `UPDATE users SET coins = coins + ?, monetix_task_count = ?, monetix_task_date = ?
+     WHERE telegram_id = ? AND (monetix_task_date IS NULL OR monetix_task_date <> ? OR monetix_task_count = ?)`
+  ).bind(MONETIX_REWARD_COINS, newCount, today, telegramId, today, countToday);
+  const txnStmt = env.DB.prepare(
+    "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'monetix_ad', ?, 'coins')"
+  ).bind(telegramId, MONETIX_REWARD_COINS);
+
+  const [updateResult] = await env.DB.batch([updateStmt, txnStmt]);
+  if (!updateResult.meta || updateResult.meta.changes === 0) {
+    return jsonResponse({ error: "daily_limit_reached", watched_today: countToday, daily_limit: MONETIX_DAILY_LIMIT }, 409);
+  }
+
+  return jsonResponse({
+    watched_today: newCount,
+    daily_limit: MONETIX_DAILY_LIMIT,
+    reward_coins: MONETIX_REWARD_COINS,
+    coins: row.coins + MONETIX_REWARD_COINS
+  });
 }
 
 // =====================================================================
