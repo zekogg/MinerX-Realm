@@ -5799,7 +5799,7 @@ function runGiftClaimRequest(initData, selectedBox){
 // تُستخدم هنا فقط لعرض معاينة صحيحة في نافذة الترقية قبل إرسال الطلب؛
 // القرار والتحقق الفعليان يبقيان بالكامل من طرف السيرفر.
 var PET_MAX_LEVEL = 30; // نفس الحد الأقصى لكل الحيوانات
-var PET_UPGRADE_COST_COINS = 40000; // ثابت لكل الشخصيات ولكل مستوى (كان 10% من سعر الشراء) — يجب مطابقته دائماً لقيمة PET_UPGRADE_COST_COINS في worker.js
+var PET_UPGRADE_COST_RATIO = 0.10; // 10% من سعر الشراء — يجب مطابقته دائماً لقيمة PET_UPGRADE_COST_RATIO في worker.js
 var PET_DEFS = [
   { id: 'duck',         basespeed: 114,   price: 300000,   name: 'The Duck',       lvId: 'duck-lv-badge',         rateId: 'duck-rate-text',         buyBtnId: 'pet-card-btn',         upgradeBtnId: 'duck-upgrade-btn' },
   { id: 'polar_bear',   basespeed: 191,   price: 500000,   name: 'The Polar Bear', lvId: 'bear-lv-badge',         rateId: 'bear-rate-text',         buyBtnId: 'bear-buy-btn',         upgradeBtnId: 'bear-upgrade-btn' },
@@ -6291,7 +6291,7 @@ function openUpgradePetModal(petId){
   activeUpgradePetId = petId;
   var newLevel = state.level + 1;
   var newSpeed = petSpeedForLevel(petId, newLevel);
-  var upgradeCost = PET_UPGRADE_COST_COINS;
+  var upgradeCost = Math.round(def.price * PET_UPGRADE_COST_RATIO);
 
   var titleEl = document.getElementById('pet-upgrade-title');
   var lvCurrent = document.getElementById('pet-upgrade-lv-current');
