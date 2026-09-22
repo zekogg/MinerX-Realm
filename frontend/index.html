@@ -2099,10 +2099,29 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 #spin-help-tooltip{ left:auto; right:0; transform:translateY(-6px); }
 #spin-help-tooltip::after{ left:auto; right:10px; transform:none; }
 #gift-help-tooltip::after{ left:auto; right:10px; transform:none; }
-/* -- شارات "؟" الصغيرة في البطاقات الحصرية قريبة من الحافة اليمنى للبطاقة
-      (نفس سبب تعديل spin-help-tooltip أعلاه) -- */
-#hd-help-tooltip, #tg-help-tooltip, #amb-help-tooltip{ left:auto; right:0; transform:translateY(-6px); }
-#hd-help-tooltip::after, #tg-help-tooltip::after, #amb-help-tooltip::after{ left:auto; right:6px; transform:none; }
+/* -- تلميحات شارات "؟" الصغيرة في البطاقات الحصرية (Happy Dog/Guardian/
+      Ambassador): لا تُستخدم .price-tooltip العامة هنا لأن الشارة نفسها
+      داخل عنصر بـoverflow:hidden (.pet-slot--exclusive، للحفاظ على تأثير
+      البطاقة البصري)، فأي تلميح متداخل بداخلها يُقصّ ولا يظهر أبداً —
+      لذلك التلميح عنصر شقيق مستقل خارج ذلك العنصر (داخل .pet-card-wrap
+      نفسه الذي بلا قصّ)، بموضع مطلق يحاذي زاوية الشارة تقريباً، ويفتح
+      للأسفل (لا للأعلى) لأن الشارة قريبة من أعلى البطاقة. -- */
+.pet-exclusive-tip{
+  position:absolute; top:26px; right:8px; z-index:6;
+  width:150px; padding:6px 10px; border-radius:8px;
+  background:rgba(18,12,6,.95); border:1px solid rgba(227,165,66,.55);
+  color:#ffd76a; font-family:var(--font-display); font-size:8px; font-weight:800;
+  line-height:1.5; text-align:center; white-space:normal;
+  opacity:0; visibility:hidden; pointer-events:none; transition:opacity .15s ease;
+  box-shadow:0 4px 10px rgba(0,0,0,.45);
+}
+.pet-exclusive-tip::after{
+  content:""; position:absolute; bottom:100%; right:8px;
+  width:0; height:0;
+  border-left:4px solid transparent; border-right:4px solid transparent;
+  border-bottom:4px solid rgba(227,165,66,.55);
+}
+.pet-exclusive-tip.is-visible{ opacity:1; visibility:visible; }
 #chest-help-tooltip{ left:auto; right:0; transform:translateY(-6px); }
 #chest-help-tooltip::after{ left:auto; right:10px; transform:none; }
 
@@ -3964,9 +3983,8 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         </div>
       </div>
 
-      <div class="page-title page-title--with-help" style="font-size:15px; margin-top:20px;">
+      <div class="page-title" style="font-size:15px; margin-top:20px;">
         <span>Exclusive Cards</span>
-        <span class="help-badge help-badge--md" style="cursor:pointer;" onclick="openModal('modal-pets-guide')">?</span>
       </div>
       <div class="pet-exclusive-grid">
         <div class="pet-card-wrap" style="position:relative; margin-top:14px;">
@@ -4039,9 +4057,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
             <div class="hd-badges-left">
               <span class="hd-animated-badge">Animated</span>
             </div>
-            <span class="hd-help-badge" style="cursor:pointer;" onclick="togglePriceTooltip('hd-help-tooltip')">?
-              <span class="price-tooltip price-tooltip--wide" id="hd-help-tooltip">Unlocks when you invite 100 active friends.</span>
-            </span>
+            <span class="hd-help-badge" style="cursor:pointer;" onclick="togglePriceTooltip('hd-help-tooltip')">?</span>
             <div class="hd-bottom-left-stack">
               <span class="hd-progress-badge">(0/100) Active</span>
               <span class="hd-friend-badge">100 Active Friend</span>
@@ -4057,13 +4073,12 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
             <div class="pet-slot--exclusive__backdrop"></div>
             <img draggable="false" class="pet-slot--exclusive__art" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/187bbf0071e1651c314318166c4605ba8f82b430/frontend/Happy%20Dog%20(100%20Reward)%20.svg" alt="Happy Dog">
           </div>
+          <span class="pet-exclusive-tip" id="hd-help-tooltip">Unlocks when you invite 100 active friends.</span>
         </div>
         <div class="pet-card-wrap" style="position:relative; margin-top:14px;">
           <span class="realm-label realm-label--shine"><span>The Guardian</span></span>
           <div class="pet-slot pet-slot--wide pet-slot--exclusive tg-exclusive">
-            <span class="tg-help-badge" style="cursor:pointer;" onclick="togglePriceTooltip('tg-help-tooltip')">?
-              <span class="price-tooltip price-tooltip--wide" id="tg-help-tooltip">Unlocks after watching 4,000 ads in total. Every ad you watch anywhere in the bot counts toward this.</span>
-            </span>
+            <span class="tg-help-badge" style="cursor:pointer;" onclick="togglePriceTooltip('tg-help-tooltip')">?</span>
             <div class="tg-badges-left">
               <span class="tg-legend-badge">Ads Legend 👑</span>
               <span class="tg-count-badge">4K Ads</span>
@@ -4079,13 +4094,12 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
             </div>
             <img draggable="false" class="pet-slot--exclusive__art" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Ads%20Guardian%20Reward%20.webp" alt="The Guardian">
           </div>
+          <span class="pet-exclusive-tip" id="tg-help-tooltip">Unlocks after watching 4,000 ads in total. Every ad you watch anywhere in the bot counts toward this.</span>
         </div>
         <div class="pet-card-wrap" style="position:relative; margin-top:14px;">
           <span class="realm-label realm-label--shine"><span>The Ambassador</span></span>
           <div class="pet-slot pet-slot--wide pet-slot--exclusive amb-exclusive">
-            <span class="amb-help-badge" style="cursor:pointer;" onclick="togglePriceTooltip('amb-help-tooltip')">?
-              <span class="price-tooltip price-tooltip--wide" id="amb-help-tooltip">Unlocks for active ambassadors.</span>
-            </span>
+            <span class="amb-help-badge" style="cursor:pointer;" onclick="togglePriceTooltip('amb-help-tooltip')">?</span>
             <div class="amb-badges-left">
               <span class="amb-influencer-badge">The Influencer</span>
               <span class="amb-exclusive-badge">Super Exclusive</span>
@@ -4100,6 +4114,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
             </div>
             <img draggable="false" class="pet-slot--exclusive__art" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/187bbf0071e1651c314318166c4605ba8f82b430/frontend/The%20Ambassador%20Pet%20.svg" alt="The Ambassador">
           </div>
+          <span class="pet-exclusive-tip" id="amb-help-tooltip">Unlocks for active ambassadors.</span>
         </div>
       </div>
     </section>
@@ -4876,6 +4891,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
             <span class="pg-section__title">Passive Mining</span>
           </div>
           <div class="pg-section__body">Every pet you buy adds its <b>Speed</b> to your <b>Total Speed</b> (shown as Coins/hr at the top of this page). That speed accrues automatically into your <span class="is-purple">Storage</span> every second — even while you're away from the app.</div>
+          <div class="pg-section__body">When you buy any pet, it starts at <b>Level 1</b> and begins mining immediately — right after the purchase, with no extra step needed.</div>
         </div>
 
         <div class="pg-section">
