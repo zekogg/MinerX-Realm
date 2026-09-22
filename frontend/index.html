@@ -2099,6 +2099,10 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 #spin-help-tooltip{ left:auto; right:0; transform:translateY(-6px); }
 #spin-help-tooltip::after{ left:auto; right:10px; transform:none; }
 #gift-help-tooltip::after{ left:auto; right:10px; transform:none; }
+/* -- شارات "؟" الصغيرة في البطاقات الحصرية قريبة من الحافة اليمنى للبطاقة
+      (نفس سبب تعديل spin-help-tooltip أعلاه) -- */
+#hd-help-tooltip, #tg-help-tooltip, #amb-help-tooltip{ left:auto; right:0; transform:translateY(-6px); }
+#hd-help-tooltip::after, #tg-help-tooltip::after, #amb-help-tooltip::after{ left:auto; right:6px; transform:none; }
 #chest-help-tooltip{ left:auto; right:0; transform:translateY(-6px); }
 #chest-help-tooltip::after{ left:auto; right:10px; transform:none; }
 
@@ -2709,6 +2713,91 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   font-family:var(--font-display); font-weight:800; font-size:10.5px; color:#e3a542;
 }
 .lb-row__coins svg{ width:12px; height:12px; flex-shrink:0; }
+
+/* /////كود نافذة Pet Cards Guide (شرح احترافي كامل لآلية التعدين/الترقية/التخزين/الأسعار) — نفس نمط Bottom Sheet + نفس تدرج ذهبي/بنفسجي المستخدم في Exchange/Deposit/Withdraw///// */
+#modal-pets-guide{
+  display:flex; align-items:flex-end; padding:0;
+  background:rgba(8,6,14,0);
+  visibility:hidden; pointer-events:none;
+  transition:background .32s ease, visibility 0s linear .32s;
+}
+#modal-pets-guide.is-open{
+  visibility:visible; pointer-events:auto;
+  background:rgba(8,6,14,.72);
+  transition:background .32s ease, visibility 0s linear 0s;
+}
+.pg-sheet{
+  position:relative;
+  max-width:none; width:100%; margin:0;
+  max-height:85vh; overflow:hidden;
+  display:flex; flex-direction:column;
+  border-radius:26px 26px 0 0;
+  transform:translateY(100%);
+  transition:transform .32s cubic-bezier(.22,.9,.32,1);
+  background:
+    radial-gradient(240px 200px at 50% 0%, rgba(227,165,66,.16), transparent 70%),
+    radial-gradient(200px 180px at 100% 100%, rgba(165,108,240,.16), transparent 70%),
+    linear-gradient(165deg, #1c1130, #0c0815 75%);
+  border:1px solid transparent;
+  box-shadow:0 -20px 50px -20px rgba(0,0,0,.85);
+}
+#modal-pets-guide.is-open .pg-sheet{ transform:translateY(0); }
+.pg-sheet::before{
+  content:""; position:absolute; inset:0; border-radius:inherit; padding:1.6px;
+  background:linear-gradient(135deg, #f0d878 0%, #a9701f 28%, var(--c-royal-purple-2) 55%, #f0d878 100%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor; mask-composite:exclude;
+  pointer-events:none;
+}
+.pg-sheet .modal-head{ padding:20px 20px 14px; margin-bottom:0; border-bottom:1px solid rgba(255,255,255,.08); flex-shrink:0; }
+.pg-scroll{
+  flex:1 1 auto; min-height:0;
+  overflow-y:auto; overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;
+  padding:18px 20px 24px;
+}
+.pg-hero{ text-align:center; margin-bottom:18px; }
+.pg-hero__icon{
+  width:50px; height:50px; margin:0 auto 10px;
+  display:flex; align-items:center; justify-content:center;
+  border-radius:50%; font-size:24px;
+  background:linear-gradient(135deg, rgba(240,216,120,.28), rgba(165,108,240,.28));
+  border:1px solid rgba(240,216,120,.45);
+  box-shadow:0 0 18px rgba(240,216,120,.25);
+}
+.pg-hero__title{
+  font-family:var(--font-display); font-weight:900; font-size:18px;
+  background:linear-gradient(90deg, #f0d878, #ffe9b8 40%, #d8b4fe 60%, #f0d878);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+.pg-hero__sub{ font-size:11px; color:#a3acb8; margin-top:5px; }
+
+.pg-section{
+  margin-bottom:14px; padding:14px; border-radius:14px;
+  background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.08);
+}
+.pg-section__head{ display:flex; align-items:center; gap:9px; margin-bottom:9px; }
+.pg-section__icon{
+  width:27px; height:27px; border-radius:9px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center; font-size:14px;
+  background:linear-gradient(135deg, rgba(240,216,120,.32), rgba(165,108,240,.32));
+  border:1px solid rgba(240,216,120,.3);
+}
+.pg-section__title{ font-family:var(--font-display); font-weight:800; font-size:13.5px; color:#fff6e3; }
+.pg-section__body{ font-size:11.5px; color:#c9cfda; line-height:1.65; }
+.pg-section__body + .pg-section__body{ margin-top:8px; }
+.pg-section__body b{ color:#f0d878; font-weight:800; }
+.pg-section__body .is-purple{ color:#d8b4fe; font-weight:800; }
+
+.pg-table{ width:100%; border-collapse:collapse; margin-top:6px; font-size:10.5px; }
+.pg-table th{ text-align:left; padding:6px 5px; color:#a3acb8; font-weight:700; border-bottom:1px solid rgba(255,255,255,.14); }
+.pg-table td{ padding:6px 5px; border-bottom:1px solid rgba(255,255,255,.05); color:#e6e9ef; }
+.pg-table tr:last-child td{ border-bottom:none; }
+.pg-table td.is-gold{ color:#f0d878; font-weight:800; }
+
+.pg-tip-list{ margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:9px; }
+.pg-tip-list li{ display:flex; gap:8px; font-size:11.5px; color:#c9cfda; line-height:1.55; }
+.pg-tip-list li::before{ content:"✦"; color:#f0d878; flex-shrink:0; }
 
 /* /////كود نافذة The Mysterious Free Pet — تصميم ملكي/فاخر مستقل عن كل النوافذ الأخرى///// */
 /* -- تحويلها إلى Bottom Sheet (نفس آلية Profile/Exchange/Deposit/Withdraw):
@@ -3725,7 +3814,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
     <section class="page" id="page-realm">
       <div class="page-title page-title--with-help">
         <span>Pet Cards</span>
-        <span class="help-badge help-badge--md">?</span>
+        <span class="help-badge help-badge--md" style="cursor:pointer;" onclick="openModal('modal-pets-guide')">?</span>
       </div>
 
       <div class="card storage-card">
@@ -3877,7 +3966,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 
       <div class="page-title page-title--with-help" style="font-size:15px; margin-top:20px;">
         <span>Exclusive Cards</span>
-        <span class="help-badge help-badge--md">?</span>
+        <span class="help-badge help-badge--md" style="cursor:pointer;" onclick="openModal('modal-pets-guide')">?</span>
       </div>
       <div class="pet-exclusive-grid">
         <div class="pet-card-wrap" style="position:relative; margin-top:14px;">
@@ -3950,7 +4039,9 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
             <div class="hd-badges-left">
               <span class="hd-animated-badge">Animated</span>
             </div>
-            <span class="hd-help-badge">?</span>
+            <span class="hd-help-badge" style="cursor:pointer;" onclick="togglePriceTooltip('hd-help-tooltip')">?
+              <span class="price-tooltip price-tooltip--wide" id="hd-help-tooltip">Unlocks when you invite 100 active friends.</span>
+            </span>
             <div class="hd-bottom-left-stack">
               <span class="hd-progress-badge">(0/100) Active</span>
               <span class="hd-friend-badge">100 Active Friend</span>
@@ -3970,7 +4061,9 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         <div class="pet-card-wrap" style="position:relative; margin-top:14px;">
           <span class="realm-label realm-label--shine"><span>The Guardian</span></span>
           <div class="pet-slot pet-slot--wide pet-slot--exclusive tg-exclusive">
-            <span class="tg-help-badge">?</span>
+            <span class="tg-help-badge" style="cursor:pointer;" onclick="togglePriceTooltip('tg-help-tooltip')">?
+              <span class="price-tooltip price-tooltip--wide" id="tg-help-tooltip">Unlocks after watching 4,000 ads in total. Every ad you watch anywhere in the bot counts toward this.</span>
+            </span>
             <div class="tg-badges-left">
               <span class="tg-legend-badge">Ads Legend 👑</span>
               <span class="tg-count-badge">4K Ads</span>
@@ -3990,7 +4083,9 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         <div class="pet-card-wrap" style="position:relative; margin-top:14px;">
           <span class="realm-label realm-label--shine"><span>The Ambassador</span></span>
           <div class="pet-slot pet-slot--wide pet-slot--exclusive amb-exclusive">
-            <span class="amb-help-badge">?</span>
+            <span class="amb-help-badge" style="cursor:pointer;" onclick="togglePriceTooltip('amb-help-tooltip')">?
+              <span class="price-tooltip price-tooltip--wide" id="amb-help-tooltip">Unlocks for active ambassadors.</span>
+            </span>
             <div class="amb-badges-left">
               <span class="amb-influencer-badge">The Influencer</span>
               <span class="amb-exclusive-badge">Super Exclusive</span>
@@ -4753,6 +4848,81 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
           </div>
         </div>
       </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- /////كود نافذة Pet Cards Guide///// -->
+  <div class="modal-overlay" id="modal-pets-guide">
+    <div class="pg-sheet">
+      <div class="modal-head">
+        <div class="modal-head__title-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#f0d878" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 4.8L20 8l-4 4 1 5.6L12 15l-5 2.6 1-5.6-4-4 5.6-1.2z"/></svg>
+          <div class="modal-head__title">Pet Cards Guide</div>
+        </div>
+        <button class="modal-close" onclick="closeModal('modal-pets-guide')">✕</button>
+      </div>
+
+      <div class="pg-scroll">
+        <div class="pg-hero">
+          <div class="pg-hero__icon">🐾</div>
+          <div class="pg-hero__title">How Pet Cards Work</div>
+          <div class="pg-hero__sub">Mining, upgrades, storage & pricing — everything in one place</div>
+        </div>
+
+        <div class="pg-section">
+          <div class="pg-section__head">
+            <span class="pg-section__icon">💰</span>
+            <span class="pg-section__title">Passive Mining</span>
+          </div>
+          <div class="pg-section__body">Every pet you buy adds its <b>Speed</b> to your <b>Total Speed</b> (shown as Coins/hr at the top of this page). That speed accrues automatically into your <span class="is-purple">Storage</span> every second — even while you're away from the app.</div>
+        </div>
+
+        <div class="pg-section">
+          <div class="pg-section__head">
+            <span class="pg-section__icon">⬆️</span>
+            <span class="pg-section__title">Upgrading Pets</span>
+          </div>
+          <div class="pg-section__body">Each pet can be upgraded up to <b>Level 100</b>. Every level permanently adds <b>+10%</b> of that pet's base Speed. Each upgrade costs <b>10% of the pet's original purchase price</b> — the same cost at every single level.</div>
+        </div>
+
+        <div class="pg-section">
+          <div class="pg-section__head">
+            <span class="pg-section__icon">📦</span>
+            <span class="pg-section__title">Storage</span>
+          </div>
+          <div class="pg-section__body">Storage has a limited capacity that caps how long coins can accrue before you claim them: <b>6h → 8h → 12h → 16h → 24h</b> (5 levels). Upgrading Storage costs a flat <b>300,000 Coins</b> per level.</div>
+          <div class="pg-section__body">Claim regularly — coins earned beyond your Storage capacity are lost if you wait too long to claim. Minimum claim amount: <b>10 Coins</b>.</div>
+        </div>
+
+        <div class="pg-section">
+          <div class="pg-section__head">
+            <span class="pg-section__icon">🐾</span>
+            <span class="pg-section__title">Pet Prices &amp; Speed</span>
+          </div>
+          <table class="pg-table">
+            <tr><th>Pet</th><th>Price</th><th>Speed (Lv.1)</th></tr>
+            <tr><td>Duck</td><td class="is-gold">300K</td><td>114 /hr</td></tr>
+            <tr><td>Polar Bear</td><td class="is-gold">500K</td><td>191 /hr</td></tr>
+            <tr><td>Scorpion</td><td class="is-gold">1M</td><td>379 /hr</td></tr>
+            <tr><td>Penguin</td><td class="is-gold">5M</td><td>1,894 /hr</td></tr>
+            <tr><td>Dancing Bear</td><td class="is-gold">10M</td><td>3,788 /hr</td></tr>
+            <tr><td>The Cat</td><td class="is-gold">50M</td><td>18,940 /hr</td></tr>
+          </table>
+        </div>
+
+        <div class="pg-section">
+          <div class="pg-section__head">
+            <span class="pg-section__icon">💡</span>
+            <span class="pg-section__title">Tips</span>
+          </div>
+          <ul class="pg-tip-list">
+            <li>Higher-tier pets give more Speed per Coin spent — save up before buying if you can.</li>
+            <li>Upgrade your highest-Speed pet first for the biggest boost per Coin spent on upgrades.</li>
+            <li>Upgrade your Storage capacity early so you don't lose coins while you're away.</li>
+            <li>Check the Exclusive Cards — some pets can be unlocked for free instead of bought.</li>
+          </ul>
+        </div>
       </div>
     </div>
   </div>
