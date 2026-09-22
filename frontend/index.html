@@ -5798,7 +5798,7 @@ function runGiftClaimRequest(initData, selectedBox){
 // نفس القيم المستخدمة بالسيرفر بالضبط (pet_id -> {basespeed, price}) —
 // تُستخدم هنا فقط لعرض معاينة صحيحة في نافذة الترقية قبل إرسال الطلب؛
 // القرار والتحقق الفعليان يبقيان بالكامل من طرف السيرفر.
-var PET_MAX_LEVEL = 50; // نفس الحد الأقصى لكل الحيوانات
+var PET_MAX_LEVEL = 100; // نفس الحد الأقصى لكل الحيوانات
 var PET_UPGRADE_COST_RATIO = 0.10; // 10% من سعر الشراء — يجب مطابقته دائماً لقيمة PET_UPGRADE_COST_RATIO في worker.js
 var PET_DEFS = [
   { id: 'duck',         basespeed: 114,   price: 300000,   name: 'The Duck',       lvId: 'duck-lv-badge',         rateId: 'duck-rate-text',         buyBtnId: 'pet-card-btn',         upgradeBtnId: 'duck-upgrade-btn' },
