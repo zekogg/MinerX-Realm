@@ -1753,6 +1753,14 @@ async function handleGigapubPostback(url, env) {
     return new Response("bad request", { status: 200 });
   }
 
+  // "gate" = بوابة إعلان أمام مميزات موجودة أصلاً (Start Mining، Claim
+  // Daily Rewards، Chest، Spin، Gift، Promo Redeem) — لا تمنح شيئاً هنا،
+  // الفعل الحقيقي يُنفَّذ من الواجهة مباشرة بعد نجاح مشاهدة الإعلان
+  // (AdController.show().then())، فقط نرد 200 كما تطلب GigaPub من كل طلب.
+  if (url.searchParams.get("task") === "gate") {
+    return new Response("OK", { status: 200 });
+  }
+
   const row = await env.DB.prepare(
     "SELECT gigapub_task_count, gigapub_task_date FROM users WHERE telegram_id = ?"
   ).bind(telegramId).first();
