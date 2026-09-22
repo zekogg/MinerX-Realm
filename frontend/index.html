@@ -6835,7 +6835,8 @@ function pollBonusAdRewardConfirmation(baselineWatched, attempt){
    ===================================================================== */
 var GIGAPUB_PUBLISHER_ID = '8282'; // معرّف حساب GigaPub الحقيقي (تمت الموافقة عليه)
 var gigapubReady = false;
-var gigapubState = { watchedToday: 0, dailyLimit: 8, rewardCoins: 15, busy: false };
+var gigapubState = { watchedToday: 0, dailyLimit: 8, rewardCoins: 15, busy: false, cooldownUntil: 0 };
+var gigapubTaskCooldownTimer = null;
 
 function isValidGigapubId(id){
   return /^\d+$/.test(String(id));
@@ -6897,10 +6898,27 @@ function renderGigapubButton(){
 
   var dailyDone = gigapubState.watchedToday >= gigapubState.dailyLimit;
   if (avail) avail.textContent = dailyDone ? 'Come Back Tomorrow' : 'Available';
+
+  var cooldownRemaining = Math.ceil((gigapubState.cooldownUntil - Date.now()) / 1000);
+  var inCooldown = cooldownRemaining > 0;
   if (btn){
-    btn.textContent = 'Watch';
-    btn.classList.toggle('is-claimed', dailyDone || gigapubState.busy);
+    btn.textContent = inCooldown ? String(cooldownRemaining) : 'Watch';
+    btn.classList.toggle('is-claimed', dailyDone || gigapubState.busy || inCooldown);
   }
+}
+
+// بعد كل مشاهدة ناجحة: قفل الزر 10 ثوانٍ (عداد تنازلي داخل الزر نفسه)
+// قبل السماح بالضغط مجدداً — نفس أسلوب Adsgram بالضبط.
+function startGigapubTaskCooldown(){
+  gigapubState.cooldownUntil = Date.now() + 10000;
+  clearInterval(gigapubTaskCooldownTimer);
+  renderGigapubButton();
+  gigapubTaskCooldownTimer = setInterval(function(){
+    if (Date.now() >= gigapubState.cooldownUntil){
+      clearInterval(gigapubTaskCooldownTimer);
+    }
+    renderGigapubButton();
+  }, 1000);
 }
 
 function onWatchGigapubClick(){
@@ -6908,7 +6926,7 @@ function onWatchGigapubClick(){
     showBuyErrorToast('Coming Soon', { title: 'Watch gigapub ads' });
     return;
   }
-  if (gigapubState.busy) return;
+  if (gigapubState.busy || Date.now() < gigapubState.cooldownUntil) return;
   if (gigapubState.watchedToday >= gigapubState.dailyLimit){
     showComeBackTomorrowToast();
     return;
@@ -6960,7 +6978,7 @@ function pollGigapubRewardConfirmation(baselineWatched, attempt){
       });
       showAppToast({ title: 'Watch gigapub ads', icon: PRIZE_ICON_URLS.coins, amount: '+' + gigapubState.rewardCoins + ' Coins' });
       gigapubState.busy = false;
-      renderGigapubButton();
+      startGigapubTaskCooldown();
       return;
     }
 
