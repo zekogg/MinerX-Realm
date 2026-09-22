@@ -1594,8 +1594,16 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   background:rgba(0,0,0,.5); border:1px solid rgba(255,247,230,.55);
   color:#fff7e6; font-size:6px; font-weight:800;
 }
-.hd-friend-badge{
+.hd-bottom-left-stack{
   position:absolute; bottom:8px; left:8px; z-index:4;
+  display:flex; flex-direction:column; align-items:flex-start; gap:4px;
+}
+.hd-progress-badge{
+  padding:1.35px 4.5px; border-radius:999px;
+  background:rgba(0,0,0,.5); border:1px solid rgba(255,247,230,.55);
+  color:#fff7e6; font-family:var(--font-display); font-weight:800; font-size:4.4px;
+}
+.hd-friend-badge{
   padding:1.35px 4.5px; border-radius:999px;
   background:rgba(0,0,0,.5); border:1px solid rgba(255,247,230,.55);
   color:#fff7e6; font-family:var(--font-display); font-weight:800; font-size:4.4px;
@@ -1646,6 +1654,12 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   box-shadow:0 0 8px rgba(239,68,68,.4);
 }
 .tg-count-badge{
+  padding:1.35px 4.5px; border-radius:999px;
+  background:rgba(0,0,0,.5); border:1px solid rgba(255,255,255,.4);
+  color:#ffffff; font-family:var(--font-display); font-weight:800; font-size:4.4px;
+}
+.tg-progress-badge{
+  position:absolute; bottom:8px; left:8px; z-index:4;
   padding:1.35px 4.5px; border-radius:999px;
   background:rgba(0,0,0,.5); border:1px solid rgba(255,255,255,.4);
   color:#ffffff; font-family:var(--font-display); font-weight:800; font-size:4.4px;
@@ -3384,11 +3398,27 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
           <div class="ad-task__meta">
             <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
             <span class="ad-task__reward">+15 / Ad</span>
-            <span class="ad-task__avail">Available</span>
+            <span class="ad-task__avail">Coming Soon</span>
           </div>
           <div class="ad-task__divider"></div>
           <div class="ad-task__footer">
-            <button class="ad-task__watch">Watch</button>
+            <button class="ad-task__watch is-claimed">Soon</button>
+            <span class="ad-task__counter">0 / 10</span>
+          </div>
+        </div>
+        <div class="card ad-task">
+          <div class="ad-task__icon">
+            <svg viewBox="0 0 24 24" fill="var(--c-ad-watch-1)" stroke="none"><path d="M8 5l12 7-12 7z"/></svg>
+          </div>
+          <div class="ad-task__title">Watch MonetixAds</div>
+          <div class="ad-task__meta">
+            <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
+            <span class="ad-task__reward">+15 / Ad</span>
+            <span class="ad-task__avail">Coming Soon</span>
+          </div>
+          <div class="ad-task__divider"></div>
+          <div class="ad-task__footer">
+            <button class="ad-task__watch is-claimed">Soon</button>
             <span class="ad-task__counter">0 / 10</span>
           </div>
         </div>
@@ -3906,7 +3936,10 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
               <span class="hd-animated-badge">Animated</span>
             </div>
             <span class="hd-help-badge">?</span>
-            <span class="hd-friend-badge">100 Active Friend</span>
+            <div class="hd-bottom-left-stack">
+              <span class="hd-progress-badge">(0/100) Active</span>
+              <span class="hd-friend-badge">100 Active Friend</span>
+            </div>
             <div class="hd-right-stack">
               <div class="hd-speed">
                 <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:11px;height:11px;flex-shrink:0;vertical-align:middle;">
@@ -3927,6 +3960,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
               <span class="tg-legend-badge">Ads Legend 👑</span>
               <span class="tg-count-badge">4K Ads</span>
             </div>
+            <span class="tg-progress-badge">AD (0/4000)</span>
             <div class="tg-right-stack">
               <div class="tg-speed">
                 <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:11px;height:11px;flex-shrink:0;vertical-align:middle;">
@@ -6817,7 +6851,8 @@ function pollBonusAdRewardConfirmation(baselineWatched, attempt){
    ===================================================================== */
 var GIGAPUB_PUBLISHER_ID = '8282'; // معرّف حساب GigaPub الحقيقي (تمت الموافقة عليه)
 var gigapubReady = false;
-var gigapubState = { watchedToday: 0, dailyLimit: 8, rewardCoins: 15, busy: false };
+var gigapubState = { watchedToday: 0, dailyLimit: 8, rewardCoins: 15, busy: false, cooldownUntil: 0 };
+var gigapubTaskCooldownTimer = null;
 
 function isValidGigapubId(id){
   return /^\d+$/.test(String(id));
@@ -6879,10 +6914,27 @@ function renderGigapubButton(){
 
   var dailyDone = gigapubState.watchedToday >= gigapubState.dailyLimit;
   if (avail) avail.textContent = dailyDone ? 'Come Back Tomorrow' : 'Available';
+
+  var cooldownRemaining = Math.ceil((gigapubState.cooldownUntil - Date.now()) / 1000);
+  var inCooldown = cooldownRemaining > 0;
   if (btn){
-    btn.textContent = 'Watch';
-    btn.classList.toggle('is-claimed', dailyDone || gigapubState.busy);
+    btn.textContent = inCooldown ? String(cooldownRemaining) : 'Watch';
+    btn.classList.toggle('is-claimed', dailyDone || gigapubState.busy || inCooldown);
   }
+}
+
+// بعد كل مشاهدة ناجحة: قفل الزر 10 ثوانٍ (عداد تنازلي داخل الزر نفسه)
+// قبل السماح بالضغط مجدداً — نفس أسلوب Adsgram بالضبط.
+function startGigapubTaskCooldown(){
+  gigapubState.cooldownUntil = Date.now() + 10000;
+  clearInterval(gigapubTaskCooldownTimer);
+  renderGigapubButton();
+  gigapubTaskCooldownTimer = setInterval(function(){
+    if (Date.now() >= gigapubState.cooldownUntil){
+      clearInterval(gigapubTaskCooldownTimer);
+    }
+    renderGigapubButton();
+  }, 1000);
 }
 
 function onWatchGigapubClick(){
@@ -6890,7 +6942,7 @@ function onWatchGigapubClick(){
     showBuyErrorToast('Coming Soon', { title: 'Watch gigapub ads' });
     return;
   }
-  if (gigapubState.busy) return;
+  if (gigapubState.busy || Date.now() < gigapubState.cooldownUntil) return;
   if (gigapubState.watchedToday >= gigapubState.dailyLimit){
     showComeBackTomorrowToast();
     return;
@@ -6942,7 +6994,7 @@ function pollGigapubRewardConfirmation(baselineWatched, attempt){
       });
       showAppToast({ title: 'Watch gigapub ads', icon: PRIZE_ICON_URLS.coins, amount: '+' + gigapubState.rewardCoins + ' Coins' });
       gigapubState.busy = false;
-      renderGigapubButton();
+      startGigapubTaskCooldown();
       return;
     }
 
