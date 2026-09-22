@@ -237,3 +237,11 @@ ALTER TABLE users ADD COLUMN gigapub_pending_expires INTEGER;
 -- الحالي نفسه.
 ALTER TABLE users ADD COLUMN created_at INTEGER;
 ALTER TABLE users ADD COLUMN photo_url TEXT;
+
+-- -- Watch MonetixAds --
+-- monetix_task_count/date : عدّاد يومي (نفس أسلوب gigapub_task_count) —
+-- MonetixAds لا يوفّر Postback من سيرفره (تأكيد Client-side فقط عبر
+-- window.showRewardAd)، فالمنح يتم عبر /api/monetix/reward المحمي
+-- بـinitData الموثّق من تيليجرام فقط، لا عبر رابط عام كـGigaPub/Adsgram.
+ALTER TABLE users ADD COLUMN monetix_task_count INTEGER DEFAULT 0;
+ALTER TABLE users ADD COLUMN monetix_task_date TEXT;

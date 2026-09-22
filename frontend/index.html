@@ -24,6 +24,10 @@
      بطاقات Daily Ads ما زالت تصميماً ثابتاً بدون شبكة إعلانات حقيقية) -->
 <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
 
+<!-- MonetixAds SDK — مهمة "Watch MonetixAds" + محاولة أولى في بوابات
+     الأزرار الستة قبل GigaPub (window.showRewardAd الجاهزة). -->
+<script src="https://www.monetixads.online/ads.js" data-mxid="MX-00DFB0A3"></script>
+
 <style>
 /* /////كود الألوان والمتغيرات العامة///// */
 /* ألوان الخلفيات/النصوص مشتركة عمداً (تغييرها ينعكس بكل الصفحات). */
@@ -2967,7 +2971,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
     <div class="ad-loading-overlay__box">
       <div class="ad-loading-overlay__spinner"></div>
       <div class="ad-loading-overlay__text">Loading Ad...</div>
-      <div class="ad-loading-overlay__via">via GigaPub</div>
+      <div class="ad-loading-overlay__via" id="ad-loading-overlay-via">via Monetix</div>
     </div>
   </div>
 
@@ -3435,18 +3439,18 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         </div>
         <div class="card ad-task">
           <div class="ad-task__icon">
-            <svg viewBox="0 0 24 24" fill="var(--c-ad-watch-1)" stroke="none"><path d="M8 5l12 7-12 7z"/></svg>
+            <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Monetix%20Ads%20icon.webp" alt="MonetixAds" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">
           </div>
           <div class="ad-task__title">Watch MonetixAds</div>
           <div class="ad-task__meta">
             <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
             <span class="ad-task__reward">+15 / Ad</span>
-            <span class="ad-task__avail">Coming Soon</span>
+            <span class="ad-task__avail" id="monetix-task-avail">Available</span>
           </div>
           <div class="ad-task__divider"></div>
           <div class="ad-task__footer">
-            <button class="ad-task__watch is-claimed">Soon</button>
-            <span class="ad-task__counter">0 / 10</span>
+            <button class="ad-task__watch" id="monetix-task-watch-btn" onclick="onWatchMonetixClick()">Watch</button>
+            <span class="ad-task__counter" id="monetix-task-counter">0 / 10</span>
           </div>
         </div>
       </div>
@@ -5133,6 +5137,11 @@ function fetchUserData(){
       daily_limit: data.user.gigapub_daily_limit,
       reward_coins: data.user.gigapub_reward_coins
     });
+    applyMonetixState({
+      watched_today: data.user.monetix_watched_today,
+      daily_limit: data.user.monetix_daily_limit,
+      reward_coins: data.user.monetix_reward_coins
+    });
     fetchAdminTasks('special');
     fetchAdminTasks('partner');
     setupInviteLink(data.user.telegram_id);
@@ -5267,7 +5276,7 @@ function onMiningButtonClick(){
     runMiningRequest(true);
   } else {
     miningBusy = true;
-    runGigapubGate(function(){ runMiningRequest(false); }, function(){ miningBusy = false; });
+    runAdGate(function(){ runMiningRequest(false); }, function(){ miningBusy = false; });
   }
 }
 
@@ -5395,7 +5404,7 @@ function onStreakClaimClick(){
   }
 
   streakBusy = true;
-  runGigapubGate(function(){ runStreakClaimRequest(initData); }, function(){ streakBusy = false; });
+  runAdGate(function(){ runStreakClaimRequest(initData); }, function(){ streakBusy = false; });
 }
 
 function runStreakClaimRequest(initData){
@@ -5568,7 +5577,7 @@ function onSpinButtonClick(){
   var btn = document.getElementById('btn-spin');
   spinBusy = true;
 
-  runGigapubGate(function(){ runSpinClaimRequest(initData, btn); }, function(){ spinBusy = false; });
+  runAdGate(function(){ runSpinClaimRequest(initData, btn); }, function(){ spinBusy = false; });
 }
 
 function runSpinClaimRequest(initData, btn){
@@ -5643,7 +5652,7 @@ function onChestOpenClick(){
   }
 
   chestBusy = true;
-  runGigapubGate(function(){ runChestClaimRequest(initData); }, function(){ chestBusy = false; });
+  runAdGate(function(){ runChestClaimRequest(initData); }, function(){ chestBusy = false; });
 }
 
 function runChestClaimRequest(initData){
@@ -5730,7 +5739,7 @@ function onGiftOpenClick(){
   }
 
   giftPickBusy = true;
-  runGigapubGate(function(){ runGiftClaimRequest(initData, selectedBox); }, function(){ giftPickBusy = false; });
+  runAdGate(function(){ runGiftClaimRequest(initData, selectedBox); }, function(){ giftPickBusy = false; });
 }
 
 function runGiftClaimRequest(initData, selectedBox){
@@ -7051,11 +7060,14 @@ function pollGigapubRewardConfirmation(baselineWatched, attempt){
 }
 
 /* =====================================================================
-   بوابة إعلان GigaPub أمام مميزات موجودة أصلاً (Start Mining، Claim Daily
-   Rewards، Chest، Spin، Gift، Promo Redeem) — لا تمنح مكافأة بنفسها (لا
-   Reward URL فعّال، سيرفرنا يرد 200 فقط على استدعاء task=gate)، فقط شرط
-   عرض أمام فعل مسموح للمستخدم أصلاً. النافذة المنبثقة تظهر فوراً عند
-   الضغط، وتُغلق فور نجاح/فشل مشاهدة الإعلان.
+   بوابة إعلان أمام مميزات موجودة أصلاً (Start Mining، Claim Daily Rewards،
+   Chest، Spin، Gift، Promo Redeem) — لا تمنح مكافأة بنفسها (لا Reward URL
+   فعّال من أي طرف هنا)، فقط شرط عرض أمام فعل مسموح للمستخدم أصلاً.
+   تُجرَّب MonetixAds أولاً، وإن لم يوجد إعلان (لم يُحمَّل السكربت، أو
+   status ليس completed/closed) يُجرَّب GigaPub (بلوك 'gate' منفصل عن
+   مهمة Watch gigapub ads — سيرفرنا يرد 200 فقط على task=gate بدون منح
+   شيء). النافذة المنبثقة تظهر فوراً عند الضغط، وتتحدث كتابة via حسب من
+   نجرّبه حالياً، وتُغلق فور نجاح/فشل نهائي.
    ===================================================================== */
 var GIGAPUB_GATE_PLACEMENT = 'gate';
 
@@ -7069,17 +7081,43 @@ function hideAdLoadingOverlay(){
   if (el) el.classList.remove('is-visible');
 }
 
-// onSuccess يُستدعى فقط بعد نجاح مشاهدة الإعلان بالكامل؛ onFail (اختياري)
-// يُستدعى عند فشل/عدم توفر الإعلان، ليتيح لكل زر إعادة تعيين حالته
-// (busy=false، تفعيل الزر...) بدل أن يبقى معلّقاً للأبد.
-function runGigapubGate(onSuccess, onFail){
+function setAdLoadingOverlayVia(providerName){
+  var el = document.getElementById('ad-loading-overlay-via');
+  if (el) el.textContent = 'via ' + providerName;
+}
+
+// onSuccess يُستدعى فقط بعد نجاح مشاهدة الإعلان بالكامل (من أي مزوّد)؛
+// onFail (اختياري) يُستدعى عند فشل/عدم توفر الإعلان من الاثنين معاً، ليتيح
+// لكل زر إعادة تعيين حالته (busy=false، تفعيل الزر...).
+function runAdGate(onSuccess, onFail){
+  showAdLoadingOverlay();
+  setAdLoadingOverlayVia('Monetix');
+
+  if (typeof window.showRewardAd === 'function'){
+    window.showRewardAd(function(res){
+      if (res && (res.status === 'completed' || res.status === 'closed')){
+        hideAdLoadingOverlay();
+        onSuccess();
+      } else {
+        runAdGateGigapubFallback(onSuccess, onFail);
+      }
+    });
+    return;
+  }
+
+  runAdGateGigapubFallback(onSuccess, onFail);
+}
+
+function runAdGateGigapubFallback(onSuccess, onFail){
+  setAdLoadingOverlayVia('GigaPub');
+
   if (!gigapubReady || typeof window.showGiga !== 'function'){
+    hideAdLoadingOverlay();
     showBuyErrorToast('Ad not available right now', { title: 'Ad Required' });
     if (onFail) onFail();
     return;
   }
 
-  showAdLoadingOverlay();
   window.showGiga(GIGAPUB_GATE_PLACEMENT).then(function(){
     hideAdLoadingOverlay();
     onSuccess();
@@ -7087,6 +7125,117 @@ function runGigapubGate(onSuccess, onFail){
     hideAdLoadingOverlay();
     showBuyErrorToast('Ad was not completed', { title: 'Ad Required' });
     if (onFail) onFail();
+  });
+}
+
+/* =====================================================================
+   Watch MonetixAds: مهمة منفصلة تماماً عن بوابات الأزرار أعلاه — تُستدعى
+   فقط من زرها الخاص، بعدّادها ومكافأتها المستقلة (+15/إعلان، 10/يوم).
+   لا Postback من سيرفر MonetixAds (توثيقهم الرسمي: تأكيد Client-side فقط
+   عبر window.showRewardAd)، فالحماية القصوى الممكنة: هذه الدالة تستدعي
+   /api/monetix/reward المحمي بـinitData الموثّق من تيليجرام، والسيرفر هو
+   من يحسم الحد اليومي والمنح بشرط CAS — لا الواجهة تمنح شيئاً بنفسها.
+   ===================================================================== */
+var monetixState = { watchedToday: 0, dailyLimit: 10, rewardCoins: 15, busy: false, cooldownUntil: 0 };
+var monetixTaskCooldownTimer = null;
+
+function applyMonetixState(data){
+  monetixState.watchedToday = data.watched_today || 0;
+  monetixState.dailyLimit = data.daily_limit || 10;
+  monetixState.rewardCoins = data.reward_coins || 15;
+  renderMonetixButton();
+}
+
+function renderMonetixButton(){
+  var btn = document.getElementById('monetix-task-watch-btn');
+  var counter = document.getElementById('monetix-task-counter');
+  var avail = document.getElementById('monetix-task-avail');
+  if (counter) counter.textContent = monetixState.watchedToday + ' / ' + monetixState.dailyLimit;
+
+  var dailyDone = monetixState.watchedToday >= monetixState.dailyLimit;
+  if (avail) avail.textContent = dailyDone ? 'Come Back Tomorrow' : 'Available';
+
+  var cooldownRemaining = Math.ceil((monetixState.cooldownUntil - Date.now()) / 1000);
+  var inCooldown = cooldownRemaining > 0;
+  if (btn){
+    btn.textContent = inCooldown ? String(cooldownRemaining) : 'Watch';
+    btn.classList.toggle('is-claimed', dailyDone || monetixState.busy || inCooldown);
+  }
+}
+
+// بعد كل مشاهدة ناجحة: قفل الزر 10 ثوانٍ (عداد تنازلي داخل الزر نفسه)
+// قبل السماح بالضغط مجدداً — نفس أسلوب Adsgram/GigaPub بالضبط.
+function startMonetixTaskCooldown(){
+  monetixState.cooldownUntil = Date.now() + 10000;
+  clearInterval(monetixTaskCooldownTimer);
+  renderMonetixButton();
+  monetixTaskCooldownTimer = setInterval(function(){
+    if (Date.now() >= monetixState.cooldownUntil){
+      clearInterval(monetixTaskCooldownTimer);
+    }
+    renderMonetixButton();
+  }, 1000);
+}
+
+function onWatchMonetixClick(){
+  if (monetixState.busy || Date.now() < monetixState.cooldownUntil) return;
+  if (monetixState.watchedToday >= monetixState.dailyLimit){
+    showComeBackTomorrowToast();
+    return;
+  }
+  if (typeof window.showRewardAd !== 'function'){
+    showBuyErrorToast('Ad not available right now', { title: 'Watch MonetixAds' });
+    return;
+  }
+
+  monetixState.busy = true;
+  renderMonetixButton();
+
+  window.showRewardAd(function(res){
+    if (res && (res.status === 'completed' || res.status === 'closed')){
+      creditMonetixReward();
+    } else {
+      monetixState.busy = false;
+      renderMonetixButton();
+      showBuyErrorToast('Ad was not completed', { title: 'Watch MonetixAds' });
+    }
+  });
+}
+
+function creditMonetixReward(){
+  var initData = getTelegramInitData();
+  if (!initData){
+    monetixState.busy = false;
+    renderMonetixButton();
+    return;
+  }
+
+  fetch('/api/monetix/reward', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: initData })
+  })
+  .then(function(res){ return res.json(); })
+  .then(function(data){
+    if (data.error){
+      if (data.error === 'daily_limit_reached'){
+        applyMonetixState({ watched_today: data.watched_today, daily_limit: data.daily_limit });
+      }
+      monetixState.busy = false;
+      renderMonetixButton();
+      return;
+    }
+
+    updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE });
+    applyMonetixState({ watched_today: data.watched_today, daily_limit: data.daily_limit, reward_coins: data.reward_coins });
+    showAppToast({ title: 'Watch MonetixAds', icon: PRIZE_ICON_URLS.coins, amount: '+' + monetixState.rewardCoins + ' Coins' });
+    monetixState.busy = false;
+    startMonetixTaskCooldown();
+  })
+  .catch(function(err){
+    console.error('monetix reward request failed:', err);
+    monetixState.busy = false;
+    renderMonetixButton();
   });
 }
 
@@ -7745,7 +7894,7 @@ function onPromoRedeemClick(){
   }
 
   promoRedeemBusy = true;
-  runGigapubGate(function(){ runPromoRedeemRequest(initData, code, input); }, function(){ promoRedeemBusy = false; });
+  runAdGate(function(){ runPromoRedeemRequest(initData, code, input); }, function(){ promoRedeemBusy = false; });
 }
 
 function runPromoRedeemRequest(initData, code, input){
