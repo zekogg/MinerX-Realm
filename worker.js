@@ -181,9 +181,9 @@ const PETS = {
   dancing_bear: { basespeed: 3788,  price: 10000000 },
   the_cat:      { basespeed: 18940, price: 50000000 }
 };
-const PET_MAX_LEVEL = 30;
+const PET_MAX_LEVEL = 100;
 const PET_SPEED_INCREMENT_RATIO = 0.10;
-const PET_UPGRADE_COST_COINS = 40000; // ثابت لكل الشخصيات الست ولكل مستوى (كان 10% من سعر الشراء)
+const PET_UPGRADE_COST_RATIO = 0.10;
 const STORAGE_DEFAULT_CAPACITY_HOURS = 6;
 const STORAGE_MIN_CLAIM_COINS = 10;
 
@@ -193,7 +193,7 @@ function petSpeedForLevel(petId, level) {
 }
 
 function petUpgradeCost(petId) {
-  return PET_UPGRADE_COST_COINS;
+  return Math.round(PETS[petId].price * PET_UPGRADE_COST_RATIO);
 }
 
 // مستويات مدة التخزين (Storage) بالساعات — الفهرس 0 = Lv.1 (الافتراضي عند
