@@ -7001,10 +7001,14 @@ function onWatchGigapubClick(){
   var baselineWatched = gigapubState.watchedToday;
   gigapubState.busy = true;
   renderGigapubButton();
+  showAdLoadingOverlay();
+  setAdLoadingOverlayVia('GigaPub');
 
   window.showGiga('main').then(function(){
+    hideAdLoadingOverlay();
     pollGigapubRewardConfirmation(baselineWatched, 0);
   }).catch(function(){
+    hideAdLoadingOverlay();
     gigapubState.busy = false;
     renderGigapubButton();
     showBuyErrorToast('Ad was not completed', { title: 'Watch gigapub ads' });
@@ -7094,7 +7098,20 @@ function runAdGate(onSuccess, onFail){
   setAdLoadingOverlayVia('Monetix');
 
   if (typeof window.showRewardAd === 'function'){
+    // نفس مشكلة callback الذي لا يُستدعى إطلاقاً بدون إعلان (انظر
+    // onWatchMonetixClick) — بدون هذا المؤقت تبقى بوابات الأزرار معلّقة
+    // للأبد بدل الانتقال إلى GigaPub.
+    var settled = false;
+    var noAdTimeout = setTimeout(function(){
+      if (settled) return;
+      settled = true;
+      runAdGateGigapubFallback(onSuccess, onFail);
+    }, 10000);
+
     window.showRewardAd(function(res){
+      if (settled) return;
+      settled = true;
+      clearTimeout(noAdTimeout);
       if (res && (res.status === 'completed' || res.status === 'closed')){
         hideAdLoadingOverlay();
         onSuccess();
@@ -7190,8 +7207,29 @@ function onWatchMonetixClick(){
 
   monetixState.busy = true;
   renderMonetixButton();
+  showAdLoadingOverlay();
+  setAdLoadingOverlayVia('Monetix');
+
+  // بعض المرات لا يستدعي MonetixAds الـcallback إطلاقاً إن لم يوجد إعلان
+  // متاح (بدل استدعائه بحالة فشل) — بدون هذا المؤقت يبقى الزر معطّلاً
+  // للأبد ويظهر كأن شيئاً "لا يعمل". settled يمنع التنفيذ مرتين لو نجح
+  // الـcallback بعد انتهاء المؤقت بلحظات.
+  var settled = false;
+  var noAdTimeout = setTimeout(function(){
+    if (settled) return;
+    settled = true;
+    hideAdLoadingOverlay();
+    monetixState.busy = false;
+    renderMonetixButton();
+    showBuyErrorToast('No ad available right now', { title: 'Watch MonetixAds' });
+  }, 10000);
 
   window.showRewardAd(function(res){
+    if (settled) return;
+    settled = true;
+    clearTimeout(noAdTimeout);
+    hideAdLoadingOverlay();
+
     if (res && (res.status === 'completed' || res.status === 'closed')){
       creditMonetixReward();
     } else {
