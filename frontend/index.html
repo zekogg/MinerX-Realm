@@ -360,6 +360,13 @@ img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
 .ad-loading-overlay__text{ font-family:var(--font-display); font-weight:800; font-size:14px; color:#ffffff; }
 .ad-loading-overlay__via{ font-size:11px; color:rgba(255,255,255,.55); }
 
+/* -- طبقة الكونفيتي المشتركة: canvas ثابت فوق كل شيء، بدون أي تفاعل -- */
+#confetti-canvas{
+  position:fixed; inset:0; z-index:10000;
+  width:100%; height:100%;
+  pointer-events:none;
+}
+
 /* /////كود حبات الضوء الذهبية المتطايرة (Fireflies)///// */
 /* طبقة شفافة فوق الخلفية مباشرة، خلف كل محتوى الواجهة (topbar بـ z-index:2) */
 .fireflies{
@@ -3092,6 +3099,9 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
     </div>
   </div>
 
+  <!-- ///// طبقة الكونفيتي المشتركة — canvas واحد فقط، يُستدعى عبر triggerConfetti() من كل نقاط النجاح ///// -->
+  <canvas id="confetti-canvas"></canvas>
+
   <!-- ///// حبات ضوء ذهبية متطايرة (Fireflies) فوق خلفية الغابة ///// -->
   <div class="fireflies" aria-hidden="true">
       <span class="firefly" style="left:62.5%; bottom:-8.2px; width:2.6px; height:2.6px; --drift:-16.5px; animation-duration:23.2s,3.9s; animation-delay:-3.5s,-3.5s;"></span>
@@ -5660,6 +5670,86 @@ function runStreakClaimRequest(initData){
    كود توست الجوائز (Prize Toast) — عام وقابل لإعادة الاستخدام لأي جائزة
    مستقبلية (Spin حالياً)، يظهر وسط الشاشة لمدة 4 ثوانٍ ثم يختفي تلقائياً.
    ===================================================================== */
+/* =====================================================================
+   محرك الكونفيتي المشترك — canvas واحد فقط (#confetti-canvas)، ودالة
+   واحدة triggerConfetti() تُستدعى من كل نقطة نجاح (البوابات الست، مهام
+   Daily Ads، Daily Combo، Exchange، شراء/ترقية أي شخصية، Storage
+   Claim/Upgrade، Withdraw، Claim أرباح الإحالة). لا يوجد أي تكرار
+   للمنطق — كل نقطة نجاح تستدعي هذه الدالة بسطر واحد فقط. الحلقة
+   (requestAnimationFrame) تتوقف من نفسها فور انتهاء آخر قصّة، فلا يوجد
+   أي استهلاك في الخلفية عندما لا يوجد احتفال جارٍ.
+   ===================================================================== */
+var confettiCanvas = document.getElementById('confetti-canvas');
+var confettiCtx = confettiCanvas ? confettiCanvas.getContext('2d') : null;
+var confettiParticles = [];
+var confettiRafId = null;
+var CONFETTI_COLORS = ['#e3a542', '#a56cf0', '#6fbf73', '#ff6f91', '#5cc8ff', '#ffd76a'];
+
+function resizeConfettiCanvas(){
+  if (!confettiCanvas) return;
+  var dpr = Math.min(window.devicePixelRatio || 1, 2);
+  confettiCanvas.width = window.innerWidth * dpr;
+  confettiCanvas.height = window.innerHeight * dpr;
+  confettiCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+resizeConfettiCanvas();
+window.addEventListener('resize', resizeConfettiCanvas);
+
+function confettiStep(){
+  var w = window.innerWidth, h = window.innerHeight;
+  confettiCtx.clearRect(0, 0, w, h);
+  confettiParticles = confettiParticles.filter(function(p){
+    if (p.delay > 0){ p.delay--; return true; }
+    p.life++;
+    p.vy += p.gravity;
+    p.x += p.vx;
+    p.y += p.vy;
+    p.rot += p.vr;
+    var fadeStart = p.maxLife * 0.7;
+    var alpha = p.life > fadeStart ? Math.max(0, 1 - (p.life - fadeStart) / (p.maxLife - fadeStart)) : 1;
+    if (p.life > p.maxLife || p.y > h + 30) return false;
+
+    confettiCtx.save();
+    confettiCtx.globalAlpha = alpha;
+    confettiCtx.translate(p.x, p.y);
+    confettiCtx.rotate(p.rot);
+    confettiCtx.fillStyle = p.color;
+    confettiCtx.fillRect(-p.size / 2, -p.size / 3, p.size, p.size * 0.6);
+    confettiCtx.restore();
+    return true;
+  });
+
+  if (confettiParticles.length > 0){
+    confettiRafId = requestAnimationFrame(confettiStep);
+  } else {
+    confettiRafId = null;
+  }
+}
+
+// دالة واحدة تُستدعى من أي مكان في الكود عند نجاح أي مكافأة/إجراء —
+// تساقط خفيف من الأعلى على كامل الشاشة لمدة ~2 ثانية ثم يختفي تلقائياً.
+function triggerConfetti(){
+  if (!confettiCtx) return;
+  var w = window.innerWidth;
+  for (var i = 0; i < 46; i++){
+    confettiParticles.push({
+      x: Math.random() * w,
+      y: -20 - Math.random() * 40,
+      vx: (Math.random() - 0.5) * 1.2,
+      vy: 1.4 + Math.random() * 1.2,
+      rot: Math.random() * Math.PI * 2,
+      vr: (Math.random() - 0.5) * 0.2,
+      size: 6 + Math.random() * 4,
+      color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
+      gravity: 0.05,
+      life: 0,
+      maxLife: 130,
+      delay: Math.floor(Math.random() * 20)
+    });
+  }
+  if (!confettiRafId) confettiRafId = requestAnimationFrame(confettiStep);
+}
+
 var PRIZE_ICON_URLS = {
   coins: 'https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp',
   gram: 'https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png'
@@ -5727,15 +5817,18 @@ function showBuyErrorToast(message, opts){
 
 function showPurchaseToast(name, level){
   showAppToast({ title: 'Purchased!', icon: PRIZE_ICON_URLS.coins, amount: name + ' — ' + level });
+  triggerConfetti();
 }
 
 function showUpgradeToast(name, level){
   showAppToast({ title: 'Upgraded!', icon: PRIZE_ICON_URLS.coins, amount: name + ' → ' + level });
+  triggerConfetti();
 }
 
 // توست ترقية Storage — بدون أيقونة عملة كما طُلب صراحة (تركيز على المدة الجديدة فقط)
 function showStorageUpgradeToast(level, hours){
   showAppToast({ title: 'Storage Upgraded!', amount: 'Lv.' + level + ' — Full in ' + hours + 'h' });
+  triggerConfetti();
 }
 
 /* =====================================================================
@@ -6326,6 +6419,7 @@ function onStorageClaimClick(){
 
     updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE });
     showPrizeToast('coins', Math.round(data.claimed_amount * 100) / 100, 'You Got');
+    triggerConfetti();
     applyStorageState({
       storage_has_pet: true,
       total_speed: storageState.totalSpeed,
@@ -6980,6 +7074,7 @@ function onComboCheckClick(){
       comboState.solvedToday = true;
       updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE });
       showAppToast({ title: 'Daily Combo Solved', icon: PRIZE_ICON_URLS.coins, amount: '+' + data.reward + ' Coins' });
+      triggerConfetti();
       renderComboCheckButton();
       renderComboPickLock();
       return;
@@ -7114,6 +7209,7 @@ function pollAdsRewardConfirmation(baselineWatched, attempt){
         reward_coins: data.user.ads_reward_coins
       });
       showAppToast({ title: 'Ad Reward', icon: PRIZE_ICON_URLS.coins, amount: '+' + adsTaskState.rewardCoins + ' Coins' });
+      triggerConfetti();
       adsTaskState.busy = false;
       startAdsTaskCooldown();
       return;
@@ -7264,6 +7360,7 @@ function pollBonusAdRewardConfirmation(baselineWatched, attempt){
         next_available_at: data.user.bonus_ad_next_available_at
       });
       showAppToast({ title: 'Bonus Ad Reward', icon: PRIZE_ICON_URLS.coins, amount: '+' + bonusAdState.rewardCoins + ' Coins' });
+      triggerConfetti();
       bonusAdState.busy = false;
       return;
     }
@@ -7443,6 +7540,7 @@ function pollGigapubRewardConfirmation(baselineWatched, attempt){
         reward_coins: data.user.gigapub_reward_coins
       });
       showAppToast({ title: 'Watch gigapub ads', icon: PRIZE_ICON_URLS.coins, amount: '+' + gigapubState.rewardCoins + ' Coins' });
+      triggerConfetti();
       gigapubState.busy = false;
       startGigapubTaskCooldown();
       return;
@@ -7501,6 +7599,7 @@ function runAdGate(onSuccess, onFail){
   if (gigapubReady && typeof window.showGiga === 'function'){
     window.showGiga({ showTag: GIGAPUB_GATE_PLACEMENT }).then(function(){
       hideAdLoadingOverlay();
+      triggerConfetti();
       onSuccess();
     }).catch(function(){
       runAdGateMonetixFallback(onSuccess, onFail);
@@ -7539,6 +7638,7 @@ function runAdGateMonetixFallback(onSuccess, onFail){
     hideAdLoadingOverlay();
     if (res && (res.status === 'completed' || res.status === 'closed')){
       reportGateAdWatched();
+      triggerConfetti();
       onSuccess();
     } else {
       showBuyErrorToast('Ad was not completed', { title: 'Ad Required' });
@@ -7683,6 +7783,7 @@ function creditMonetixReward(){
     updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE });
     applyMonetixState({ watched_today: data.watched_today, daily_limit: data.daily_limit, reward_coins: data.reward_coins });
     showAppToast({ title: 'Watch MonetixAds', icon: PRIZE_ICON_URLS.coins, amount: '+' + monetixState.rewardCoins + ' Coins' });
+    triggerConfetti();
     monetixState.busy = false;
     startMonetixTaskCooldown();
   })
@@ -8113,6 +8214,7 @@ function onClaimFriendsEarningsClick(){
     friendsState.pendingEarnings = 0;
     renderFriendsStats();
     showAppToast({ title: 'Earnings Claimed', icon: PRIZE_ICON_URLS.coins, amount: '+' + formatFriendsAmount(data.claimed) + ' Coins' });
+    triggerConfetti();
   })
   .catch(function(){
     friendsState.claimBusy = false;
@@ -8319,6 +8421,7 @@ function onExchangeConfirm(){
       title: 'Exchange Successful',
       amount: Math.round(data.exchanged_coins) + ' Coins → ' + data.received_gram.toFixed(5) + ' Gram'
     });
+    triggerConfetti();
   })
   .catch(function(err){
     console.error('exchange request failed:', err);
@@ -8645,6 +8748,7 @@ function submitWithdrawRequest(){
       rect: true,
       amount: 'Withdrawal request submitted'
     });
+    triggerConfetti();
   })
   .catch(function(err){
     console.error('withdraw request failed:', err);
