@@ -2888,10 +2888,12 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   background:linear-gradient(90deg, transparent, #e3a542, transparent);
 }
 .fp-pet-slot{
-  width:140px; height:140px; margin:0 auto 22px;
+  width:210px; height:210px; margin:0 auto 22px;
   display:flex; align-items:center; justify-content:center;
+  overflow:hidden;
   box-shadow:0 0 26px rgba(227,165,66,.3), inset 0 0 22px rgba(0,0,0,.35);
 }
+.fp-pet-slot img{ transform:scale(1.85); }
 .fp-pet-slot__emoji{ font-size:76px; line-height:1; }
 .fp-desc{ text-align:center; font-size:12.5px; color:var(--ink-dim); line-height:1.65; margin-bottom:22px; }
 .fp-desc b{ color:#ffd76a; }
@@ -3481,10 +3483,10 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
             <div class="free-pet-box__title">Get A Free Pet</div>
             <div class="free-pet-box__sub">Watch 4000 ads in total — one-time reward</div>
           </div>
-          <span class="free-pet-box__badge">0/4000</span>
+          <span class="free-pet-box__badge" id="dg-free-pet-badge">0/4000</span>
         </div>
-        <div class="free-pet-box__progress progress-track"><div class="progress-fill" style="width:0%"></div></div>
-        <div class="free-pet-box__caption">4000 more ads to unlock</div>
+        <div class="free-pet-box__progress progress-track"><div class="progress-fill" id="dg-free-pet-fill" style="width:0%"></div></div>
+        <div class="free-pet-box__caption" id="dg-free-pet-caption">4000 more ads to unlock</div>
       </div>
 
       <div class="ad-tasks-grid">
@@ -4188,7 +4190,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/187bbf0071e1651c314318166c4605ba8f82b430/frontend/Happy%20Dog%20(100%20Reward)%20.svg" alt="Happy Dog" style="width:100%;height:100%;object-fit:contain;">
       </div>
 
-      <div class="fp-desc">Invite <b>100</b> Active Friends And Get Happy Dog — Free, Forever, Mining Right Away At <b>50/hr</b></div>
+      <div class="fp-desc">Invite <b>100</b> Active Friends And Get Happy Dog — Free, Forever, Mining Right Away At <b>Full Speed</b></div>
 
       <div class="fp-progress-label">Active Friends (<span id="fp-progress-num">0</span>/100)</div>
       <div class="fp-progress-track"><div class="fp-progress-fill" id="fp-progress-fill" style="width:0%"></div></div>
@@ -4940,7 +4942,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
             <span class="pg-section__title">Exclusive Card Details</span>
           </div>
           <div class="pg-section__body"><b>Dancing Bear</b> gains an extra <b>+0.5%</b> of its base Speed automatically every day at <b>00:00 UTC</b> — completely free, no action needed.</div>
-          <div class="pg-section__body"><b>The Cat</b> has the same daily growth, but at <b>+1%</b> of its base Speed per day.</div>
+          <div class="pg-section__body"><b>The Cat</b> gains an extra <b>+1%</b> of its base Speed automatically every day at <b>00:00 UTC</b> — completely free, no action needed.</div>
           <div class="pg-section__body">How to unlock the free exclusive pets:</div>
           <div class="pg-section__body">• <b>Happy Dog</b> — invite 100 active friends.</div>
           <div class="pg-section__body">• <span class="is-purple">The Guardian</span> — watch 4,000 ads in total (any ad watched anywhere in the bot counts toward this).</div>
@@ -6727,6 +6729,20 @@ function renderGuardianUI(){
   if (qfpLabel) qfpLabel.textContent = guardianState.adsWatched + '/' + guardianState.threshold;
   var qfpReward = document.getElementById('qfp-tg-reward');
   if (qfpReward) qfpReward.textContent = guardianState.claimed ? '✓' : '+1 Card';
+
+  var dgBadge = document.getElementById('dg-free-pet-badge');
+  if (dgBadge) dgBadge.textContent = guardianState.adsWatched + '/' + guardianState.threshold;
+  var dgFill = document.getElementById('dg-free-pet-fill');
+  if (dgFill) dgFill.style.width = pct + '%';
+  var dgCaption = document.getElementById('dg-free-pet-caption');
+  if (dgCaption){
+    if (guardianState.claimed){
+      dgCaption.textContent = 'Unlocked ✓';
+    } else {
+      var remaining = Math.max(0, guardianState.threshold - guardianState.adsWatched);
+      dgCaption.textContent = remaining + ' more ads to unlock';
+    }
+  }
 }
 
 function applyGuardianState(data){
