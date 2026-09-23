@@ -7267,10 +7267,12 @@ function pollGigapubRewardConfirmation(baselineWatched, attempt){
    Chest، Spin، Gift، Promo Redeem) — لا تمنح مكافأة بنفسها (لا Reward URL
    فعّال من أي طرف هنا)، فقط شرط عرض أمام فعل مسموح للمستخدم أصلاً.
    تُجرَّب MonetixAds أولاً، وإن لم يوجد إعلان (لم يُحمَّل السكربت، أو
-   status ليس completed/closed) يُجرَّب GigaPub (بلوك 'gate' منفصل عن
-   مهمة Watch gigapub ads — سيرفرنا يرد 200 فقط على task=gate بدون منح
-   شيء). النافذة المنبثقة تظهر فوراً عند الضغط، وتتحدث كتابة via حسب من
-   نجرّبه حالياً، وتُغلق فور نجاح/فشل نهائي.
+   status ليس completed/closed) يُجرَّب GigaPub — بنفس تطبيقهم/بلوكهم
+   الأصلي (8282)، لكن بمعامل showTag مميّز (نفس آلية Sub ID التي أكّدها
+   دعم GigaPub) لتمييزه عن مهمة Watch gigapub ads في الـPostback؛
+   سيرفرنا يرد 200 فقط عند tag=gate بدون منح شيء. النافذة المنبثقة تظهر
+   فوراً عند الضغط، وتتحدث كتابة via حسب من نجرّبه حالياً، وتُغلق فور
+   نجاح/فشل نهائي.
    ===================================================================== */
 var GIGAPUB_GATE_PLACEMENT = 'gate';
 
@@ -7334,7 +7336,7 @@ function runAdGateGigapubFallback(onSuccess, onFail){
     return;
   }
 
-  window.showGiga(GIGAPUB_GATE_PLACEMENT).then(function(){
+  window.showGiga({ showTag: GIGAPUB_GATE_PLACEMENT }).then(function(){
     hideAdLoadingOverlay();
     onSuccess();
   }).catch(function(){
