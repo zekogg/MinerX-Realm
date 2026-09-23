@@ -5540,6 +5540,7 @@ function runMiningRequest(isReadyToClaim){
       if (typeof data.coins === 'number'){
         updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE, total_mined: data.total_mined });
         showPrizeToast('coins', data.reward, 'You Got');
+        triggerConfetti();
       }
       applyMiningState({ mining_started_at: null, cycles_today: data.cycles_today, cycles_max: data.cycles_max, cycle_duration_seconds: miningState.cycleDurationSec });
     } else {
