@@ -824,10 +824,28 @@ async function handlePetBuy(request, env, petId) {
   ).bind(telegramId, petId).first();
   if (existing) return jsonResponse({ error: "already_owned" }, 409);
 
+  const storageRow = await env.DB.prepare(
+    `SELECT u.total_speed, s.capacity_hours, s.last_claim_at
+     FROM users u LEFT JOIN user_storage s ON s.telegram_id = u.telegram_id
+     WHERE u.telegram_id = ?`
+  ).bind(telegramId).first();
+
+  // نُصفّي (checkpoint) ما تراكم في Storage بالسرعة الكلية القديمة *قبل*
+  // شراء هذه الشخصية — تنطبق فقط عند شراء ثانية شخصية فأكثر (صف
+  // user_storage موجود بالفعل من الشراء الأول)، نفس أسلوب handlePetUpgrade/
+  // handleClaimHappyDog بالضبط، لمنع احتساب كل الوقت المنقضي منذ آخر Claim
+  // (حتى ما قبل هذا الشراء) بالسرعة الجديدة الأعلى.
+  let preBuyAccrued = 0;
+  if (storageRow && storageRow.last_claim_at) {
+    const capacitySeconds = (storageRow.capacity_hours || STORAGE_DEFAULT_CAPACITY_HOURS) * 3600;
+    const elapsedSeconds = Math.max(0, (Date.now() - Date.parse(storageRow.last_claim_at)) / 1000);
+    preBuyAccrued = Math.min(elapsedSeconds, capacitySeconds) * ((storageRow.total_speed || 0) / 3600);
+  }
+
   const deductResult = await env.DB.prepare(
-    `UPDATE users SET coins = coins - ?, total_speed = total_speed + ?
+    `UPDATE users SET coins = coins - ? + ?, total_speed = total_speed + ?
      WHERE telegram_id = ? AND coins >= ?`
-  ).bind(pet.price, pet.basespeed, telegramId, pet.price).run();
+  ).bind(pet.price, preBuyAccrued, pet.basespeed, telegramId, pet.price).run();
 
   if (!deductResult.meta || deductResult.meta.changes === 0) {
     return jsonResponse({ error: "insufficient_funds" }, 400);
@@ -837,20 +855,29 @@ async function handlePetBuy(request, env, petId) {
   const insertPetStmt = env.DB.prepare(
     "INSERT INTO user_pets (telegram_id, pet_id, level, current_speed) VALUES (?, ?, 1, ?)"
   ).bind(telegramId, petId, pet.basespeed);
-  const insertStorageStmt = env.DB.prepare(
-    "INSERT OR IGNORE INTO user_storage (telegram_id, capacity_hours, last_claim_at) VALUES (?, ?, ?)"
-  ).bind(telegramId, STORAGE_DEFAULT_CAPACITY_HOURS, nowIso);
+  const storageStmt = (storageRow && storageRow.last_claim_at)
+    ? env.DB.prepare("UPDATE user_storage SET last_claim_at = ? WHERE telegram_id = ?").bind(nowIso, telegramId)
+    : env.DB.prepare(
+        "INSERT OR IGNORE INTO user_storage (telegram_id, capacity_hours, last_claim_at) VALUES (?, ?, ?)"
+      ).bind(telegramId, STORAGE_DEFAULT_CAPACITY_HOURS, nowIso);
   const txnStmt = env.DB.prepare(
     "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'pet_purchase', ?, 'coins')"
   ).bind(telegramId, -pet.price);
 
+  const stmts = [insertPetStmt, storageStmt, txnStmt];
+  if (preBuyAccrued > 0) {
+    stmts.push(env.DB.prepare(
+      "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'storage_auto_collect', ?, 'coins')"
+    ).bind(telegramId, preBuyAccrued));
+  }
+
   try {
-    await env.DB.batch([insertPetStmt, insertStorageStmt, txnStmt]);
+    await env.DB.batch(stmts);
   } catch (e) {
-    // نادر جداً: طلب شراء متزامن سبقه بجزء من الثانية — نُرجع العملات والسرعة
+    // نادر جداً: طلب شراء متزامن سبقه بجزء من الثانية — نُرجع العملات (بما فيها ما صُفِّي) والسرعة
     await env.DB.prepare(
-      "UPDATE users SET coins = coins + ?, total_speed = total_speed - ? WHERE telegram_id = ?"
-    ).bind(pet.price, pet.basespeed, telegramId).run();
+      "UPDATE users SET coins = coins + ? - ?, total_speed = total_speed - ? WHERE telegram_id = ?"
+    ).bind(pet.price, preBuyAccrued, pet.basespeed, telegramId).run();
     return jsonResponse({ error: "already_owned" }, 409);
   }
 
@@ -863,7 +890,8 @@ async function handlePetBuy(request, env, petId) {
     level: 1,
     speed: pet.basespeed,
     total_speed: updatedUser.total_speed,
-    coins: updatedUser.coins
+    coins: updatedUser.coins,
+    storage_credited: preBuyAccrued
   });
 }
 
