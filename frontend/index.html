@@ -5475,7 +5475,7 @@ function miningTick(){
     return;
   }
   renderMiningProgress(elapsedSec);
-  setMiningButton('Mining in Progress', { mining: true });
+  setMiningButton('Mining in Progress', { mining: true, disabled: true });
 }
 
 function callMiningApi(path){
@@ -5498,6 +5498,10 @@ function onMiningButtonClick(){
 
   var isReadyToClaim = miningState.startedAt &&
     (Date.now() - miningState.startedAt.getTime()) / 1000 >= miningState.cycleDurationSec;
+
+  // دورة تعدين جارية ولم تنتهِ بعد — لا إعلان ولا أي إجراء، الزر معطّل أصلاً
+  // لكن هذا الحارس يمنع أي طلب مضاعف (مثلاً ضغطة وصلت قبل تحديث opts.disabled).
+  if (miningState.startedAt && !isReadyToClaim) return;
 
   // إعلان قبل بدء دورة تعدين جديدة فقط — Claim Reward بدون إعلان.
   if (isReadyToClaim){
