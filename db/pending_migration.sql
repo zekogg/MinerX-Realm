@@ -254,3 +254,14 @@ ALTER TABLE users ADD COLUMN monetix_task_date TEXT;
 -- وGuardian بعد الفتح يُخزَّنان كصفوف عادية في user_pets (pet_id='happy_dog'
 -- / 'guardian')، بلا أي عمود جديد خاص بهما.
 ALTER TABLE users ADD COLUMN lifetime_ads_watched INTEGER DEFAULT 0;
+
+-- -- The Ambassador (منح/سحب يدوي بالكامل من الأدمن عبر D1، لا عداد تلقائي) --
+-- ambassador_grants: صف واحد لكل مستخدم = "منح معلّق" لم يُستلم بعد
+-- (INSERT يدوي من الأدمن بالسرعة التي يحددها، DELETE للتراجع قبل
+-- الاستلام). عند الاستلام يُنشأ صف حقيقي في user_pets (pet_id='ambassador')
+-- بنفس أسلوب Happy Dog/Guardian تماماً، ويُحذف هذا الصف تلقائياً.
+CREATE TABLE IF NOT EXISTS ambassador_grants (
+  telegram_id INTEGER PRIMARY KEY,
+  speed INTEGER NOT NULL,
+  granted_at INTEGER NOT NULL
+);

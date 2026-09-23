@@ -371,6 +371,10 @@ export default {
       return handleClaimGuardian(request, env);
     }
 
+    if (url.pathname === "/api/pets/claim_ambassador" && request.method === "POST") {
+      return handleClaimAmbassador(request, env);
+    }
+
     // نقطة منفصلة عن /api/user عمداً — تُستدعى فقط عند فتح نافذة Profile
     // فعلياً (وليس في كل تحديث دوري)، لأنها تحتوي استعلامات SUM إضافية
     // (إجمالي الإيداع/السحب) لا حاجة لتكرارها في أكثر نقطة استدعاءً بالتطبيق.
@@ -500,6 +504,16 @@ async function handleGetUser(request, env) {
   view.guardian_ads_threshold = GUARDIAN_ADS_THRESHOLD;
   view.happy_dog_claimed = !!pets.happy_dog;
   view.guardian_claimed = !!pets.guardian;
+
+  // The Ambassador: استحقاق يدوي بالكامل من الأدمن، وليس تلقائياً من أي
+  // عداد — وجود صف في ambassador_grants (يُضاف/يُحذف مباشرة على D1) هو
+  // الشرط الوحيد لظهور زر Claim متوهجاً؛ السرعة الفعلية تُحدَّد من قِبل
+  // الأدمن نفسه عند المنح (انظر handleClaimAmbassador).
+  const ambassadorGrant = await env.DB.prepare(
+    "SELECT 1 FROM ambassador_grants WHERE telegram_id = ?"
+  ).bind(telegramId).first();
+  view.ambassador_available = !!ambassadorGrant;
+  view.ambassador_claimed = !!pets.ambassador;
 
   const milestonesResult = await env.DB.prepare(
     "SELECT friends_required, reward FROM milestone_missions ORDER BY friends_required ASC"
@@ -1958,6 +1972,88 @@ async function handleClaimGuardian(request, env) {
     pet_id: "guardian",
     level: 1,
     speed: GUARDIAN_SPEED,
+    total_speed: updatedUser.total_speed,
+    coins: updatedUser.coins,
+    storage_credited: preClaimAccrued
+  });
+}
+
+// =====================================================================
+// نقطة /api/pets/claim_ambassador — فتح شخصية The Ambassador الحصرية.
+// الاستحقاق هنا يدوي بالكامل من الأدمن (وليس تلقائياً من أي عداد): وجود
+// صف في ambassador_grants (يُضاف/يُحذف مباشرة على D1 من قِبل الأدمن) هو
+// الشرط الوحيد، والسرعة تُقرأ من هذا الصف نفسه (يحددها الأدمن حرفياً عند
+// المنح، وليست ثابتة بالكود كباقي الشخصيات الحصرية). نفس أسلوب
+// handleClaimHappyDog بالضبط (تصفية Storage قبل رفع السرعة)، ثم يُحذف
+// صف ambassador_grants بعد الاستلام (استُهلك).
+// =====================================================================
+async function handleClaimAmbassador(request, env) {
+  const auth = await authenticateRequest(request, env);
+  if (!auth.ok) return auth.response;
+  const { telegramId } = auth;
+
+  const existing = await env.DB.prepare(
+    "SELECT 1 FROM user_pets WHERE telegram_id = ? AND pet_id = 'ambassador'"
+  ).bind(telegramId).first();
+  if (existing) return jsonResponse({ error: "already_claimed" }, 409);
+
+  const grantRow = await env.DB.prepare(
+    "SELECT speed FROM ambassador_grants WHERE telegram_id = ?"
+  ).bind(telegramId).first();
+  if (!grantRow) return jsonResponse({ error: "not_eligible" }, 403);
+  const ambassadorSpeed = grantRow.speed;
+
+  const storageRow = await env.DB.prepare(
+    `SELECT u.total_speed, s.capacity_hours, s.last_claim_at
+     FROM users u LEFT JOIN user_storage s ON s.telegram_id = u.telegram_id
+     WHERE u.telegram_id = ?`
+  ).bind(telegramId).first();
+  if (!storageRow) return jsonResponse({ error: "user_not_found" }, 404);
+
+  let preClaimAccrued = 0;
+  if (storageRow.last_claim_at) {
+    const capacitySeconds = (storageRow.capacity_hours || STORAGE_DEFAULT_CAPACITY_HOURS) * 3600;
+    const elapsedSeconds = Math.max(0, (Date.now() - Date.parse(storageRow.last_claim_at)) / 1000);
+    preClaimAccrued = Math.min(elapsedSeconds, capacitySeconds) * ((storageRow.total_speed || 0) / 3600);
+  }
+
+  const nowIso = new Date().toISOString();
+  const insertPetStmt = env.DB.prepare(
+    "INSERT INTO user_pets (telegram_id, pet_id, level, current_speed) VALUES (?, 'ambassador', 1, ?)"
+  ).bind(telegramId, ambassadorSpeed);
+  const speedStmt = env.DB.prepare(
+    "UPDATE users SET total_speed = total_speed + ?, coins = coins + ? WHERE telegram_id = ?"
+  ).bind(ambassadorSpeed, preClaimAccrued, telegramId);
+  const storageStmt = storageRow.last_claim_at
+    ? env.DB.prepare("UPDATE user_storage SET last_claim_at = ? WHERE telegram_id = ?").bind(nowIso, telegramId)
+    : env.DB.prepare(
+        "INSERT OR IGNORE INTO user_storage (telegram_id, capacity_hours, last_claim_at) VALUES (?, ?, ?)"
+      ).bind(telegramId, STORAGE_DEFAULT_CAPACITY_HOURS, nowIso);
+  const deleteGrantStmt = env.DB.prepare(
+    "DELETE FROM ambassador_grants WHERE telegram_id = ?"
+  ).bind(telegramId);
+
+  const stmts = [insertPetStmt, speedStmt, storageStmt, deleteGrantStmt];
+  if (preClaimAccrued > 0) {
+    stmts.push(env.DB.prepare(
+      "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'storage_auto_collect', ?, 'coins')"
+    ).bind(telegramId, preClaimAccrued));
+  }
+
+  try {
+    await env.DB.batch(stmts);
+  } catch (e) {
+    return jsonResponse({ error: "already_claimed" }, 409);
+  }
+
+  const updatedUser = await env.DB.prepare(
+    "SELECT total_speed, coins FROM users WHERE telegram_id = ?"
+  ).bind(telegramId).first();
+
+  return jsonResponse({
+    pet_id: "ambassador",
+    level: 1,
+    speed: ambassadorSpeed,
     total_speed: updatedUser.total_speed,
     coins: updatedUser.coins,
     storage_credited: preClaimAccrued
