@@ -1485,6 +1485,11 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   background:linear-gradient(135deg, rgba(217,99,79,.32), rgba(156,62,47,.26));
   color:#ffd9d3; border:1px solid rgba(217,99,79,.45); box-shadow:none;
 }
+/* -- فضي-ستيل واضح ومميز عندما لا يملك المستخدم أي شخصية بعد (Storage غير نشط) -- */
+.storage-card__claim.is-inactive{
+  background:linear-gradient(135deg, rgba(203,213,225,.28), rgba(100,116,139,.24));
+  color:rgba(226,232,240,.85); border:1px solid rgba(203,213,225,.4); box-shadow:none;
+}
 
 .pet-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:start; }
 .pet-slot{
@@ -6416,9 +6421,11 @@ function storageTick(){
     timerEl.style.display = 'none';
     valEl.textContent = '0.00000';
     claimBtn.classList.remove('is-charging');
+    claimBtn.classList.add('is-inactive');
     claimBtn.disabled = true;
     return;
   }
+  claimBtn.classList.remove('is-inactive');
 
   timerEl.style.display = '';
   var elapsedSinceSync = (Date.now() - storageState.syncedAtMs) / 1000;
