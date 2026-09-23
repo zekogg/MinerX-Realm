@@ -72,8 +72,10 @@
      ========================================================= */
 
   /* -- بطاقة صفحة Earn الرئيسية -- */
-  --c-char-ring:        rgba(140,170,255,.22);  /* الحلقة حول دائرة الشخصية — ضوء قمري (كان ذهبي) */
-  --c-char-glow:        rgba(140,170,255,.26);   /* التوهج داخل دائرة الشخصية — ضوء قمري (كان ذهبي) */
+  --c-char-ring-sleep:   rgba(139,92,246,.5);   /* حد الشخصية أثناء النوم — بنفسجي ملكي (نفس بقية الواجهة) */
+  --c-char-glow-sleep:   rgba(139,92,246,.24);  /* التوهج خلف الشخصية أثناء النوم — بنفسجي هادئ */
+  --c-char-ring-mining:  rgba(227,165,66,.65);  /* حد الشخصية أثناء التعدين — ذهبي */
+  --c-char-glow-mining:  rgba(227,165,66,.32);  /* التوهج خلف الشخصية أثناء التعدين — ذهبي */
 
   /* -- شريط التقدم "Active session" -- */
   --c-progress-1: #1f7d70;   /* كان ذهبي */
@@ -357,6 +359,7 @@ img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
   border-top-color:#ffffff;
   animation:spin .8s linear infinite;
 }
+@keyframes spin{ to{ transform:rotate(360deg); } }
 .ad-loading-overlay__text{ font-family:var(--font-display); font-weight:800; font-size:14px; color:#ffffff; }
 .ad-loading-overlay__via{ font-size:11px; color:rgba(255,255,255,.55); }
 
@@ -561,24 +564,34 @@ img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
   border-radius:50%;
   display:flex; align-items:center; justify-content:center;
   background:
-    radial-gradient(circle at 35% 30%, var(--c-char-glow), transparent 60%),
+    radial-gradient(circle at 35% 30%, var(--c-char-glow-sleep), transparent 60%),
     var(--stone-2);
-  border:2px dashed var(--stone-border-2);
+}
+.char-slot.is-mining{
+  background:
+    radial-gradient(circle at 35% 30%, var(--c-char-glow-mining), transparent 60%),
+    var(--stone-2);
 }
 .char-slot__art{
   position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:1;
-  width:85%; height:85%; object-fit:contain; border-radius:50%;
+  width:85%; height:85%; object-fit:contain;
   opacity:0; pointer-events:none;
   transition:opacity .35s ease;
 }
 .char-slot__art.is-visible{ opacity:1; }
+/* -- الحد المتقطع حول الشخصية: ثابت وبنفسجي أثناء النوم، يدور ببطء
+      ويتحول ذهبياً أثناء التعدين فقط (إحساس "عمل جارٍ") -- */
 .char-slot__ring{
-  position:absolute; inset:-8px;
+  position:absolute; inset:0;
   border-radius:50%;
-  border:1px solid var(--c-char-ring);
-  animation:spin 16s linear infinite;
+  border:2px dashed var(--c-char-ring-sleep);
+  pointer-events:none;
 }
-@keyframes spin{ to{ transform:rotate(360deg); } }
+.char-slot.is-mining .char-slot__ring{
+  border-color: var(--c-char-ring-mining);
+  animation:char-ring-spin 13s linear infinite;
+}
+@keyframes char-ring-spin{ to{ transform:rotate(360deg); } }
 
 .earn-rate-row{
   display:flex; align-items:center; justify-content:center; gap:10px;
@@ -5462,8 +5475,10 @@ function renderMiningProgress(elapsedSec){
 function setCharacterMining(isMining){
   var idleArt = document.querySelector('.char-slot__art--idle');
   var miningArt = document.querySelector('.char-slot__art--mining');
+  var slot = document.getElementById('char-slot');
   if (idleArt) idleArt.classList.toggle('is-visible', !isMining);
   if (miningArt) miningArt.classList.toggle('is-visible', isMining);
+  if (slot) slot.classList.toggle('is-mining', isMining);
 }
 
 function applyMiningState(data){
