@@ -72,10 +72,11 @@
      ========================================================= */
 
   /* -- بطاقة صفحة Earn الرئيسية -- */
-  --c-char-ring-sleep:   rgba(139,92,246,.5);   /* حد الشخصية أثناء النوم — بنفسجي ملكي (نفس بقية الواجهة) */
-  --c-char-glow-sleep:   rgba(139,92,246,.24);  /* التوهج خلف الشخصية أثناء النوم — بنفسجي هادئ */
-  --c-char-ring-mining:  rgba(227,165,66,.65);  /* حد الشخصية أثناء التعدين — ذهبي */
+  --c-char-ring-sleep:   rgba(139,92,246,.55);  /* الحد المتقطع أثناء النوم — بنفسجي ملكي (نفس بقية الواجهة) */
+  --c-char-glow-sleep:   rgba(140,170,255,.26); /* التوهج خلف الشخصية أثناء النوم — اللون القديم (ضوء قمري) */
+  --c-char-ring-mining:  rgba(227,165,66,.65);  /* الحد المتقطع أثناء التعدين — ذهبي */
   --c-char-glow-mining:  rgba(227,165,66,.32);  /* التوهج خلف الشخصية أثناء التعدين — ذهبي */
+  --c-char-outer-ring:   rgba(140,170,255,.22); /* الحلقة الخارجية الرفيعة الثابتة — نفس اللون الأصلي دائماً */
 
   /* -- شريط التقدم "Active session" -- */
   --c-progress-1: #1f7d70;   /* كان ذهبي */
@@ -579,16 +580,33 @@ img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
   transition:opacity .35s ease;
 }
 .char-slot__art.is-visible{ opacity:1; }
-/* -- الحد المتقطع حول الشخصية: ثابت وبنفسجي أثناء النوم، يدور ببطء
-      ويتحول ذهبياً أثناء التعدين فقط (إحساس "عمل جارٍ") -- */
+/* -- التوهج الذي أثناء التعدين يميل الرسم قليلاً لليمين داخل مربعه —
+      تصحيح بصري بسيط خاص بها فقط دون المساس بوضع النوم -- */
+.char-slot__art--mining{ transform:translate(calc(-50% - 4px), -50%); }
+/* -- الحلقة الخارجية الرفيعة الثابتة (موجودة دائماً بالوضعين) -- */
+.char-slot__outer-ring{
+  position:absolute; inset:-8px;
+  border-radius:50%;
+  border:1px solid var(--c-char-outer-ring);
+  animation:char-outer-ring-spin 16s linear infinite;
+  pointer-events:none;
+}
+@keyframes char-outer-ring-spin{ to{ transform:rotate(360deg); } }
+/* -- الحد المتقطع حول الشخصية: ثابت وبنفسجي (بثلاث طبقات rgba للتوهج)
+      أثناء النوم، يدور ببطء ويتحول ذهبياً أثناء التعدين فقط -- */
 .char-slot__ring{
   position:absolute; inset:0;
   border-radius:50%;
   border:2px dashed var(--c-char-ring-sleep);
+  box-shadow:
+    0 0 4px rgba(139,92,246,.35),
+    0 0 8px rgba(139,92,246,.22),
+    0 0 14px rgba(139,92,246,.12);
   pointer-events:none;
 }
 .char-slot.is-mining .char-slot__ring{
   border-color: var(--c-char-ring-mining);
+  box-shadow:none;
   animation:char-ring-spin 13s linear infinite;
 }
 @keyframes char-ring-spin{ to{ transform:rotate(360deg); } }
@@ -3212,6 +3230,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
                Size is 160px (5% smaller than the original 168px). -->
           <div class="char-slot-wrap">
             <div class="char-slot" id="char-slot">
+              <div class="char-slot__outer-ring"></div>
               <div class="char-slot__ring"></div>
               <img draggable="false" class="char-slot__art char-slot__art--idle is-visible" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/c564887c059e956ef50c9510409b98266c483040/frontend/Doge%20Sleeping%20.svg" alt="Doge Sleeping">
               <img draggable="false" class="char-slot__art char-slot__art--mining" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/c564887c059e956ef50c9510409b98266c483040/frontend/Doge%20is%20Mining%20.svg" alt="Doge Mining">
