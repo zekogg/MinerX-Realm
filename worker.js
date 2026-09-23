@@ -119,6 +119,19 @@ const REFERRAL_MIN_CLAIM_COINS = 5000;
 const ACTIVE_FRIEND_ADS_THRESHOLD = 10;
 
 // =====================================================================
+// "نشط" يعتمد الآن على lifetime_ads_watched (عدّاد موحّد: GigaPub وMonetixAds
+// — مهمتاهما الحقيقيتان + بوابات الأزرار الست كلها — انظر
+// bumpLifetimeAdsWatched)، بدل ads_task_total الخاص بـAdsgram وحده، لأن
+// Adsgram لم توافق عليه الشبكة بعد. نفس هذا العدّاد يفتح شخصية The Guardian
+// الحصرية عند GUARDIAN_ADS_THRESHOLD (لا علاقة له بـACTIVE_FRIEND_ADS_THRESHOLD
+// أعلاه، رقمان منفصلان لغرضين مختلفين تماماً).
+// =====================================================================
+const GUARDIAN_ADS_THRESHOLD = 4000;
+const GUARDIAN_SPEED = 50;
+const HAPPY_DOG_FRIENDS_THRESHOLD = 100;
+const HAPPY_DOG_SPEED = 50;
+
+// =====================================================================
 // إعدادات مهام Check-in الأربع اليومية (تُصفَّر 00:00 UTC، نفس أسلوب باقي
 // الميزات اليومية). المهمتان 1 و2 بدون أي تحقق حقيقي (النقر على الرابط ثم
 // انتظار 5 ثوانٍ فقط من الواجهة). المهمتان 3 و4 لهما تحقق حقيقي من طرف
@@ -346,6 +359,18 @@ export default {
       return handleMonetixReward(request, env);
     }
 
+    if (url.pathname === "/api/ads/gate-watched" && request.method === "POST") {
+      return handleAdsGateWatched(request, env);
+    }
+
+    if (url.pathname === "/api/pets/claim_happy_dog" && request.method === "POST") {
+      return handleClaimHappyDog(request, env);
+    }
+
+    if (url.pathname === "/api/pets/claim_guardian" && request.method === "POST") {
+      return handleClaimGuardian(request, env);
+    }
+
     // نقطة منفصلة عن /api/user عمداً — تُستدعى فقط عند فتح نافذة Profile
     // فعلياً (وليس في كل تحديث دوري)، لأنها تحتوي استعلامات SUM إضافية
     // (إجمالي الإيداع/السحب) لا حاجة لتكرارها في أكثر نقطة استدعاءً بالتطبيق.
@@ -392,7 +417,7 @@ async function handleGetUser(request, env) {
            u.checkin1_claimed_date, u.checkin2_claimed_date, u.checkin3_claimed_date, u.checkin4_claimed_date,
            u.bonus_ad_count_today, u.bonus_ad_date, u.bonus_ad_last_watched_at,
            u.gigapub_task_count, u.gigapub_task_date, u.photo_url,
-           u.monetix_task_count, u.monetix_task_date,
+           u.monetix_task_count, u.monetix_task_date, u.lifetime_ads_watched,
            s.capacity_hours AS storage_capacity_hours, s.last_claim_at AS storage_last_claim_at,
            ca.attempts_used AS combo_attempts_used, ca.solved AS combo_solved
     FROM users u
@@ -469,6 +494,12 @@ async function handleGetUser(request, env) {
   view.friends_active = user.active_referrals_count || 0;
   view.friends_pending_earnings = user.referral_pending_earnings || 0;
   view.friends_min_claim = REFERRAL_MIN_CLAIM_COINS;
+
+  view.lifetime_ads_watched = user.lifetime_ads_watched || 0;
+  view.happy_dog_friends_threshold = HAPPY_DOG_FRIENDS_THRESHOLD;
+  view.guardian_ads_threshold = GUARDIAN_ADS_THRESHOLD;
+  view.happy_dog_claimed = !!pets.happy_dog;
+  view.guardian_claimed = !!pets.guardian;
 
   const milestonesResult = await env.DB.prepare(
     "SELECT friends_required, reward FROM milestone_missions ORDER BY friends_required ASC"
@@ -1711,6 +1742,146 @@ async function handleAdsReward(url, env) {
 }
 
 // =====================================================================
+// عدّاد "إجمالي الإعلانات المشاهدة مدى الحياة" (lifetime_ads_watched) —
+// موحّد بين مهمتي Watch gigapub ads/Watch MonetixAds الحقيقيتين وبوابات
+// الأزرار الست (كلاهما عبر GigaPub أو MonetixAds)، لغرضين معاً:
+// 1) تفعيل "صديق نشط" لصالح مُحيل هذا المستخدم بعد ACTIVE_FRIEND_ADS_THRESHOLD
+//    إعلاناً (بدل الاعتماد على Adsgram وحده).
+// 2) فتح شخصية The Guardian الحصرية عند GUARDIAN_ADS_THRESHOLD (انظر
+//    handleClaimGuardian).
+// شرط CAS على القيمة السابقة بالتحديد يمنع أي زيادة مضاعفة لو تكرر نفس
+// الطلب (نفس أسلوب باقي نقاط المنح في الملف).
+// =====================================================================
+async function bumpLifetimeAdsWatched(env, telegramId) {
+  const row = await env.DB.prepare(
+    "SELECT lifetime_ads_watched, referred_by FROM users WHERE telegram_id = ?"
+  ).bind(telegramId).first();
+  if (!row) return;
+
+  const previous = row.lifetime_ads_watched || 0;
+  const newTotal = previous + 1;
+
+  const updateResult = await env.DB.prepare(
+    "UPDATE users SET lifetime_ads_watched = ? WHERE telegram_id = ? AND lifetime_ads_watched = ?"
+  ).bind(newTotal, telegramId, previous).run();
+
+  if (!updateResult.meta || updateResult.meta.changes === 0) return;
+
+  if (row.referred_by && newTotal >= ACTIVE_FRIEND_ADS_THRESHOLD) {
+    const activateResult = await env.DB.prepare(
+      `UPDATE referrals SET is_active = 1, earned_coins = earned_coins + ?
+       WHERE referrer_id = ? AND referred_id = ? AND is_active = 0`
+    ).bind(REFERRAL_ACTIVE_BONUS_COINS, row.referred_by, telegramId).run();
+
+    if (activateResult.meta && activateResult.meta.changes > 0) {
+      await env.DB.prepare(
+        `UPDATE users SET referral_pending_earnings = referral_pending_earnings + ?, active_referrals_count = active_referrals_count + 1
+         WHERE telegram_id = ?`
+      ).bind(REFERRAL_ACTIVE_BONUS_COINS, row.referred_by).run();
+    }
+  }
+}
+
+// =====================================================================
+// نقطة /api/pets/claim_happy_dog — فتح شخصية Happy Dog الحصرية مجاناً بعد
+// دعوة 100 صديق نشط (active_referrals_count). تُخزَّن بنفس جدول user_pets
+// المستخدم للحيوانات العادية (pet_id='happy_dog')، فتظهر تلقائياً في
+// استجابة /api/user (view.pets) بنفس الآلية الموجودة — نفس أسلوب
+// handlePetBuy بالضبط لكن مجانية ومشروطة بالأهلية بدل السعر. لا علاقة لها
+// بميزة Milestone Missions (مكافأة عملات منفصلة تماماً تصادف نفس رقم 100).
+// =====================================================================
+async function handleClaimHappyDog(request, env) {
+  const auth = await authenticateRequest(request, env);
+  if (!auth.ok) return auth.response;
+  const { telegramId } = auth;
+
+  const existing = await env.DB.prepare(
+    "SELECT 1 FROM user_pets WHERE telegram_id = ? AND pet_id = 'happy_dog'"
+  ).bind(telegramId).first();
+  if (existing) return jsonResponse({ error: "already_claimed" }, 409);
+
+  const row = await env.DB.prepare(
+    "SELECT active_referrals_count FROM users WHERE telegram_id = ?"
+  ).bind(telegramId).first();
+  if (!row) return jsonResponse({ error: "user_not_found" }, 404);
+
+  if ((row.active_referrals_count || 0) < HAPPY_DOG_FRIENDS_THRESHOLD) {
+    return jsonResponse({ error: "not_eligible", active_referrals_count: row.active_referrals_count || 0 }, 403);
+  }
+
+  const nowIso = new Date().toISOString();
+  const insertPetStmt = env.DB.prepare(
+    "INSERT INTO user_pets (telegram_id, pet_id, level, current_speed) VALUES (?, 'happy_dog', 1, ?)"
+  ).bind(telegramId, HAPPY_DOG_SPEED);
+  const speedStmt = env.DB.prepare(
+    "UPDATE users SET total_speed = total_speed + ? WHERE telegram_id = ?"
+  ).bind(HAPPY_DOG_SPEED, telegramId);
+  const insertStorageStmt = env.DB.prepare(
+    "INSERT OR IGNORE INTO user_storage (telegram_id, capacity_hours, last_claim_at) VALUES (?, ?, ?)"
+  ).bind(telegramId, STORAGE_DEFAULT_CAPACITY_HOURS, nowIso);
+
+  try {
+    await env.DB.batch([insertPetStmt, speedStmt, insertStorageStmt]);
+  } catch (e) {
+    return jsonResponse({ error: "already_claimed" }, 409);
+  }
+
+  const updatedUser = await env.DB.prepare(
+    "SELECT total_speed FROM users WHERE telegram_id = ?"
+  ).bind(telegramId).first();
+
+  return jsonResponse({ pet_id: "happy_dog", level: 1, speed: HAPPY_DOG_SPEED, total_speed: updatedUser.total_speed });
+}
+
+// =====================================================================
+// نقطة /api/pets/claim_guardian — فتح شخصية The Guardian الحصرية مجاناً
+// بعد مشاهدة 4000 إعلان إجمالياً (lifetime_ads_watched، من أي شبكة/بوابة)
+// — نفس أسلوب handleClaimHappyDog أعلاه بالضبط، فقط شرط الاستحقاق مختلف.
+// =====================================================================
+async function handleClaimGuardian(request, env) {
+  const auth = await authenticateRequest(request, env);
+  if (!auth.ok) return auth.response;
+  const { telegramId } = auth;
+
+  const existing = await env.DB.prepare(
+    "SELECT 1 FROM user_pets WHERE telegram_id = ? AND pet_id = 'guardian'"
+  ).bind(telegramId).first();
+  if (existing) return jsonResponse({ error: "already_claimed" }, 409);
+
+  const row = await env.DB.prepare(
+    "SELECT lifetime_ads_watched FROM users WHERE telegram_id = ?"
+  ).bind(telegramId).first();
+  if (!row) return jsonResponse({ error: "user_not_found" }, 404);
+
+  if ((row.lifetime_ads_watched || 0) < GUARDIAN_ADS_THRESHOLD) {
+    return jsonResponse({ error: "not_eligible", lifetime_ads_watched: row.lifetime_ads_watched || 0 }, 403);
+  }
+
+  const nowIso = new Date().toISOString();
+  const insertPetStmt = env.DB.prepare(
+    "INSERT INTO user_pets (telegram_id, pet_id, level, current_speed) VALUES (?, 'guardian', 1, ?)"
+  ).bind(telegramId, GUARDIAN_SPEED);
+  const speedStmt = env.DB.prepare(
+    "UPDATE users SET total_speed = total_speed + ? WHERE telegram_id = ?"
+  ).bind(GUARDIAN_SPEED, telegramId);
+  const insertStorageStmt = env.DB.prepare(
+    "INSERT OR IGNORE INTO user_storage (telegram_id, capacity_hours, last_claim_at) VALUES (?, ?, ?)"
+  ).bind(telegramId, STORAGE_DEFAULT_CAPACITY_HOURS, nowIso);
+
+  try {
+    await env.DB.batch([insertPetStmt, speedStmt, insertStorageStmt]);
+  } catch (e) {
+    return jsonResponse({ error: "already_claimed" }, 409);
+  }
+
+  const updatedUser = await env.DB.prepare(
+    "SELECT total_speed FROM users WHERE telegram_id = ?"
+  ).bind(telegramId).first();
+
+  return jsonResponse({ pet_id: "guardian", level: 1, speed: GUARDIAN_SPEED, total_speed: updatedUser.total_speed });
+}
+
+// =====================================================================
 // منطق "Bonus AD Every 1H" — إعلان إضافي كل ساعة، بحد أقصى 5/يوم. شرط
 // CAS يجمع ثلاثة أمور في عبارة UPDATE واحدة: القيمة السابقة بالتحديد
 // لـbonus_ad_last_watched_at (يمنع الاستلام المضاعف من نفس النداء
@@ -1781,6 +1952,7 @@ async function handleGigapubPostback(url, env) {
   // مهمة Watch gigapub ads الحقيقية لا تمرر showTag إطلاقاً فلن يتطابق
   // أبداً مع 'gate' (أو أي قيمة بوابة مستقبلية أخرى نخصصها بنفسنا).
   if (url.searchParams.get("tag") === "gate") {
+    await bumpLifetimeAdsWatched(env, telegramId);
     return new Response("OK", { status: 200 });
   }
 
@@ -1810,6 +1982,7 @@ async function handleGigapubPostback(url, env) {
   ).bind(telegramId, GIGAPUB_REWARD_COINS);
 
   await env.DB.batch([updateStmt, txnStmt]);
+  await bumpLifetimeAdsWatched(env, telegramId);
 
   return new Response("OK", { status: 200 });
 }
@@ -1852,12 +2025,27 @@ async function handleMonetixReward(request, env) {
     return jsonResponse({ error: "daily_limit_reached", watched_today: countToday, daily_limit: MONETIX_DAILY_LIMIT }, 409);
   }
 
+  await bumpLifetimeAdsWatched(env, telegramId);
+
   return jsonResponse({
     watched_today: newCount,
     daily_limit: MONETIX_DAILY_LIMIT,
     reward_coins: MONETIX_REWARD_COINS,
     coins: row.coins + MONETIX_REWARD_COINS
   });
+}
+
+// =====================================================================
+// نقطة /api/ads/gate-watched — تُستدعى من الواجهة فقط بعد نجاح بوابة إعلان
+// عبر MonetixAds تحديداً (بوابة GigaPub تُحتسَب أصلاً عبر Postback الحقيقي
+// أعلاه في handleGigapubPostback، فلا داعي لاستدعاء مضاعف). لا تمنح أي
+// مكافأة بنفسها — فقط تزيد lifetime_ads_watched.
+// =====================================================================
+async function handleAdsGateWatched(request, env) {
+  const auth = await authenticateRequest(request, env);
+  if (!auth.ok) return auth.response;
+  await bumpLifetimeAdsWatched(env, auth.telegramId);
+  return jsonResponse({ ok: true });
 }
 
 // =====================================================================

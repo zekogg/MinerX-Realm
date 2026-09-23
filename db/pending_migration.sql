@@ -245,3 +245,12 @@ ALTER TABLE users ADD COLUMN photo_url TEXT;
 -- بـinitData الموثّق من تيليجرام فقط، لا عبر رابط عام كـGigaPub/Adsgram.
 ALTER TABLE users ADD COLUMN monetix_task_count INTEGER DEFAULT 0;
 ALTER TABLE users ADD COLUMN monetix_task_date TEXT;
+
+-- -- عدّاد "إجمالي الإعلانات المشاهدة مدى الحياة" --
+-- lifetime_ads_watched : موحّد بين مهمتي Watch gigapub ads/Watch MonetixAds
+-- الحقيقيتين وبوابات الأزرار الست (كلاهما)، لغرضين معاً: تفعيل "صديق نشط"
+-- لصالح المُحيل بعد ACTIVE_FRIEND_ADS_THRESHOLD إعلاناً (بدل Adsgram)، وفتح
+-- شخصية The Guardian الحصرية عند GUARDIAN_ADS_THRESHOLD (4000). Happy Dog
+-- وGuardian بعد الفتح يُخزَّنان كصفوف عادية في user_pets (pet_id='happy_dog'
+-- / 'guardian')، بلا أي عمود جديد خاص بهما.
+ALTER TABLE users ADD COLUMN lifetime_ads_watched INTEGER DEFAULT 0;
