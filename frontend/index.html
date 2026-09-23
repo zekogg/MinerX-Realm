@@ -1772,6 +1772,17 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   color:#eafdec;
   border-color:rgba(234,253,236,.4);
 }
+/* -- حالة "منح معلّق من الأدمن، جاهز للاستلام": توهج بنفسجي-ذهبي نابض -- */
+.amb-claim-btn.is-ready{
+  background:linear-gradient(135deg, #b794f6, #e3a542);
+  color:#2a1533;
+  border-color:rgba(183,148,246,.6);
+  animation:amb-claim-glow 1.6s ease-in-out infinite;
+}
+@keyframes amb-claim-glow{
+  0%, 100%{ box-shadow:0 0 6px -1px rgba(183,148,246,.7); }
+  50%{ box-shadow:0 0 14px 2px rgba(227,165,66,.85); }
+}
 
 .pet-exclusive-grid{ display:flex; flex-direction:column; gap:12px; }
 .pet-exclusive-grid .pet-slot--wide{ grid-column:unset; }
@@ -4126,10 +4137,10 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
             <div class="amb-right-stack">
               <div class="amb-speed">
                 <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:11px;height:11px;flex-shrink:0;vertical-align:middle;">
-                <span>0000/hr</span>
+                <span id="amb-speed-value">???/hr</span>
               </div>
               <span class="amb-right-stack__divider"></span>
-              <button class="amb-claim-btn" onclick="claimAmbassador(this)">Claim</button>
+              <button class="amb-claim-btn" id="amb-claim-btn" onclick="onClaimAmbassadorClick()">Claim</button>
             </div>
             <img draggable="false" class="pet-slot--exclusive__art" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/187bbf0071e1651c314318166c4605ba8f82b430/frontend/The%20Ambassador%20Pet%20.svg" alt="The Ambassador">
           </div>
@@ -5369,6 +5380,11 @@ function fetchUserData(){
       ads_watched: data.user.lifetime_ads_watched,
       threshold: data.user.guardian_ads_threshold,
       claimed: data.user.guardian_claimed
+    });
+    applyAmbassadorState({
+      available: data.user.ambassador_available,
+      claimed: data.user.ambassador_claimed,
+      speed: data.user.pets && data.user.pets.ambassador ? data.user.pets.ambassador.speed : 0
     });
     fetchAdminTasks('special');
     fetchAdminTasks('partner');
@@ -6800,6 +6816,7 @@ function onClaimHappyDogClick(){
       return;
     }
     happyDogState.claimed = true;
+    if (typeof data.coins === 'number') updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE });
     if (typeof data.total_speed === 'number') applyClaimedPetSpeed(data.total_speed);
     renderHappyDogUI();
     showAppToast({ title: 'Happy Dog', amount: 'Pet unlocked for free!' });
@@ -6886,6 +6903,7 @@ function onClaimGuardianClick(){
       return;
     }
     guardianState.claimed = true;
+    if (typeof data.coins === 'number') updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE });
     if (typeof data.total_speed === 'number') applyClaimedPetSpeed(data.total_speed);
     renderGuardianUI();
     showAppToast({ title: 'The Guardian', amount: 'Pet unlocked for free!' });
@@ -6897,10 +6915,80 @@ function onClaimGuardianClick(){
   });
 }
 
-function claimAmbassador(btn){
-  if (btn.classList.contains('is-claimed')) return;
-  btn.classList.add('is-claimed');
-  setTimeout(function(){ btn.classList.remove('is-claimed'); }, 3000);
+/* =====================================================================
+   The Ambassador — استحقاق يدوي بالكامل من الأدمن (لا عداد تلقائي).
+   الأدمن يمنح/يسحب المنح المعلّق مباشرة عبر D1 (جدول ambassador_grants)؛
+   وجود صف = زر Claim يتوهج ويصبح قابلاً للضغط، وغيابه = الزر عادي
+   ومعطّل. السرعة تظهر "???" حتى الاستلام الفعلي (claimed=true)، تماماً
+   كأسلوب Happy Dog/Guardian.
+   ===================================================================== */
+var ambassadorState = { available: false, claimed: false, speed: 0, busy: false };
+
+function renderAmbassadorUI(){
+  var speedEl = document.getElementById('amb-speed-value');
+  var btn = document.getElementById('amb-claim-btn');
+  if (!btn) return;
+
+  if (ambassadorState.claimed){
+    if (speedEl) speedEl.textContent = (ambassadorState.speed || 0) + '/hr';
+    btn.textContent = '✓';
+    btn.disabled = true;
+    btn.classList.remove('is-ready');
+    btn.classList.add('is-claimed');
+    return;
+  }
+
+  if (speedEl) speedEl.textContent = '???/hr';
+  btn.classList.remove('is-claimed');
+  btn.textContent = ambassadorState.busy ? '...' : 'Claim';
+  btn.disabled = ambassadorState.busy || !ambassadorState.available;
+  btn.classList.toggle('is-ready', !ambassadorState.busy && ambassadorState.available);
+}
+
+function applyAmbassadorState(data){
+  ambassadorState.available = !!data.available;
+  ambassadorState.claimed = !!data.claimed;
+  ambassadorState.speed = data.speed || 0;
+  renderAmbassadorUI();
+}
+
+function onClaimAmbassadorClick(){
+  if (ambassadorState.claimed || ambassadorState.busy || !ambassadorState.available) return;
+
+  var initData = getTelegramInitData();
+  if (!initData){
+    alert('Open this app from Telegram to claim.');
+    return;
+  }
+
+  ambassadorState.busy = true;
+  renderAmbassadorUI();
+
+  fetch('/api/pets/claim_ambassador', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: initData })
+  })
+  .then(function(res){ return res.json(); })
+  .then(function(data){
+    ambassadorState.busy = false;
+    if (data.error){
+      renderAmbassadorUI();
+      return;
+    }
+    ambassadorState.claimed = true;
+    ambassadorState.speed = data.speed || 0;
+    if (typeof data.coins === 'number') updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE });
+    if (typeof data.total_speed === 'number') applyClaimedPetSpeed(data.total_speed);
+    renderAmbassadorUI();
+    showAppToast({ title: 'The Ambassador', amount: 'Pet unlocked!' });
+    triggerConfetti();
+  })
+  .catch(function(err){
+    console.error('claim ambassador failed:', err);
+    ambassadorState.busy = false;
+    renderAmbassadorUI();
+  });
 }
 
 /* -- تأثير مؤقت 4 ثواني عند شراء The Duck: علامة صح + تغيير شكل الزر -- */
