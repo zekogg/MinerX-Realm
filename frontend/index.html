@@ -2913,6 +2913,13 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   color:#241202; font-weight:800; font-size:13px; letter-spacing:.3px;
   box-shadow:0 10px 22px -10px rgba(227,165,66,.65);
 }
+.fp-claim-btn.is-claimed{
+  background:linear-gradient(135deg, #6fbf73, #2f7d3f);
+  color:#eafdec; box-shadow:none;
+}
+.hd-claim-btn:disabled, .tg-claim-btn:disabled, .fp-claim-btn:disabled{
+  opacity:.55; cursor:not-allowed;
+}
 
 /* -- نافذة Free Pet Tasks (من Quick Actions) — تصميم مصغّر يتماشى مع باقي النوافذ -- */
 .qfp-desc{ font-size:11.5px; color:var(--ink-dim); line-height:1.6; margin-bottom:14px; }
@@ -3531,22 +3538,6 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         </div>
         <div class="card ad-task">
           <div class="ad-task__icon">
-            <svg viewBox="0 0 24 24" fill="var(--c-ad-watch-1)" stroke="none"><path d="M8 5l12 7-12 7z"/></svg>
-          </div>
-          <div class="ad-task__title">Watch adexium ads</div>
-          <div class="ad-task__meta">
-            <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
-            <span class="ad-task__reward">+15 / Ad</span>
-            <span class="ad-task__avail">Coming Soon</span>
-          </div>
-          <div class="ad-task__divider"></div>
-          <div class="ad-task__footer">
-            <button class="ad-task__watch is-claimed">Soon</button>
-            <span class="ad-task__counter">0 / 10</span>
-          </div>
-        </div>
-        <div class="card ad-task">
-          <div class="ad-task__icon">
             <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Monetix%20Ads%20icon.webp" alt="MonetixAds" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">
           </div>
           <div class="ad-task__title">Watch MonetixAds</div>
@@ -3559,6 +3550,22 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
           <div class="ad-task__footer">
             <button class="ad-task__watch" id="monetix-task-watch-btn" onclick="onWatchMonetixClick()">Watch</button>
             <span class="ad-task__counter" id="monetix-task-counter">0 / 10</span>
+          </div>
+        </div>
+        <div class="card ad-task">
+          <div class="ad-task__icon">
+            <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/adexium%20icon.webp" alt="adexium" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">
+          </div>
+          <div class="ad-task__title">Watch adexium ads</div>
+          <div class="ad-task__meta">
+            <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
+            <span class="ad-task__reward">+15 / Ad</span>
+            <span class="ad-task__avail">Coming Soon</span>
+          </div>
+          <div class="ad-task__divider"></div>
+          <div class="ad-task__footer">
+            <button class="ad-task__watch is-claimed">Soon</button>
+            <span class="ad-task__counter">0 / 10</span>
           </div>
         </div>
       </div>
@@ -4059,16 +4066,16 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
             </div>
             <span class="hd-help-badge" style="cursor:pointer;" onclick="togglePriceTooltip('hd-help-tooltip')">?</span>
             <div class="hd-bottom-left-stack">
-              <span class="hd-progress-badge">(0/100) Active</span>
+              <span class="hd-progress-badge" id="hd-progress-badge">(0/100) Active</span>
               <span class="hd-friend-badge">100 Active Friend</span>
             </div>
             <div class="hd-right-stack">
               <div class="hd-speed">
                 <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:11px;height:11px;flex-shrink:0;vertical-align:middle;">
-                <span>50/hr</span>
+                <span id="hd-speed-value">??/hr</span>
               </div>
               <span class="hd-right-stack__divider"></span>
-              <button class="hd-claim-btn" onclick="claimHappyDog(this)">Claim</button>
+              <button class="hd-claim-btn" id="hd-claim-btn" onclick="onClaimHappyDogClick()">Claim</button>
             </div>
             <div class="pet-slot--exclusive__backdrop"></div>
             <img draggable="false" class="pet-slot--exclusive__art" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/187bbf0071e1651c314318166c4605ba8f82b430/frontend/Happy%20Dog%20(100%20Reward)%20.svg" alt="Happy Dog">
@@ -4083,14 +4090,14 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
               <span class="tg-legend-badge">Ads Legend 👑</span>
               <span class="tg-count-badge">4K Ads</span>
             </div>
-            <span class="tg-progress-badge">AD (0/4000)</span>
+            <span class="tg-progress-badge" id="tg-progress-badge">AD (0/4000)</span>
             <div class="tg-right-stack">
               <div class="tg-speed">
                 <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:11px;height:11px;flex-shrink:0;vertical-align:middle;">
-                <span>50/hr</span>
+                <span id="tg-speed-value">??/hr</span>
               </div>
               <span class="tg-right-stack__divider"></span>
-              <button class="tg-claim-btn" onclick="claimGuardian(this)">Claim</button>
+              <button class="tg-claim-btn" id="tg-claim-btn" onclick="onClaimGuardianClick()">Claim</button>
             </div>
             <img draggable="false" class="pet-slot--exclusive__art" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Ads%20Guardian%20Reward%20.webp" alt="The Guardian">
           </div>
@@ -4174,19 +4181,19 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
       <span class="fp-corner fp-corner--tr"></span>
       <button class="fp-close" onclick="closeModal('modal-free-pet')">✕</button>
 
-      <div class="fp-title">The Mysterious Free Pet</div>
+      <div class="fp-title">Happy Dog</div>
       <div class="fp-title-divider"></div>
 
       <div class="fp-pet-slot">
-        <span class="fp-pet-slot__emoji">🐕</span>
+        <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/187bbf0071e1651c314318166c4605ba8f82b430/frontend/Happy%20Dog%20(100%20Reward)%20.svg" alt="Happy Dog" style="width:100%;height:100%;object-fit:contain;">
       </div>
 
-      <div class="fp-desc">Invite <b>100</b> Active Referrals And Get The Mysterious Exclusive Pet In The Realm</div>
+      <div class="fp-desc">Invite <b>100</b> Active Friends And Get Happy Dog — Free, Forever, Mining Right Away At <b>50/hr</b></div>
 
-      <div class="fp-progress-label">Invited Active Referrals (<span id="fp-progress-num">0</span>/100)</div>
+      <div class="fp-progress-label">Active Friends (<span id="fp-progress-num">0</span>/100)</div>
       <div class="fp-progress-track"><div class="fp-progress-fill" id="fp-progress-fill" style="width:0%"></div></div>
 
-      <button class="fp-claim-btn" id="fp-claim-btn">Claim</button>
+      <button class="fp-claim-btn" id="fp-claim-btn" onclick="onClaimHappyDogClick()">Claim</button>
     </div>
   </div>
 
@@ -4365,20 +4372,20 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         <div class="qfp-task__icon">🎁</div>
         <div class="qfp-task__body">
           <div class="qfp-task__title">Invite 100 Active Referrals</div>
-          <div class="qfp-task__progress-track"><div class="qfp-task__progress-fill" style="width:0%"></div></div>
-          <div class="qfp-task__progress-label">0/100</div>
+          <div class="qfp-task__progress-track"><div class="qfp-task__progress-fill" id="qfp-hd-progress-fill" style="width:0%"></div></div>
+          <div class="qfp-task__progress-label" id="qfp-hd-progress-label">0/100</div>
         </div>
-        <span class="qfp-task__reward">+1 Card</span>
+        <span class="qfp-task__reward" id="qfp-hd-reward">+1 Card</span>
       </div>
 
       <div class="qfp-task">
         <div class="qfp-task__icon">📺</div>
         <div class="qfp-task__body">
           <div class="qfp-task__title">Watch 4000 Ads</div>
-          <div class="qfp-task__progress-track"><div class="qfp-task__progress-fill" style="width:0%"></div></div>
-          <div class="qfp-task__progress-label">0/4000</div>
+          <div class="qfp-task__progress-track"><div class="qfp-task__progress-fill" id="qfp-tg-progress-fill" style="width:0%"></div></div>
+          <div class="qfp-task__progress-label" id="qfp-tg-progress-label">0/4000</div>
         </div>
-        <span class="qfp-task__reward">+1 Card</span>
+        <span class="qfp-task__reward" id="qfp-tg-reward">+1 Card</span>
       </div>
     </div>
   </div>
@@ -5341,6 +5348,16 @@ function fetchUserData(){
       daily_limit: data.user.monetix_daily_limit,
       reward_coins: data.user.monetix_reward_coins
     });
+    applyHappyDogState({
+      active_friends: data.user.friends_active,
+      threshold: data.user.happy_dog_friends_threshold,
+      claimed: data.user.happy_dog_claimed
+    });
+    applyGuardianState({
+      ads_watched: data.user.lifetime_ads_watched,
+      threshold: data.user.guardian_ads_threshold,
+      claimed: data.user.guardian_claimed
+    });
     fetchAdminTasks('special');
     fetchAdminTasks('partner');
     setupInviteLink(data.user.telegram_id);
@@ -6205,6 +6222,23 @@ function renderTotalSpeedBadge(){
   if (badge) badge.textContent = 'Total Speed (+' + Math.round(storageState.totalSpeed) + ' Coins / hr)';
 }
 
+// بعد الحصول على Happy Dog/Guardian مجاناً: تحديث Total Speed فوراً، وتشغيل
+// عدّاد Storage إن كانت هذه أول شخصية يملكها المستخدم على الإطلاق (بدون
+// إعادة ضبط ساعة التراكم الحالية، فقط تفعيلها إن لم تكن مفعّلة أصلاً).
+function applyClaimedPetSpeed(newTotalSpeed){
+  storageState.totalSpeed = newTotalSpeed;
+  renderTotalSpeedBadge();
+
+  if (!storageState.hasPet){
+    storageState.hasPet = true;
+    var boostBtn = document.getElementById('storage-boost-btn');
+    if (boostBtn) boostBtn.disabled = false;
+    clearInterval(storageTickTimer);
+    storageTick();
+    storageTickTimer = setInterval(storageTick, 1000);
+  }
+}
+
 function applyStorageState(data){
   storageState.hasPet = !!data.storage_has_pet;
   storageState.totalSpeed = data.total_speed || 0;
@@ -6576,16 +6610,167 @@ function onStorageUpgradeConfirm(){
   });
 }
 
-function claimHappyDog(btn){
-  if (btn.classList.contains('is-claimed')) return;
-  btn.classList.add('is-claimed');
-  setTimeout(function(){ btn.classList.remove('is-claimed'); }, 3000);
+/* =====================================================================
+   Happy Dog (فتح مجاني بعد 100 صديق نشط) وThe Guardian (فتح مجاني بعد
+   4000 إعلان مدى الحياة) — نفس البيانات والحالة تُعرَض في مكانين لكل واحدة
+   (بطاقتها في Realm + نافذتها المنبثقة المطابقة)، وتُحدَّثان معاً دائماً من
+   applyHappyDogState/applyGuardianState (تُستدعيان من fetchUserData، نفس
+   بيانات /api/user الحقيقية — لا حالة محلية منفصلة). السرعة تُعرض "??"
+   قبل الحصول على الشخصية، والزر يتحول لعلامة صح دائمة بعد الحصول عليها في
+   كل الأماكن (البطاقة، نافذة Happy Dog، نافذة Free Pet Tasks السريعة).
+   ===================================================================== */
+var happyDogState = { activeFriends: 0, threshold: 100, claimed: false, busy: false };
+var guardianState = { adsWatched: 0, threshold: 4000, claimed: false, busy: false };
+
+function renderHappyDogUI(){
+  var pct = Math.min(100, Math.round((happyDogState.activeFriends / happyDogState.threshold) * 100));
+  var progressBadge = document.getElementById('hd-progress-badge');
+  if (progressBadge) progressBadge.textContent = '(' + happyDogState.activeFriends + '/' + happyDogState.threshold + ') Active';
+  var speedEl = document.getElementById('hd-speed-value');
+  if (speedEl) speedEl.textContent = happyDogState.claimed ? '50/hr' : '??/hr';
+
+  var cardBtn = document.getElementById('hd-claim-btn');
+  var modalBtn = document.getElementById('fp-claim-btn');
+  [cardBtn, modalBtn].forEach(function(btn){
+    if (!btn) return;
+    if (happyDogState.claimed){
+      btn.textContent = '✓';
+      btn.disabled = true;
+      btn.classList.add('is-claimed');
+    } else {
+      btn.textContent = happyDogState.busy ? '...' : 'Claim';
+      btn.disabled = happyDogState.busy || happyDogState.activeFriends < happyDogState.threshold;
+      btn.classList.remove('is-claimed');
+    }
+  });
+
+  var fpNum = document.getElementById('fp-progress-num');
+  if (fpNum) fpNum.textContent = happyDogState.activeFriends;
+  var fpFill = document.getElementById('fp-progress-fill');
+  if (fpFill) fpFill.style.width = pct + '%';
+
+  var qfpFill = document.getElementById('qfp-hd-progress-fill');
+  if (qfpFill) qfpFill.style.width = pct + '%';
+  var qfpLabel = document.getElementById('qfp-hd-progress-label');
+  if (qfpLabel) qfpLabel.textContent = happyDogState.activeFriends + '/' + happyDogState.threshold;
+  var qfpReward = document.getElementById('qfp-hd-reward');
+  if (qfpReward) qfpReward.textContent = happyDogState.claimed ? '✓' : '+1 Card';
 }
 
-function claimGuardian(btn){
-  if (btn.classList.contains('is-claimed')) return;
-  btn.classList.add('is-claimed');
-  setTimeout(function(){ btn.classList.remove('is-claimed'); }, 3000);
+function applyHappyDogState(data){
+  happyDogState.activeFriends = data.active_friends || 0;
+  happyDogState.threshold = data.threshold || 100;
+  happyDogState.claimed = !!data.claimed;
+  renderHappyDogUI();
+}
+
+function onClaimHappyDogClick(){
+  if (happyDogState.claimed || happyDogState.busy) return;
+  if (happyDogState.activeFriends < happyDogState.threshold) return;
+
+  var initData = getTelegramInitData();
+  if (!initData){
+    alert('Open this app from Telegram to claim.');
+    return;
+  }
+
+  happyDogState.busy = true;
+  renderHappyDogUI();
+
+  fetch('/api/pets/claim_happy_dog', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: initData })
+  })
+  .then(function(res){ return res.json(); })
+  .then(function(data){
+    happyDogState.busy = false;
+    if (data.error){
+      renderHappyDogUI();
+      return;
+    }
+    happyDogState.claimed = true;
+    if (typeof data.total_speed === 'number') applyClaimedPetSpeed(data.total_speed);
+    renderHappyDogUI();
+    showAppToast({ title: 'Happy Dog', amount: 'Pet unlocked for free!' });
+  })
+  .catch(function(err){
+    console.error('claim happy dog failed:', err);
+    happyDogState.busy = false;
+    renderHappyDogUI();
+  });
+}
+
+function renderGuardianUI(){
+  var pct = Math.min(100, Math.round((guardianState.adsWatched / guardianState.threshold) * 100));
+  var progressBadge = document.getElementById('tg-progress-badge');
+  if (progressBadge) progressBadge.textContent = 'AD (' + guardianState.adsWatched + '/' + guardianState.threshold + ')';
+  var speedEl = document.getElementById('tg-speed-value');
+  if (speedEl) speedEl.textContent = guardianState.claimed ? '50/hr' : '??/hr';
+
+  var cardBtn = document.getElementById('tg-claim-btn');
+  if (cardBtn){
+    if (guardianState.claimed){
+      cardBtn.textContent = '✓';
+      cardBtn.disabled = true;
+      cardBtn.classList.add('is-claimed');
+    } else {
+      cardBtn.textContent = guardianState.busy ? '...' : 'Claim';
+      cardBtn.disabled = guardianState.busy || guardianState.adsWatched < guardianState.threshold;
+      cardBtn.classList.remove('is-claimed');
+    }
+  }
+
+  var qfpFill = document.getElementById('qfp-tg-progress-fill');
+  if (qfpFill) qfpFill.style.width = pct + '%';
+  var qfpLabel = document.getElementById('qfp-tg-progress-label');
+  if (qfpLabel) qfpLabel.textContent = guardianState.adsWatched + '/' + guardianState.threshold;
+  var qfpReward = document.getElementById('qfp-tg-reward');
+  if (qfpReward) qfpReward.textContent = guardianState.claimed ? '✓' : '+1 Card';
+}
+
+function applyGuardianState(data){
+  guardianState.adsWatched = data.ads_watched || 0;
+  guardianState.threshold = data.threshold || 4000;
+  guardianState.claimed = !!data.claimed;
+  renderGuardianUI();
+}
+
+function onClaimGuardianClick(){
+  if (guardianState.claimed || guardianState.busy) return;
+  if (guardianState.adsWatched < guardianState.threshold) return;
+
+  var initData = getTelegramInitData();
+  if (!initData){
+    alert('Open this app from Telegram to claim.');
+    return;
+  }
+
+  guardianState.busy = true;
+  renderGuardianUI();
+
+  fetch('/api/pets/claim_guardian', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: initData })
+  })
+  .then(function(res){ return res.json(); })
+  .then(function(data){
+    guardianState.busy = false;
+    if (data.error){
+      renderGuardianUI();
+      return;
+    }
+    guardianState.claimed = true;
+    if (typeof data.total_speed === 'number') applyClaimedPetSpeed(data.total_speed);
+    renderGuardianUI();
+    showAppToast({ title: 'The Guardian', amount: 'Pet unlocked for free!' });
+  })
+  .catch(function(err){
+    console.error('claim guardian failed:', err);
+    guardianState.busy = false;
+    renderGuardianUI();
+  });
 }
 
 function claimAmbassador(btn){
@@ -7337,12 +7522,27 @@ function runAdGateMonetixFallback(onSuccess, onFail){
     clearTimeout(noAdTimeout);
     hideAdLoadingOverlay();
     if (res && (res.status === 'completed' || res.status === 'closed')){
+      reportGateAdWatched();
       onSuccess();
     } else {
       showBuyErrorToast('Ad was not completed', { title: 'Ad Required' });
       if (onFail) onFail();
     }
   });
+}
+
+// إعلام السيرفر أن بوابة زر نجحت عبر MonetixAds تحديداً (بوابة GigaPub
+// تُحتسَب أصلاً عبر Postback حقيقي من طرفهم، فلا داعي لاستدعاء مضاعف من
+// هنا). Fire-and-forget عمداً — فشل هذا الاستدعاء لا يجب أن يمنع تنفيذ
+// الفعل الحقيقي (onSuccess) الذي يليه.
+function reportGateAdWatched(){
+  var initData = getTelegramInitData();
+  if (!initData) return;
+  fetch('/api/ads/gate-watched', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: initData })
+  }).catch(function(err){ console.error('gate ad watched report failed:', err); });
 }
 
 /* =====================================================================
