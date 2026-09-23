@@ -2656,6 +2656,11 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   transition:transform .32s cubic-bezier(.22,.9,.32,1);
 }
 #modal-leaderboard.is-open .lb-sheet{ transform:translateY(0); }
+/* -- الحد العلوي الافتراضي أزرق (.modal-sheet::before) — هنا بنفسجي ملكي بدل ذلك ليطابق بقية الواجهة -- */
+#modal-leaderboard .modal-sheet::before{
+  background:linear-gradient(90deg, transparent, var(--c-royal-purple-2), transparent);
+  box-shadow:0 0 7px rgba(139,92,246,.55);
+}
 .lb-scroll{
   flex:1 1 auto;
   min-height:0;
