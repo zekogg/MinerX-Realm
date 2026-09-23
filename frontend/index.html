@@ -5402,8 +5402,7 @@ function fetchUserData(){
       total_speed: data.user.total_speed,
       storage_level: data.user.storage_level,
       storage_capacity_seconds: data.user.storage_capacity_seconds,
-      storage_remaining_seconds: data.user.storage_remaining_seconds,
-      storage_min_claim: data.user.storage_min_claim
+      storage_remaining_seconds: data.user.storage_remaining_seconds
     });
   })
   .catch(function(err){
@@ -5812,14 +5811,6 @@ function showPrizeToast(type, amount, title){
     title: title || 'You Won!',
     icon: PRIZE_ICON_URLS[type] || PRIZE_ICON_URLS.coins,
     amount: '+' + amount + (type === 'gram' ? ' Gram' : ' Coins')
-  });
-}
-
-function showMinClaimToast(minimum){
-  showAppToast({
-    title: 'Minimum Claim',
-    icon: PRIZE_ICON_URLS.coins,
-    amount: minimum + ' Coins Required'
   });
 }
 
@@ -6243,8 +6234,7 @@ function onPetBuyClick(petId, btn){
       total_speed: data.total_speed,
       storage_level: storageState.level || 1,
       storage_capacity_seconds: storageState.capacitySeconds,
-      storage_remaining_seconds: storageState.capacitySeconds, // أول شراء يبدأ Storage من الصفر
-      storage_min_claim: storageState.minClaim
+      storage_remaining_seconds: storageState.capacitySeconds // أول شراء يبدأ Storage من الصفر
     });
     showBuySuccessGeneric(btn);
     showPurchaseToast(def.name, 'Lv.1');
@@ -6299,8 +6289,7 @@ function onPetUpgradeConfirm(){
       total_speed: data.total_speed,
       storage_level: storageState.level, // ترقية أي حيوان لا تغيّر مستوى Storage نفسه
       storage_capacity_seconds: storageState.capacitySeconds,
-      storage_remaining_seconds: storageState.capacitySeconds,
-      storage_min_claim: storageState.minClaim
+      storage_remaining_seconds: storageState.capacitySeconds
     });
     showUpgradeToast(def.name, 'Lv.' + data.level);
   })
@@ -6325,7 +6314,6 @@ var storageState = {
   totalSpeed: 0,
   level: 1,
   capacitySeconds: 6 * 3600,
-  minClaim: 10,
   elapsedAtSync: 0,
   syncedAtMs: Date.now()
 };
@@ -6360,7 +6348,6 @@ function applyStorageState(data){
   storageState.totalSpeed = data.total_speed || 0;
   storageState.level = data.storage_level || 1;
   storageState.capacitySeconds = data.storage_capacity_seconds || (6 * 3600);
-  storageState.minClaim = data.storage_min_claim || 10;
   var remainingSeconds = (data.storage_remaining_seconds != null) ? data.storage_remaining_seconds : storageState.capacitySeconds;
   storageState.elapsedAtSync = Math.max(0, storageState.capacitySeconds - remainingSeconds);
   storageState.syncedAtMs = Date.now();
@@ -6388,6 +6375,7 @@ function storageTick(){
     timerEl.style.display = 'none';
     valEl.textContent = '0.00000';
     claimBtn.classList.remove('is-charging');
+    claimBtn.disabled = true;
     return;
   }
 
@@ -6402,12 +6390,14 @@ function storageTick(){
   if (remainingSeconds <= 0){
     timerEl.textContent = 'Full';
     claimBtn.classList.remove('is-charging');
+    claimBtn.disabled = false;
   } else {
     var hh = String(Math.floor(remainingSeconds / 3600)).padStart(2, '0');
     var mm = String(Math.floor((remainingSeconds % 3600) / 60)).padStart(2, '0');
     var ss = String(Math.floor(remainingSeconds % 60)).padStart(2, '0');
     timerEl.textContent = 'Full in ' + hh + ':' + mm + ':' + ss;
     claimBtn.classList.add('is-charging');
+    claimBtn.disabled = true;
   }
 }
 
@@ -6430,9 +6420,9 @@ function onStorageClaimClick(){
   .then(function(result){
     var data = result.data;
     if (data.error){
-      if (data.error === 'below_minimum_claim'){
-        showMinClaimToast(data.minimum);
-      } else {
+      // 'not_full_yet' غير قابل للوصول عادةً لأن الزر معطّل حتى الامتلاء —
+      // لا حاجة لأي رسالة، فقط تجاهل بصمت لو حدث (تلاعب مباشر بالطلب مثلاً).
+      if (data.error !== 'not_full_yet'){
         console.error('storage claim error:', data.error);
       }
       return;
@@ -6446,8 +6436,7 @@ function onStorageClaimClick(){
       total_speed: storageState.totalSpeed,
       storage_level: storageState.level, // استلام Storage لا يغيّر مستواه
       storage_capacity_seconds: data.capacity_seconds || storageState.capacitySeconds,
-      storage_remaining_seconds: data.capacity_seconds || storageState.capacitySeconds,
-      storage_min_claim: storageState.minClaim
+      storage_remaining_seconds: data.capacity_seconds || storageState.capacitySeconds
     });
   })
   .catch(function(err){
@@ -6723,8 +6712,7 @@ function onStorageUpgradeConfirm(){
       total_speed: storageState.totalSpeed,
       storage_level: data.level,
       storage_capacity_seconds: data.capacity_seconds,
-      storage_remaining_seconds: data.capacity_seconds,
-      storage_min_claim: storageState.minClaim
+      storage_remaining_seconds: data.capacity_seconds
     });
     showStorageUpgradeToast(data.level, STORAGE_LEVEL_HOURS[data.level - 1]);
   })
