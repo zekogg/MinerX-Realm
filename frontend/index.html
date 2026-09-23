@@ -3645,7 +3645,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
               </div>
             </div>
             <div class="partner-task__actions">
-              <button class="checkin-copy-btn" onclick="copyCheckinText(this, 'https://t.me/MinerXRealmBot/app?startapp=ref_84213')">Copy</button>
+              <button class="checkin-copy-btn" onclick="copyMyReferralLink(this)">Copy</button>
               <button class="ad-task__watch partner-task__btn" id="checkin-btn-4" onclick="onCheckinVerifyClick(4)">Check</button>
             </div>
           </div>
@@ -6522,6 +6522,15 @@ function copyCheckinText(btn, text){
       setTimeout(function(){ btn.textContent = original; }, 1400);
     });
   }
+}
+
+// مهمة "Put Your Link In Bio" تنسخ رابط الدعوة الحقيقي لهذا المستخدم
+// (نفس الرابط المعروض في صندوق Invite)، وليس قيمة ثابتة/وهمية.
+function copyMyReferralLink(btn){
+  var linkEl = document.getElementById('invite-link-text');
+  var text = linkEl ? linkEl.textContent.trim() : '';
+  if (!text) return;
+  copyCheckinText(btn, text);
 }
 
 /* /////كود النوافذ المنبثقة (Modals)///// */
