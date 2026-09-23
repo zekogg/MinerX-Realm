@@ -7266,11 +7266,12 @@ function pollGigapubRewardConfirmation(baselineWatched, attempt){
    بوابة إعلان أمام مميزات موجودة أصلاً (Start Mining، Claim Daily Rewards،
    Chest، Spin، Gift، Promo Redeem) — لا تمنح مكافأة بنفسها (لا Reward URL
    فعّال من أي طرف هنا)، فقط شرط عرض أمام فعل مسموح للمستخدم أصلاً.
-   تُجرَّب MonetixAds أولاً، وإن لم يوجد إعلان (لم يُحمَّل السكربت، أو
-   status ليس completed/closed) يُجرَّب GigaPub (بلوك 'gate' منفصل عن
-   مهمة Watch gigapub ads — سيرفرنا يرد 200 فقط على task=gate بدون منح
-   شيء). النافذة المنبثقة تظهر فوراً عند الضغط، وتتحدث كتابة via حسب من
-   نجرّبه حالياً، وتُغلق فور نجاح/فشل نهائي.
+   تُجرَّب GigaPub أولاً — بنفس تطبيقهم/بلوكهم الأصلي (8282)، لكن بمعامل
+   showTag مميّز (نفس آلية Sub ID التي أكّدها دعم GigaPub) لتمييزه عن
+   مهمة Watch gigapub ads في الـPostback؛ سيرفرنا يرد 200 فقط عند
+   tag=gate بدون منح شيء. إن فشل (لا إعلان متاح) يُجرَّب MonetixAds. النافذة
+   المنبثقة تظهر فوراً عند الضغط، وتتحدث كتابة via حسب من نجرّبه حالياً،
+   وتُغلق فور نجاح/فشل نهائي.
    ===================================================================== */
 var GIGAPUB_GATE_PLACEMENT = 'gate';
 
@@ -7294,53 +7295,53 @@ function setAdLoadingOverlayVia(providerName){
 // لكل زر إعادة تعيين حالته (busy=false، تفعيل الزر...).
 function runAdGate(onSuccess, onFail){
   showAdLoadingOverlay();
-  setAdLoadingOverlayVia('Monetix');
+  setAdLoadingOverlayVia('GigaPub');
 
-  if (typeof window.showRewardAd === 'function'){
-    // نفس مشكلة callback الذي لا يُستدعى إطلاقاً بدون إعلان (انظر
-    // onWatchMonetixClick) — بدون هذا المؤقت تبقى بوابات الأزرار معلّقة
-    // للأبد بدل الانتقال إلى GigaPub.
-    var settled = false;
-    var noAdTimeout = setTimeout(function(){
-      if (settled) return;
-      settled = true;
-      runAdGateGigapubFallback(onSuccess, onFail);
-    }, 10000);
-
-    window.showRewardAd(function(res){
-      if (settled) return;
-      settled = true;
-      clearTimeout(noAdTimeout);
-      if (res && (res.status === 'completed' || res.status === 'closed')){
-        hideAdLoadingOverlay();
-        onSuccess();
-      } else {
-        runAdGateGigapubFallback(onSuccess, onFail);
-      }
+  if (gigapubReady && typeof window.showGiga === 'function'){
+    window.showGiga({ showTag: GIGAPUB_GATE_PLACEMENT }).then(function(){
+      hideAdLoadingOverlay();
+      onSuccess();
+    }).catch(function(){
+      runAdGateMonetixFallback(onSuccess, onFail);
     });
     return;
   }
 
-  runAdGateGigapubFallback(onSuccess, onFail);
+  runAdGateMonetixFallback(onSuccess, onFail);
 }
 
-function runAdGateGigapubFallback(onSuccess, onFail){
-  setAdLoadingOverlayVia('GigaPub');
+function runAdGateMonetixFallback(onSuccess, onFail){
+  setAdLoadingOverlayVia('Monetix');
 
-  if (!gigapubReady || typeof window.showGiga !== 'function'){
+  if (typeof window.showRewardAd !== 'function'){
     hideAdLoadingOverlay();
     showBuyErrorToast('Ad not available right now', { title: 'Ad Required' });
     if (onFail) onFail();
     return;
   }
 
-  window.showGiga(GIGAPUB_GATE_PLACEMENT).then(function(){
+  // نفس مشكلة callback الذي لا يُستدعى إطلاقاً بدون إعلان (انظر
+  // onWatchMonetixClick) — بدون هذا المؤقت يبقى الزر معلّقاً للأبد.
+  var settled = false;
+  var noAdTimeout = setTimeout(function(){
+    if (settled) return;
+    settled = true;
     hideAdLoadingOverlay();
-    onSuccess();
-  }).catch(function(){
-    hideAdLoadingOverlay();
-    showBuyErrorToast('Ad was not completed', { title: 'Ad Required' });
+    showBuyErrorToast('Ad not available right now', { title: 'Ad Required' });
     if (onFail) onFail();
+  }, 10000);
+
+  window.showRewardAd(function(res){
+    if (settled) return;
+    settled = true;
+    clearTimeout(noAdTimeout);
+    hideAdLoadingOverlay();
+    if (res && (res.status === 'completed' || res.status === 'closed')){
+      onSuccess();
+    } else {
+      showBuyErrorToast('Ad was not completed', { title: 'Ad Required' });
+      if (onFail) onFail();
+    }
   });
 }
 

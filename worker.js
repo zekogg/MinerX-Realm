@@ -1776,8 +1776,11 @@ async function handleGigapubPostback(url, env) {
   // "gate" = بوابة إعلان أمام مميزات موجودة أصلاً (Start Mining، Claim
   // Daily Rewards، Chest، Spin، Gift، Promo Redeem) — لا تمنح شيئاً هنا،
   // الفعل الحقيقي يُنفَّذ من الواجهة مباشرة بعد نجاح مشاهدة الإعلان
-  // (AdController.show().then())، فقط نرد 200 كما تطلب GigaPub من كل طلب.
-  if (url.searchParams.get("task") === "gate") {
+  // (window.showGiga({ showTag }).then())، فقط نرد 200 كما تطلب GigaPub من
+  // كل طلب. معامل tag يأتي من showTag الذي مررناه عند استدعاء showGiga —
+  // مهمة Watch gigapub ads الحقيقية لا تمرر showTag إطلاقاً فلن يتطابق
+  // أبداً مع 'gate' (أو أي قيمة بوابة مستقبلية أخرى نخصصها بنفسنا).
+  if (url.searchParams.get("tag") === "gate") {
     return new Response("OK", { status: 200 });
   }
 
