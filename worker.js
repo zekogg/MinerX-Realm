@@ -1801,7 +1801,9 @@ async function handleClaimHappyDog(request, env) {
   if (existing) return jsonResponse({ error: "already_claimed" }, 409);
 
   const row = await env.DB.prepare(
-    "SELECT active_referrals_count FROM users WHERE telegram_id = ?"
+    `SELECT u.active_referrals_count, u.total_speed, s.capacity_hours, s.last_claim_at
+     FROM users u LEFT JOIN user_storage s ON s.telegram_id = u.telegram_id
+     WHERE u.telegram_id = ?`
   ).bind(telegramId).first();
   if (!row) return jsonResponse({ error: "user_not_found" }, 404);
 
@@ -1809,28 +1811,55 @@ async function handleClaimHappyDog(request, env) {
     return jsonResponse({ error: "not_eligible", active_referrals_count: row.active_referrals_count || 0 }, 403);
   }
 
+  // نُصفّي (checkpoint) ما تراكم في Storage بالسرعة الكلية القديمة *قبل*
+  // إضافة سرعة Happy Dog — نفس أسلوب handlePetUpgrade بالضبط، لمنع احتساب
+  // كل الوقت المنقضي منذ آخر Claim (حتى ما قبل حصوله على الشخصية) بالسرعة
+  // الجديدة الأعلى.
+  const capacitySeconds = (row.capacity_hours || STORAGE_DEFAULT_CAPACITY_HOURS) * 3600;
+  let preClaimAccrued = 0;
+  if (row.last_claim_at) {
+    const elapsedSeconds = Math.max(0, (Date.now() - Date.parse(row.last_claim_at)) / 1000);
+    preClaimAccrued = Math.min(elapsedSeconds, capacitySeconds) * ((row.total_speed || 0) / 3600);
+  }
+
   const nowIso = new Date().toISOString();
   const insertPetStmt = env.DB.prepare(
     "INSERT INTO user_pets (telegram_id, pet_id, level, current_speed) VALUES (?, 'happy_dog', 1, ?)"
   ).bind(telegramId, HAPPY_DOG_SPEED);
   const speedStmt = env.DB.prepare(
-    "UPDATE users SET total_speed = total_speed + ? WHERE telegram_id = ?"
-  ).bind(HAPPY_DOG_SPEED, telegramId);
-  const insertStorageStmt = env.DB.prepare(
-    "INSERT OR IGNORE INTO user_storage (telegram_id, capacity_hours, last_claim_at) VALUES (?, ?, ?)"
-  ).bind(telegramId, STORAGE_DEFAULT_CAPACITY_HOURS, nowIso);
+    "UPDATE users SET total_speed = total_speed + ?, coins = coins + ? WHERE telegram_id = ?"
+  ).bind(HAPPY_DOG_SPEED, preClaimAccrued, telegramId);
+  const storageStmt = row.last_claim_at
+    ? env.DB.prepare("UPDATE user_storage SET last_claim_at = ? WHERE telegram_id = ?").bind(nowIso, telegramId)
+    : env.DB.prepare(
+        "INSERT OR IGNORE INTO user_storage (telegram_id, capacity_hours, last_claim_at) VALUES (?, ?, ?)"
+      ).bind(telegramId, STORAGE_DEFAULT_CAPACITY_HOURS, nowIso);
+
+  const stmts = [insertPetStmt, speedStmt, storageStmt];
+  if (preClaimAccrued > 0) {
+    stmts.push(env.DB.prepare(
+      "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'storage_auto_collect', ?, 'coins')"
+    ).bind(telegramId, preClaimAccrued));
+  }
 
   try {
-    await env.DB.batch([insertPetStmt, speedStmt, insertStorageStmt]);
+    await env.DB.batch(stmts);
   } catch (e) {
     return jsonResponse({ error: "already_claimed" }, 409);
   }
 
   const updatedUser = await env.DB.prepare(
-    "SELECT total_speed FROM users WHERE telegram_id = ?"
+    "SELECT total_speed, coins FROM users WHERE telegram_id = ?"
   ).bind(telegramId).first();
 
-  return jsonResponse({ pet_id: "happy_dog", level: 1, speed: HAPPY_DOG_SPEED, total_speed: updatedUser.total_speed });
+  return jsonResponse({
+    pet_id: "happy_dog",
+    level: 1,
+    speed: HAPPY_DOG_SPEED,
+    total_speed: updatedUser.total_speed,
+    coins: updatedUser.coins,
+    storage_credited: preClaimAccrued
+  });
 }
 
 // =====================================================================
@@ -1849,7 +1878,9 @@ async function handleClaimGuardian(request, env) {
   if (existing) return jsonResponse({ error: "already_claimed" }, 409);
 
   const row = await env.DB.prepare(
-    "SELECT lifetime_ads_watched FROM users WHERE telegram_id = ?"
+    `SELECT u.lifetime_ads_watched, u.total_speed, s.capacity_hours, s.last_claim_at
+     FROM users u LEFT JOIN user_storage s ON s.telegram_id = u.telegram_id
+     WHERE u.telegram_id = ?`
   ).bind(telegramId).first();
   if (!row) return jsonResponse({ error: "user_not_found" }, 404);
 
@@ -1857,28 +1888,52 @@ async function handleClaimGuardian(request, env) {
     return jsonResponse({ error: "not_eligible", lifetime_ads_watched: row.lifetime_ads_watched || 0 }, 403);
   }
 
+  // نفس تصفية Storage المُطبَّقة في handleClaimHappyDog أعلاه — انظر التعليق هناك.
+  const capacitySeconds = (row.capacity_hours || STORAGE_DEFAULT_CAPACITY_HOURS) * 3600;
+  let preClaimAccrued = 0;
+  if (row.last_claim_at) {
+    const elapsedSeconds = Math.max(0, (Date.now() - Date.parse(row.last_claim_at)) / 1000);
+    preClaimAccrued = Math.min(elapsedSeconds, capacitySeconds) * ((row.total_speed || 0) / 3600);
+  }
+
   const nowIso = new Date().toISOString();
   const insertPetStmt = env.DB.prepare(
     "INSERT INTO user_pets (telegram_id, pet_id, level, current_speed) VALUES (?, 'guardian', 1, ?)"
   ).bind(telegramId, GUARDIAN_SPEED);
   const speedStmt = env.DB.prepare(
-    "UPDATE users SET total_speed = total_speed + ? WHERE telegram_id = ?"
-  ).bind(GUARDIAN_SPEED, telegramId);
-  const insertStorageStmt = env.DB.prepare(
-    "INSERT OR IGNORE INTO user_storage (telegram_id, capacity_hours, last_claim_at) VALUES (?, ?, ?)"
-  ).bind(telegramId, STORAGE_DEFAULT_CAPACITY_HOURS, nowIso);
+    "UPDATE users SET total_speed = total_speed + ?, coins = coins + ? WHERE telegram_id = ?"
+  ).bind(GUARDIAN_SPEED, preClaimAccrued, telegramId);
+  const storageStmt = row.last_claim_at
+    ? env.DB.prepare("UPDATE user_storage SET last_claim_at = ? WHERE telegram_id = ?").bind(nowIso, telegramId)
+    : env.DB.prepare(
+        "INSERT OR IGNORE INTO user_storage (telegram_id, capacity_hours, last_claim_at) VALUES (?, ?, ?)"
+      ).bind(telegramId, STORAGE_DEFAULT_CAPACITY_HOURS, nowIso);
+
+  const stmts = [insertPetStmt, speedStmt, storageStmt];
+  if (preClaimAccrued > 0) {
+    stmts.push(env.DB.prepare(
+      "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'storage_auto_collect', ?, 'coins')"
+    ).bind(telegramId, preClaimAccrued));
+  }
 
   try {
-    await env.DB.batch([insertPetStmt, speedStmt, insertStorageStmt]);
+    await env.DB.batch(stmts);
   } catch (e) {
     return jsonResponse({ error: "already_claimed" }, 409);
   }
 
   const updatedUser = await env.DB.prepare(
-    "SELECT total_speed FROM users WHERE telegram_id = ?"
+    "SELECT total_speed, coins FROM users WHERE telegram_id = ?"
   ).bind(telegramId).first();
 
-  return jsonResponse({ pet_id: "guardian", level: 1, speed: GUARDIAN_SPEED, total_speed: updatedUser.total_speed });
+  return jsonResponse({
+    pet_id: "guardian",
+    level: 1,
+    speed: GUARDIAN_SPEED,
+    total_speed: updatedUser.total_speed,
+    coins: updatedUser.coins,
+    storage_credited: preClaimAccrued
+  });
 }
 
 // =====================================================================
