@@ -198,7 +198,6 @@ const PET_MAX_LEVEL = 100;
 const PET_SPEED_INCREMENT_RATIO = 0.10;
 const PET_UPGRADE_COST_RATIO = 0.10;
 const STORAGE_DEFAULT_CAPACITY_HOURS = 6;
-const STORAGE_MIN_CLAIM_COINS = 10;
 
 function petSpeedForLevel(petId, level) {
   const pet = PETS[petId];
@@ -1033,11 +1032,13 @@ async function handleStorageClaim(request, env) {
   const elapsedSeconds = Math.max(0, (Date.now() - Date.parse(row.last_claim_at)) / 1000);
   const accrued = Math.min(elapsedSeconds, capacitySeconds) * perSecondRate;
 
-  if (accrued < STORAGE_MIN_CLAIM_COINS) {
+  // الزر معطّل في الواجهة حتى الامتلاء الكامل — هذا هو نفس الشرط مُطبَّقاً
+  // على السيرفر أيضاً (وليس فقط تعطيلاً بصرياً)، لمنع أي طلب مباشر يتجاوز
+  // الواجهة قبل اكتمال Storage فعلياً.
+  if (elapsedSeconds < capacitySeconds) {
     return jsonResponse({
-      error: "below_minimum_claim",
-      minimum: STORAGE_MIN_CLAIM_COINS,
-      accrued
+      error: "not_full_yet",
+      remaining_seconds: capacitySeconds - elapsedSeconds
     }, 400);
   }
 
@@ -2769,8 +2770,7 @@ function withStorageView(user) {
     storage_max_level: STORAGE_MAX_LEVEL,
     storage_capacity_seconds: capacitySeconds,
     storage_remaining_seconds: remainingSeconds,
-    storage_is_full: isFull,
-    storage_min_claim: STORAGE_MIN_CLAIM_COINS
+    storage_is_full: isFull
   };
 }
 
