@@ -235,6 +235,10 @@ async function routeRequest(request, env, url) {
       return handleGetUser(request, env);
     }
 
+    if (url.pathname === "/api/realm/status" && request.method === "POST") {
+      return handleRealmStatus(request, env);
+    }
+
     if (url.pathname === "/api/mine/start" && request.method === "POST") {
       return handleMineStart(request, env);
     }
@@ -324,6 +328,10 @@ async function routeRequest(request, env, url) {
       return handleFriendsList(request, env);
     }
 
+    if (url.pathname === "/api/friends/milestones" && request.method === "POST") {
+      return handleFriendsMilestones(request, env);
+    }
+
     if (url.pathname === "/api/checkin/claim" && request.method === "POST") {
       return handleCheckinClaim(request, env);
     }
@@ -406,10 +414,8 @@ async function handleGetUser(request, env) {
            u.bonus_ad_count_today, u.bonus_ad_date, u.bonus_ad_last_watched_at,
            u.gigapub_task_count, u.gigapub_task_date, u.photo_url,
            u.monetix_task_count, u.monetix_task_date, u.lifetime_ads_watched,
-           s.capacity_hours AS storage_capacity_hours, s.last_claim_at AS storage_last_claim_at,
            ca.attempts_used AS combo_attempts_used, ca.solved AS combo_solved
     FROM users u
-    LEFT JOIN user_storage s ON s.telegram_id = u.telegram_id
     LEFT JOIN combo_attempts ca ON ca.telegram_id = u.telegram_id AND ca.date = ?
     WHERE u.telegram_id = ?
   `;
@@ -442,22 +448,11 @@ async function handleGetUser(request, env) {
     user.photo_url = photoUrl;
   }
 
-  // كل الحيوانات المملوكة (قد يكون أكثر من واحد الآن) — استعلام منفصل لأن LEFT JOIN مع .first() لا يصلح إذا كان هناك أكثر من صف مطابق.
-  const petsResult = await env.DB.prepare(
-    "SELECT pet_id, level, current_speed FROM user_pets WHERE telegram_id = ?"
-  ).bind(telegramId).all();
-  const pets = {};
-  for (const row of (petsResult.results || [])) {
-    pets[row.pet_id] = { level: row.level, speed: row.current_speed };
-  }
-  user.pets = pets;
-
   let view = withMiningView(user);
   view = withStreakView(view);
   view = withDailyPrizeView(view, "last_spin_date", "spin_claimed_today", "spin_next_reset_utc");
   view = withDailyPrizeView(view, "last_chest_date", "chest_claimed_today", "chest_next_reset_utc");
   view = withDailyPrizeView(view, "last_giftpick_date", "giftpick_claimed_today", "giftpick_next_reset_utc");
-  view = withStorageView(view);
   view.exchange_rate_coin_to_gram = EXCHANGE_RATE_COIN_TO_GRAM;
   view.exchange_min_coins = EXCHANGE_MIN_COINS;
   view.withdraw_min_gram = WITHDRAW_MIN_GRAM;
@@ -477,28 +472,6 @@ async function handleGetUser(request, env) {
   view.friends_active = user.active_referrals_count || 0;
   view.friends_pending_earnings = user.referral_pending_earnings || 0;
   view.friends_min_claim = REFERRAL_MIN_CLAIM_COINS;
-
-  view.lifetime_ads_watched = user.lifetime_ads_watched || 0;
-  view.happy_dog_friends_threshold = HAPPY_DOG_FRIENDS_THRESHOLD;
-  view.guardian_ads_threshold = GUARDIAN_ADS_THRESHOLD;
-  view.happy_dog_claimed = !!pets.happy_dog;
-  view.guardian_claimed = !!pets.guardian;
-
-  // The Ambassador: استحقاق يدوي بالكامل من الأدمن، وليس تلقائياً من أي عداد — وجود صف في ambassador_grants (يُضاف/يُحذف مباشرة على D1) هو الشرط الوحيد لظهور زر Claim متوهجاً؛ السرعة الفعلية تُحدَّد من قِبل الأدمن نفسه عند المنح (انظر handleClaimAmbassador).
-  const ambassadorGrant = await env.DB.prepare(
-    "SELECT 1 FROM ambassador_grants WHERE telegram_id = ?"
-  ).bind(telegramId).first();
-  view.ambassador_available = !!ambassadorGrant;
-  view.ambassador_claimed = !!pets.ambassador;
-
-  const milestonesResult = await env.DB.prepare(
-    "SELECT friends_required, reward FROM milestone_missions ORDER BY friends_required ASC"
-  ).all();
-  view.friends_milestones = (milestonesResult.results || []).map((m) => ({
-    count: m.friends_required,
-    reward: m.reward,
-    claimed: !!user[`milestone_${m.friends_required}_claimed`]
-  }));
 
   view.checkin_claimed_today = {
     1: user.checkin1_claimed_date === today,
@@ -524,6 +497,63 @@ async function handleGetUser(request, env) {
   view.monetix_reward_coins = MONETIX_REWARD_COINS;
 
   return jsonResponse({ user: view });
+}
+
+// ===================================================================== نقطة /api/realm/status — تُستدعى فقط عند أول فتح فعلي لصفحة Realm أو نافذتي Free Pet/Quick Free Pet (وليس مع كل /api/user). تجمع: الحيوانات المملوكة، توفّر/استلام Happy Dog وGuardian والAmbassador، وحالة Storage الكاملة (withStorageView نفسها المستخدمة سابقاً بـ/api/user) — كل هذا لا يظهر في أي واجهة أخرى غير هذه الثلاث، فعزله يوفّر 3 استعلامات كاملة (JOIN + pets.all + ambassador.first) من أكثر نقطة استدعاءً بالتطبيق. =====================================================================
+async function handleRealmStatus(request, env) {
+  const auth = await authenticateRequest(request, env);
+  if (!auth.ok) return auth.response;
+  const { telegramId } = auth;
+
+  const [row, petsResult, ambassadorGrant] = await Promise.all([
+    env.DB.prepare(
+      `SELECT u.total_speed, u.lifetime_ads_watched,
+              s.capacity_hours AS storage_capacity_hours, s.last_claim_at AS storage_last_claim_at
+       FROM users u
+       LEFT JOIN user_storage s ON s.telegram_id = u.telegram_id
+       WHERE u.telegram_id = ?`
+    ).bind(telegramId).first(),
+    env.DB.prepare(
+      "SELECT pet_id, level, current_speed FROM user_pets WHERE telegram_id = ?"
+    ).bind(telegramId).all(),
+    env.DB.prepare(
+      "SELECT 1 FROM ambassador_grants WHERE telegram_id = ?"
+    ).bind(telegramId).first()
+  ]);
+
+  if (!row) return jsonResponse({ error: "user_not_found" }, 404);
+
+  const pets = {};
+  for (const r of (petsResult.results || [])) {
+    pets[r.pet_id] = { level: r.level, speed: r.current_speed };
+  }
+
+  const storageView = withStorageView({
+    pets,
+    total_speed: row.total_speed,
+    storage_capacity_hours: row.storage_capacity_hours,
+    storage_last_claim_at: row.storage_last_claim_at
+  });
+
+  return jsonResponse({
+    pets,
+    happy_dog_claimed: !!pets.happy_dog,
+    guardian_claimed: !!pets.guardian,
+    ambassador_claimed: !!pets.ambassador,
+    ambassador_available: !!ambassadorGrant,
+    happy_dog_friends_threshold: HAPPY_DOG_FRIENDS_THRESHOLD,
+    guardian_ads_threshold: GUARDIAN_ADS_THRESHOLD,
+    lifetime_ads_watched: row.lifetime_ads_watched || 0,
+    total_speed: row.total_speed,
+    storage_has_pet: storageView.storage_has_pet,
+    storage_accrued: storageView.storage_accrued,
+    storage_level: storageView.storage_level,
+    storage_max_level: storageView.storage_max_level,
+    storage_capacity_hours: storageView.storage_capacity_hours,
+    storage_capacity_seconds: storageView.storage_capacity_seconds,
+    storage_remaining_seconds: storageView.storage_remaining_seconds,
+    storage_is_full: storageView.storage_is_full
+  });
 }
 
 // ===================================================================== نقطة /api/mine/start — بدء دورة تعدين جديدة (شخصية Doge الأساسية). السيرفر هو من يسجّل وقت البدء؛ لا شيء يُستقبل من المتصفح سوى initData. =====================================================================
@@ -2225,6 +2255,32 @@ async function handleFriendsClaimMilestone(request, env) {
   return jsonResponse({ reward: milestone.reward, coins: user.coins });
 }
 
+// ===================================================================== نقطة /api/friends/milestones — تُستدعى فقط عند أول فتح فعلي لصفحة Friends (وليس مع كل /api/user)، لأن milestone_missions بيانات ثابتة لا تعتمد على المستخدم إطلاقاً ولا داعي لقراءتها في أكثر نقطة استدعاءً بالتطبيق. =====================================================================
+async function handleFriendsMilestones(request, env) {
+  const auth = await authenticateRequest(request, env);
+  if (!auth.ok) return auth.response;
+  const { telegramId } = auth;
+
+  const [user, milestonesResult] = await Promise.all([
+    env.DB.prepare(
+      "SELECT milestone_10_claimed, milestone_25_claimed, milestone_50_claimed, milestone_100_claimed FROM users WHERE telegram_id = ?"
+    ).bind(telegramId).first(),
+    env.DB.prepare(
+      "SELECT friends_required, reward FROM milestone_missions ORDER BY friends_required ASC"
+    ).all()
+  ]);
+
+  if (!user) return jsonResponse({ error: "user_not_found" }, 404);
+
+  const milestones = (milestonesResult.results || []).map((m) => ({
+    count: m.friends_required,
+    reward: m.reward,
+    claimed: !!user[`milestone_${m.friends_required}_claimed`]
+  }));
+
+  return jsonResponse({ milestones });
+}
+
 // ===================================================================== نقطة /api/friends/list — تُستدعى فقط عند ضغط المستخدم على "Show The List" (وليس مع كل /api/user) لتفادي أي كلفة إضافية على أكثر نقطة استدعاءً بالتطبيق. LIMIT 100 يحدّ من كلفة القراءة حتى لمُحيل ضخم جداً. =====================================================================
 async function handleFriendsList(request, env) {
   const auth = await authenticateRequest(request, env);
@@ -2566,7 +2622,7 @@ async function handleComboCheck(request, env) {
   });
 }
 
-// يحسب حالة Storage الحالية (كم تراكم؟ هل امتلأ؟ كم تبقّى؟) بدون أي كتابة لقاعدة البيانات — يُستخدم فقط للعرض في /api/user.
+// يحسب حالة Storage الحالية (كم تراكم؟ هل امتلأ؟ كم تبقّى؟) بدون أي كتابة لقاعدة البيانات — يُستخدم فقط للعرض في /api/realm/status.
 function withStorageView(user) {
   const hasPet = !!(user.pets && Object.keys(user.pets).length > 0);
   const capacityHours = user.storage_capacity_hours || STORAGE_DEFAULT_CAPACITY_HOURS;
