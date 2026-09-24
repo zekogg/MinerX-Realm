@@ -4754,6 +4754,16 @@ var MAINTENANCE_ADMIN_ID = 1018495986;   // معرّف تيليجرام (Telegra
   }catch(e){}
   if (userId !== MAINTENANCE_ADMIN_ID) return;
 
+  // يمنع طباعة سجلات تيليجرام الداخلية (telegram-web-app.js نفسه، وليس كودنا)
+  // في كونسل الأدمن فقط — تُستبعَد قبل تفعيل Eruda حتى لا تظهر إطلاقاً بأي
+  // تبويب فيه ("All" ضمناً)، دون أي تأثير على عمل جسر تيليجرام نفسه (console.log
+  // هنا للعرض فقط، لا يُستخدم من الجسر داخلياً في أي منطق).
+  var originalConsoleLog = console.log;
+  console.log = function(){
+    if (typeof arguments[0] === 'string' && arguments[0].indexOf('[Telegram.WebView]') === 0) return;
+    return originalConsoleLog.apply(console, arguments);
+  };
+
   var erudaScript = document.createElement('script');
   erudaScript.src = 'https://cdn.jsdelivr.net/npm/eruda';
   erudaScript.onload = function(){
