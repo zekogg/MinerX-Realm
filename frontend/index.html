@@ -5020,8 +5020,6 @@ function fetchUserData(){
       claimed: data.user.ambassador_claimed,
       speed: data.user.pets && data.user.pets.ambassador ? data.user.pets.ambassador.speed : 0
     });
-    fetchAdminTasks('special');
-    fetchAdminTasks('partner');
     setupInviteLink(data.user.telegram_id);
     applyFriendsState({
       invites: data.user.friends_invites,
@@ -6078,6 +6076,11 @@ fetchUserData();
   });
 
   /* -- تبويبات Tasks (Daily Ads / Check in / Special / Partner) -- */
+  // Special/Partner كانا يُجلَبان من /api/tasks/list مرتين تلقائياً عند كل
+  // فتح للبوت حتى لو لم يفتح المستخدم هذين التبويبين إطلاقاً — الآن يُجلَبان
+  // فقط عند أول زيارة فعلية لكل تبويب (مرة واحدة لكل جلسة، لا تُعاد بعدها
+  // عند التبديل بينهما ذهاباً وعوداً).
+  var adminTasksFetched = { special: false, partner: false };
   var taskTabs = document.querySelectorAll('.task-tab[data-tab]');
   taskTabs.forEach(function(tab){
     tab.addEventListener('click', function(){
@@ -6086,6 +6089,10 @@ fetchUserData();
       document.querySelectorAll('.task-panel').forEach(function(panel){
         panel.classList.toggle('is-active', panel.id === 'task-panel-' + target);
       });
+      if ((target === 'special' || target === 'partner') && !adminTasksFetched[target]){
+        adminTasksFetched[target] = true;
+        fetchAdminTasks(target);
+      }
     });
   });
 
