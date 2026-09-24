@@ -34,8 +34,7 @@
 /* كل لون بارز (accent) تحته متغيّر مستقل بمفرده مكتوب فوقه أين يُستخدم بالضبط. */
 :root{
   /* --- سطوح الخلفية (مشتركة) --- */
-  /* تحديث: نظام زجاجي (glass) شفاف بدرجات بنفسجية-كحلية باردة بدل الأسطح
-     البنية الدافئة السابقة، ليتناسق مع خلفية الغابة الليلية الجديدة. */
+  /* تحديث: نظام زجاجي (glass) شفاف بدرجات بنفسجية-كحلية باردة بدل الأسطح البنية الدافئة السابقة، ليتناسق مع خلفية الغابة الليلية الجديدة. */
   --bg:            #100c1a;
   --bg-glow-1:     #201636;
   --bg-glow-2:     #0d1a22;
@@ -67,9 +66,7 @@
   --safe-t: env(safe-area-inset-top, 0px);
   --safe-b: env(safe-area-inset-bottom, 0px);
 
-  /* =========================================================
-     الألوان المستقلة — كل واحد منفصل تماماً عن البقية
-     ========================================================= */
+  /* الألوان المستقلة — كل واحد منفصل تماماً عن البقية */
 
   /* -- بطاقة صفحة Earn الرئيسية -- */
   --c-char-ring-sleep:   rgba(139,92,246,.55);  /* الحد المتقطع أثناء النوم — بنفسجي ملكي (نفس بقية الواجهة) */
@@ -224,15 +221,11 @@ body{
 }
 button{ font-family:inherit; border:none; background:none; color:inherit; cursor:pointer; transition:transform .15s ease; }
 button:active{ transform:scale(.97); }
-/* أزرار Spin/Chest/Gift Pick تبقى قابلة للضغط فعلياً حتى بعد استخدام
-   المحاولة اليومية (بدل disabled الحقيقي الذي يمنع المتصفح من إطلاق حدث
-   click أساساً) — فقط تبدو معطّلة بصرياً، حتى تعمل رسالة "Come Back
-   Tomorrow" عند الضغط عليها رغم عدم توفر محاولة. */
+/* أزرار Spin/Chest/Gift Pick تبقى قابلة للضغط فعلياً حتى بعد استخدام المحاولة اليومية (بدل disabled الحقيقي الذي يمنع المتصفح من إطلاق حدث click أساساً) — فقط تبدو معطّلة بصرياً، حتى تعمل رسالة "Come Back Tomorrow" عند الضغط عليها رغم عدم توفر محاولة. */
 button.is-claimed{ opacity:.5; }
 ul{ list-style:none; }
 img,svg{ display:block; }
-/* منع قائمة "حفظ الصورة" عند الضغط المطوّل (iOS) — لا يؤثر على النقر
-   العادي أو أي حدث onclick، ولا يغيّر أي أبعاد أو تخطيط. */
+/* منع قائمة "حفظ الصورة" عند الضغط المطوّل (iOS) — لا يؤثر على النقر العادي أو أي حدث onclick، ولا يغيّر أي أبعاد أو تخطيط. */
 img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
 @media (prefers-reduced-motion: reduce){
   *{ animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; }
@@ -416,13 +409,7 @@ img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
   gap:8px;
 }
 
-/* -- لوغو البوت في الفراغ الحقيقي بين البروفايل وبطاقة Coins — موضوع بشكل
-   مطلق خارج تدفّق Flexbox عمداً فلا يؤثر أو يحرّك أي عنصر آخر. عمود
-   topbar-right (Coins+Gram+لغة) عريض ومتغيّر العرض حسب الشاشة، فلا يمكن
-   تحديد منتصف الفراغ الحقيقي بنسبة % ثابتة أو left px ثابت — يُحسَب هذا
-   بجافاسكريبت (positionTopbarLogo) من العرض الفعلي المُقاس لكل عمود،
-   ويُعاد حسابه عند تغيّر حجم الشاشة. left هنا قيمة احتياطية فقط قبل تشغيل
-   الحساب الفعلي -- */
+/* -- لوغو البوت في الفراغ الحقيقي بين البروفايل وبطاقة Coins — موضوع بشكل مطلق خارج تدفّق Flexbox عمداً فلا يؤثر أو يحرّك أي عنصر آخر. عمود topbar-right (Coins+Gram+لغة) عريض ومتغيّر العرض حسب الشاشة، فلا يمكن تحديد منتصف الفراغ الحقيقي بنسبة % ثابتة أو left px ثابت — يُحسَب هذا بجافاسكريبت (positionTopbarLogo) من العرض الفعلي المُقاس لكل عمود، ويُعاد حسابه عند تغيّر حجم الشاشة. left هنا قيمة احتياطية فقط قبل تشغيل الحساب الفعلي -- */
 .topbar-logo{
   position:absolute; top:50%; left:56px;
   transform:translate(-50%, -50%);
@@ -580,8 +567,7 @@ img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
   transition:opacity .35s ease;
 }
 .char-slot__art.is-visible{ opacity:1; }
-/* -- التوهج الذي أثناء التعدين يميل الرسم قليلاً لليمين داخل مربعه —
-      تصحيح بصري بسيط خاص بها فقط دون المساس بوضع النوم -- */
+/* -- التوهج الذي أثناء التعدين يميل الرسم قليلاً لليمين داخل مربعه — تصحيح بصري بسيط خاص بها فقط دون المساس بوضع النوم -- */
 .char-slot__art--mining{ transform:translate(calc(-50% - 4px), -50%); }
 /* -- الحلقة الخارجية الرفيعة الثابتة (موجودة دائماً بالوضعين) -- */
 .char-slot__outer-ring{
@@ -592,8 +578,7 @@ img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
   pointer-events:none;
 }
 @keyframes char-outer-ring-spin{ to{ transform:rotate(360deg); } }
-/* -- الحد المتقطع حول الشخصية: ثابت وبنفسجي (بثلاث طبقات rgba للتوهج)
-      أثناء النوم، يدور ببطء ويتحول ذهبياً أثناء التعدين فقط -- */
+/* -- الحد المتقطع حول الشخصية: ثابت وبنفسجي (بثلاث طبقات rgba للتوهج) أثناء النوم، يدور ببطء ويتحول ذهبياً أثناء التعدين فقط -- */
 .char-slot__ring{
   position:absolute; inset:0;
   border-radius:50%;
@@ -899,8 +884,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .qa-btn svg{ width:22px; height:22px; flex-shrink:0; }   /* كانت 18px */
 .qa-btn span{ font-size:12px; font-weight:700; color:var(--ink-dim); }   /* كانت 9.5px */
 
-/* -- زر Free Pet بصف Quick Actions: نفس تصميم صندوق Get A Free Pet بصفحة Tasks
-      (نفس لون الحدود والخلفية البنفسجية) لكن بنفس حجم بقية أزرار الصف -- */
+/* -- زر Free Pet بصف Quick Actions: نفس تصميم صندوق Get A Free Pet بصفحة Tasks (نفس لون الحدود والخلفية البنفسجية) لكن بنفس حجم بقية أزرار الصف -- */
 .qa-btn--free-pet{
   border-color:var(--c-free-pet-border);
   background:rgba(165,108,240,.06);
@@ -930,8 +914,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .chest-card__row{ display:flex; align-items:center; gap:14px; }
 .chest-card__icon-wrap{ position:relative; flex-shrink:0; }
 .chest-card__icon-art{ width:91px; height:91px; object-fit:contain; flex-shrink:0; }
-/* -- اهتزاز الصندوق + ومضة توهج ذهبية عند الضغط على Open (لا صورة "مفتوح" متوفرة،
-      فالإحساس بالفتح يأتي من الحركة والضوء فقط) -- */
+/* -- اهتزاز الصندوق + ومضة توهج ذهبية عند الضغط على Open (لا صورة "مفتوح" متوفرة، فالإحساس بالفتح يأتي من الحركة والضوء فقط) -- */
 @keyframes chest-shake{
   0%,100%{ transform:translateX(0) rotate(0deg); }
   15%{ transform:translateX(-4px) rotate(-4deg); }
@@ -2135,31 +2118,20 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 }
 .price-tooltip.is-visible{ opacity:1; }
 .price-tooltip--wide{ width:150px; white-space:normal; line-height:1.5; text-align:center; }
-/* -- نسخة تظهر للأسفل بدل الأعلى (للعناصر القريبة من أعلى الشاشة، مثل
-      رقم العملات بالشريط العلوي، حيث يظهر التلميح الأصلي خارج الشاشة) -- */
+/* -- نسخة تظهر للأسفل بدل الأعلى (للعناصر القريبة من أعلى الشاشة، مثل رقم العملات بالشريط العلوي، حيث يظهر التلميح الأصلي خارج الشاشة) -- */
 .price-tooltip--below{ bottom:auto; top:100%; transform:translateX(-50%) translateY(6px); }
 .price-tooltip--below::after{
   top:auto; bottom:100%;
   border-top:none; border-bottom:4px solid rgba(227,165,66,.55);
 }
-/* -- حاوية مرجعية لأي شارة "؟" ثابتة الموضع (position:static) بحيث يتموضع
-      التلميح المنبثق بداخلها بشكل صحيح دون التأثير على تخطيط الشارة نفسها -- */
+/* -- حاوية مرجعية لأي شارة "؟" ثابتة الموضع (position:static) بحيث يتموضع التلميح المنبثق بداخلها بشكل صحيح دون التأثير على تخطيط الشارة نفسها -- */
 .help-tooltip-anchor{ position:relative; display:inline-flex; }
 .prize-tooltip-icons{ display:flex; align-items:center; justify-content:center; gap:4px; margin-top:4px; font-weight:700; }
-/* -- تلميح بطاقة Spin: يُثبَّت من جهة اليمين بدل التمركز، لأن شارة "؟" قريبة
-      من الحافة اليمنى للبطاقة والتمركز كان يدفع عرض الصفحة للخارج ويسبب
-      تمريراً أفقياً غير مرغوب حتى أثناء اختفاء التلميح (opacity:0 لا يلغي
-      مساحته من حساب overflow) -- */
+/* -- تلميح بطاقة Spin: يُثبَّت من جهة اليمين بدل التمركز، لأن شارة "؟" قريبة من الحافة اليمنى للبطاقة والتمركز كان يدفع عرض الصفحة للخارج ويسبب تمريراً أفقياً غير مرغوب حتى أثناء اختفاء التلميح (opacity:0 لا يلغي مساحته من حساب overflow) -- */
 #spin-help-tooltip{ left:auto; right:0; transform:translateY(-6px); }
 #spin-help-tooltip::after{ left:auto; right:10px; transform:none; }
 #gift-help-tooltip::after{ left:auto; right:10px; transform:none; }
-/* -- تلميحات شارات "؟" الصغيرة في البطاقات الحصرية (Happy Dog/Guardian/
-      Ambassador): لا تُستخدم .price-tooltip العامة هنا لأن الشارة نفسها
-      داخل عنصر بـoverflow:hidden (.pet-slot--exclusive، للحفاظ على تأثير
-      البطاقة البصري)، فأي تلميح متداخل بداخلها يُقصّ ولا يظهر أبداً —
-      لذلك التلميح عنصر شقيق مستقل خارج ذلك العنصر (داخل .pet-card-wrap
-      نفسه الذي بلا قصّ)، بموضع مطلق يحاذي زاوية الشارة تقريباً، ويفتح
-      للأسفل (لا للأعلى) لأن الشارة قريبة من أعلى البطاقة. -- */
+/* -- تلميحات شارات "؟" الصغيرة في البطاقات الحصرية (Happy Dog/Guardian/ Ambassador): لا تُستخدم .price-tooltip العامة هنا لأن الشارة نفسها داخل عنصر بـoverflow:hidden (.pet-slot--exclusive، للحفاظ على تأثير البطاقة البصري)، فأي تلميح متداخل بداخلها يُقصّ ولا يظهر أبداً — لذلك التلميح عنصر شقيق مستقل خارج ذلك العنصر (داخل .pet-card-wrap نفسه الذي بلا قصّ)، بموضع مطلق يحاذي زاوية الشارة تقريباً، ويفتح للأسفل (لا للأعلى) لأن الشارة قريبة من أعلى البطاقة. -- */
 .pet-exclusive-tip{
   position:absolute; top:26px; right:8px; z-index:6;
   width:150px; padding:6px 10px; border-radius:8px;
@@ -2273,9 +2245,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .pod.is-active{ transform:translateY(-18px) scale(1.04); }
 .pod.is-active .pod__inner{ box-shadow:inset 0 0 0 2px var(--pod-c1); }
 
-/* /////كود "لمعة" الحد العلوي (shine bar) — بدل الحد الملوّن المسطح/////
-   شريط علوي متدرج (شفاف → لون → شفاف) بدل حد صلب، يعطي إحساس لمعة خفيفة.
-   يُطبّق على كل بطاقة بلونها الخاص، والأطراف/الأسفل تبقى ناعمة (var(--stone-border)). */
+/* /////كود "لمعة" الحد العلوي (shine bar) — بدل الحد الملوّن المسطح///// شريط علوي متدرج (شفاف → لون → شفاف) بدل حد صلب، يعطي إحساس لمعة خفيفة. يُطبّق على كل بطاقة بلونها الخاص، والأطراف/الأسفل تبقى ناعمة (var(--stone-border)). */
 .streak-card::before, .promo-card::before, .chest-card::before, .spin-card::before,
 .gift-pick-card::before, .free-pet-box::before, .ad-task::before, .invite-box::before,
 .wallet-card::before, .stat-box::before, .reward-tier::before, .earn-hero::before,
@@ -2408,12 +2378,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   pointer-events:none;
 }
 
-/* -- تحويل Exchange/Deposit/Withdraw/شروط السحب/Free Pet Tasks إلى Bottom
-      Sheet (نفس آلية نافذة Profile: تنزلق من الأسفل، حواف علوية مستديرة
-      فقط) — بلا ارتفاع أقصى قسري أو تمرير داخلي مقصود، لأن محتوى هذه
-      النوافذ قصير بما يكفي ليظهر كاملاً دون أي حاجة للتمرير. max-height/
-      overflow-y هنا فقط شبكة أمان لحالات نادرة (شاشة صغيرة جداً + لوحة
-      مفاتيح مفتوحة)، وليسا جزءاً من التصميم المقصود -- */
+/* -- تحويل Exchange/Deposit/Withdraw/شروط السحب/Free Pet Tasks إلى Bottom Sheet (نفس آلية نافذة Profile: تنزلق من الأسفل، حواف علوية مستديرة فقط) — بلا ارتفاع أقصى قسري أو تمرير داخلي مقصود، لأن محتوى هذه النوافذ قصير بما يكفي ليظهر كاملاً دون أي حاجة للتمرير. max-height/ overflow-y هنا فقط شبكة أمان لحالات نادرة (شاشة صغيرة جداً + لوحة مفاتيح مفتوحة)، وليسا جزءاً من التصميم المقصود -- */
 #modal-exchange, #modal-deposit, #modal-withdraw, #modal-withdraw-req, #modal-quick-free-pet{
   display:flex; align-items:flex-end; padding:0;
   background:rgba(8,6,14,0);
@@ -2667,11 +2632,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .modal-footnote b{ color:var(--ink); }
 
 /* /////كود نافذة Leaderboard///// */
-/* -- تحويلها إلى Bottom Sheet (نفس آلية Profile) مع الحفاظ على ألوانها
-      الحالية كما هي بالضبط (لم نُعدِّل background/border، فقط الشكل/الحركة).
-      القائمة طويلة فعلياً (حتى 20 لاعباً) فتحتاج تمريراً داخلياً حقيقياً،
-      بعكس النوافذ الأخرى القصيرة — نفس بنية .pf-scroll تماماً (flex child
-      بـmin-height:0 بدل نسبة % لا تُحسب بشكل موثوق ضد أب max-height فقط) -- */
+/* -- تحويلها إلى Bottom Sheet (نفس آلية Profile) مع الحفاظ على ألوانها الحالية كما هي بالضبط (لم نُعدِّل background/border، فقط الشكل/الحركة). القائمة طويلة فعلياً (حتى 20 لاعباً) فتحتاج تمريراً داخلياً حقيقياً، بعكس النوافذ الأخرى القصيرة — نفس بنية .pf-scroll تماماً (flex child بـmin-height:0 بدل نسبة % لا تُحسب بشكل موثوق ضد أب max-height فقط) -- */
 #modal-leaderboard{
   display:flex; align-items:flex-end; padding:0;
   background:rgba(8,6,14,0);
@@ -2882,9 +2843,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .pg-tip-list li::before{ content:"✦"; color:#f0d878; flex-shrink:0; }
 
 /* /////كود نافذة The Mysterious Free Pet — تصميم ملكي/فاخر مستقل عن كل النوافذ الأخرى///// */
-/* -- تحويلها إلى Bottom Sheet (نفس آلية Profile/Exchange/Deposit/Withdraw):
-      تنزلق من الأسفل، حواف علوية مستديرة فقط. محتواها قصير فيظهر كاملاً
-      بلا حاجة للتمرير؛ max-height/overflow-y هنا فقط شبكة أمان -- */
+/* -- تحويلها إلى Bottom Sheet (نفس آلية Profile/Exchange/Deposit/Withdraw): تنزلق من الأسفل، حواف علوية مستديرة فقط. محتواها قصير فيظهر كاملاً بلا حاجة للتمرير؛ max-height/overflow-y هنا فقط شبكة أمان -- */
 #modal-free-pet{
   display:flex; align-items:flex-end; padding:0;
   background:rgba(8,6,14,0);
@@ -3014,8 +2973,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 }
 
 /* /////كود نافذة Profile — ملكي فاخر///// */
-/* -- Bottom Sheet: تنزلق من أسفل الشاشة وتغطي 70% من ارتفاعها، بخلاف
-      بقية النوافذ التي تظهر كبطاقة في المنتصف -- */
+/* -- Bottom Sheet: تنزلق من أسفل الشاشة وتغطي 70% من ارتفاعها، بخلاف بقية النوافذ التي تظهر كبطاقة في المنتصف -- */
 #modal-profile{
   display:flex;   /* تبقى في الـDOM دائماً (بدل display:none) ليعمل انتقال الانزلاق */
   align-items:flex-end;
@@ -3047,12 +3005,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   transition:transform .32s cubic-bezier(.22,.9,.32,1);
 }
 #modal-profile.is-open .pf-sheet{ transform:translateY(0); }
-/* -- .pf-sheet نفسه لا يتمرّر (overflow:hidden) حتى يبقى الإطار الذهبي
-      والزوايا الزخرفية ثابتة تماماً على حدود البطاقة المرئية دون أي تشويه
-      عند التمرير. .pf-scroll هو flex child بـ min-height:0 (بدل نسبة مئوية
-      100% لا تُحسب بشكل موثوق ضد أب مُحدَّد بـmax-height فقط) — هذا ما كان
-      يمنع التمرير من العمل إطلاقاً سابقاً. كل المحتوى يمرّر معاً كوحدة
-      واحدة داخل .pf-scroll فقط -- */
+/* -- .pf-sheet نفسه لا يتمرّر (overflow:hidden) حتى يبقى الإطار الذهبي والزوايا الزخرفية ثابتة تماماً على حدود البطاقة المرئية دون أي تشويه عند التمرير. .pf-scroll هو flex child بـ min-height:0 (بدل نسبة مئوية 100% لا تُحسب بشكل موثوق ضد أب مُحدَّد بـmax-height فقط) — هذا ما كان يمنع التمرير من العمل إطلاقاً سابقاً. كل المحتوى يمرّر معاً كوحدة واحدة داخل .pf-scroll فقط -- */
 .pf-scroll{
   flex:1 1 auto;
   min-height:0;
@@ -3651,7 +3604,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
             <div class="partner-task__body">
               <div class="ad-task__title">React To The Latest Post</div>
               <div class="ad-task__meta">
-                <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
+                <img draggable="false" loading="lazy" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
                 <span class="ad-task__reward">+10</span>
                 <span class="ad-task__avail">Available</span>
               </div>
@@ -3665,7 +3618,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
             <div class="partner-task__body">
               <div class="ad-task__title">Share with Friends</div>
               <div class="ad-task__meta">
-                <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
+                <img draggable="false" loading="lazy" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
                 <span class="ad-task__reward">+10</span>
                 <span class="ad-task__avail">Available</span>
               </div>
@@ -3679,7 +3632,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
             <div class="partner-task__body">
               <div class="ad-task__title">Put This @MinerXRealmBot With Your Name</div>
               <div class="ad-task__meta">
-                <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
+                <img draggable="false" loading="lazy" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
                 <span class="ad-task__reward">+20</span>
                 <span class="ad-task__avail">Available</span>
               </div>
@@ -3696,7 +3649,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
             <div class="partner-task__body">
               <div class="ad-task__title">Put Your Link In Bio</div>
               <div class="ad-task__meta">
-                <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
+                <img draggable="false" loading="lazy" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
                 <span class="ad-task__reward">+20</span>
                 <span class="ad-task__avail">Available</span>
               </div>
@@ -4254,7 +4207,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
       <div class="fp-title-divider"></div>
 
       <div class="fp-pet-slot">
-        <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/187bbf0071e1651c314318166c4605ba8f82b430/frontend/Happy%20Dog%20(100%20Reward)%20.svg" alt="Happy Dog" style="width:100%;height:100%;object-fit:contain;">
+        <img draggable="false" loading="lazy" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/187bbf0071e1651c314318166c4605ba8f82b430/frontend/Happy%20Dog%20(100%20Reward)%20.svg" alt="Happy Dog" style="width:100%;height:100%;object-fit:contain;">
       </div>
 
       <div class="fp-desc">Invite <b>100</b> Active Friends And Get Happy Dog — Free, Forever, Mining Right Away At <b>Full Speed</b></div>
@@ -4299,7 +4252,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
       <div class="pf-scroll">
         <div class="pf-avatar-wrap">
           <div class="pf-avatar">
-            <img draggable="false" id="pf-avatar-img" alt="" style="display:none;width:100%;height:100%;border-radius:50%;object-fit:cover;">
+            <img draggable="false" loading="lazy" id="pf-avatar-img" alt="" style="display:none;width:100%;height:100%;border-radius:50%;object-fit:cover;">
             <span id="pf-avatar-emoji">👤</span>
           </div>
         </div>
@@ -4372,7 +4325,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
       <div class="upgrade-cost-row">
         <span class="upgrade-cost-row__label">Upgrade Cost</span>
         <span class="upgrade-cost-row__val">
-          <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:16px;height:16px;flex-shrink:0;vertical-align:middle;">
+          <img draggable="false" loading="lazy" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:16px;height:16px;flex-shrink:0;vertical-align:middle;">
           300K Coins
         </span>
       </div>
@@ -4413,7 +4366,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
       <div class="upgrade-cost-row">
         <span class="upgrade-cost-row__label">Upgrade Cost</span>
         <span class="upgrade-cost-row__val">
-          <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:16px;height:16px;flex-shrink:0;vertical-align:middle;">
+          <img draggable="false" loading="lazy" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:16px;height:16px;flex-shrink:0;vertical-align:middle;">
           <span id="pet-upgrade-cost">30K Coins</span>
         </span>
       </div>
@@ -4426,7 +4379,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
     <div class="modal-sheet">
       <div class="modal-head">
         <div class="modal-head__title-wrap">
-          <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/bd0f38f5b1b335a06503dbede5e266d49fbbfe4a/frontend/Free%20Pet%20Icon%20.svg" alt="Free Pet" style="width:25px;height:25px;flex-shrink:0;">
+          <img draggable="false" loading="lazy" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/bd0f38f5b1b335a06503dbede5e266d49fbbfe4a/frontend/Free%20Pet%20Icon%20.svg" alt="Free Pet" style="width:25px;height:25px;flex-shrink:0;">
           <div>
             <div class="modal-head__title">Free Pet Tasks</div>
             <div class="modal-head__sub">Complete a task to earn a card</div>
@@ -4600,7 +4553,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
       <span class="fp-corner fp-corner--tr"></span>
       <div class="modal-head">
         <div class="modal-head__title-wrap">
-          <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/bd0f38f5b1b335a06503dbede5e266d49fbbfe4a/frontend/Exchange%20icon%20.svg" alt="Exchange" style="width:30px;height:30px;flex-shrink:0;">
+          <img draggable="false" loading="lazy" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/bd0f38f5b1b335a06503dbede5e266d49fbbfe4a/frontend/Exchange%20icon%20.svg" alt="Exchange" style="width:30px;height:30px;flex-shrink:0;">
           <div>
             <div class="modal-head__title">Exchange</div>
             <div class="modal-head__sub">Coins to Gram</div>
@@ -4617,14 +4570,14 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
       <div class="modal-balances">
         <div class="modal-balance-box">
           <div class="modal-balance-box__head">
-            <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:21px;height:21px;flex-shrink:0;vertical-align:middle;">
+            <img draggable="false" loading="lazy" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:21px;height:21px;flex-shrink:0;vertical-align:middle;">
             <span>Coin Balance</span>
           </div>
           <div class="modal-balance-box__val" id="exchange-coin-balance">0,000</div>
         </div>
         <div class="modal-balance-box has-gram">
           <div class="modal-balance-box__head">
-            <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:21px;height:21px;flex-shrink:0;vertical-align:middle;">
+            <img draggable="false" loading="lazy" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:21px;height:21px;flex-shrink:0;vertical-align:middle;">
             <span>Gram Balance</span>
           </div>
           <div class="modal-balance-box__val" id="exchange-gram-balance" style="color:#4a9eff">0,000</div>
@@ -4636,7 +4589,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         <button class="modal-max" onclick="setMaxExchange()">MAX</button>
       </div>
       <div class="modal-input-row">
-        <span class="modal-input-icon"><img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:21px;height:21px;flex-shrink:0;vertical-align:middle;"></span>
+        <span class="modal-input-icon"><img draggable="false" loading="lazy" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:21px;height:21px;flex-shrink:0;vertical-align:middle;"></span>
         <input type="number" id="exchange-input" placeholder="0" oninput="updateExchange()">
         <span class="modal-input-suffix">COINS</span>
       </div>
@@ -4645,7 +4598,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 
       <div class="modal-field-label"><span>You Receive</span></div>
       <div class="modal-input-row is-receive">
-        <span class="modal-input-icon"><img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:21px;height:21px;flex-shrink:0;vertical-align:middle;"></span>
+        <span class="modal-input-icon"><img draggable="false" loading="lazy" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:21px;height:21px;flex-shrink:0;vertical-align:middle;"></span>
         <span id="exchange-output">0.00000</span>
         <span class="modal-input-suffix">GRAM</span>
       </div>
@@ -4665,13 +4618,13 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
       </div>
 
       <div id="deposit-step1">
-        <div class="modal-field-label"><span>Deposit Amount (Gram):</span> <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:14px;height:14px;flex-shrink:0;vertical-align:middle;"></div>
+        <div class="modal-field-label"><span>Deposit Amount (Gram):</span> <img draggable="false" loading="lazy" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:14px;height:14px;flex-shrink:0;vertical-align:middle;"></div>
         <input type="number" class="modal-plain-input" id="deposit-input" placeholder="0" oninput="updateDeposit()">
 
         <div class="modal-field-label"><span>You will Get</span></div>
         <div class="modal-plain-box" style="display:flex;flex-direction:column;align-items:center;gap:4px;">
           <span><span id="deposit-output">0</span> +Coins</span>
-          <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:30px;height:30px;flex-shrink:0;">
+          <img draggable="false" loading="lazy" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:30px;height:30px;flex-shrink:0;">
         </div>
 
         <button class="modal-cta" id="deposit-cta" disabled onclick="goDepositStep2()" style="margin-top:6px;">Deposit</button>
@@ -4680,7 +4633,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
       <div id="deposit-step2" style="display:none;">
 
         <div class="modal-field-label"><span>Send exactly:</span></div>
-        <div class="modal-plain-box has-gram" id="deposit-amount-display" style="display:flex;align-items:center;gap:6px;"><span id="deposit-amount-display-text">1 Gram</span> <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:16px;height:16px;flex-shrink:0;"></div>
+        <div class="modal-plain-box has-gram" id="deposit-amount-display" style="display:flex;align-items:center;gap:6px;"><span id="deposit-amount-display-text">1 Gram</span> <img draggable="false" loading="lazy" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:16px;height:16px;flex-shrink:0;"></div>
 
         <div class="modal-field-label"><span>To wallet address:</span></div>
         <div class="modal-plain-box modal-mono" id="deposit-address">Your_Deposit_wallet</div>
@@ -4716,7 +4669,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
       <input type="text" class="modal-plain-input" id="withdraw-address" placeholder="UQ...">
 
       <div class="modal-field-label"><span>Amount to be received:</span></div>
-      <div class="modal-plain-box has-gram" style="display:flex;align-items:center;gap:6px;"><span id="withdraw-output">0.0000</span> Gram <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:16px;height:16px;flex-shrink:0;"></div>
+      <div class="modal-plain-box has-gram" style="display:flex;align-items:center;gap:6px;"><span id="withdraw-output">0.0000</span> Gram <img draggable="false" loading="lazy" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:16px;height:16px;flex-shrink:0;"></div>
 
       <div class="wd-req">
         <div class="wd-req__label"><span>Min Withdraw : <span id="withdraw-min-label">0.1</span></span></div>
@@ -4739,6 +4692,41 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 </div>
 
 <script>
+/* /////عناصر DOM مخزَّنة مرة واحدة عند التحميل — تُستخدم داخل مؤقّتات setInterval كل ثانية (تعدين/streak/storage/leaderboard/إعلانات) بدل إعادة document.getElementById في كل تكة///// */
+var domCache = {
+  miningBtn: null, miningFill: null, miningPct: null, miningTime: null,
+  streakTimer: null,
+  storageTimer: null, storageClaimBtn: null, storageVal: null,
+  lbRewardsBadge: null,
+  adsTaskBtn: null, adsTaskCounter: null, adsTaskAvail: null,
+  gigapubBtn: null, gigapubCounter: null, gigapubAvail: null,
+  bonusAdBtn: null, bonusAdCounter: null, bonusAdAvail: null,
+  monetixBtn: null, monetixCounter: null, monetixAvail: null
+};
+(function(){
+  domCache.miningBtn = document.getElementById('btn-start-mining');
+  domCache.miningFill = document.getElementById('mining-progress-fill');
+  domCache.miningPct = document.getElementById('mining-progress-pct');
+  domCache.miningTime = document.getElementById('mining-session-time');
+  domCache.streakTimer = document.getElementById('streak-timer-val');
+  domCache.storageTimer = document.getElementById('storage-timer');
+  domCache.storageClaimBtn = document.getElementById('storage-claim-btn');
+  domCache.storageVal = document.getElementById('display-storage-val');
+  domCache.lbRewardsBadge = document.getElementById('lb-rewards-badge');
+  domCache.adsTaskBtn = document.getElementById('ads-task-watch-btn');
+  domCache.adsTaskCounter = document.getElementById('ads-task-counter');
+  domCache.adsTaskAvail = document.getElementById('ads-task-avail');
+  domCache.gigapubBtn = document.getElementById('gigapub-task-watch-btn');
+  domCache.gigapubCounter = document.getElementById('gigapub-task-counter');
+  domCache.gigapubAvail = document.getElementById('gigapub-task-avail');
+  domCache.bonusAdBtn = document.getElementById('bonus-ad-watch-btn');
+  domCache.bonusAdCounter = document.getElementById('bonus-ad-counter');
+  domCache.bonusAdAvail = document.getElementById('bonus-ad-avail');
+  domCache.monetixBtn = document.getElementById('monetix-task-watch-btn');
+  domCache.monetixCounter = document.getElementById('monetix-task-counter');
+  domCache.monetixAvail = document.getElementById('monetix-task-avail');
+})();
+
 /* /////كود وضع الصيانة — فقط الأدمن (معرّف تيليجرام أدناه) يستطيع الدخول أثناء الصيانة///// */
 var MAINTENANCE_MODE = false;   // غيّرها إلى true لتفعيل وضع الصيانة لكل المستخدمين عدا الأدمن
 var MAINTENANCE_ADMIN_ID = 1018495986;   // معرّف تيليجرام (Telegram user ID) للأدمن المسموح له بالعبور
@@ -4756,8 +4744,7 @@ var MAINTENANCE_ADMIN_ID = 1018495986;   // معرّف تيليجرام (Telegra
   }
 })();
 
-/* /////كود شاشة التحميل الوهمية: 4 ثوانٍ ثابتة عند كل فتح للتطبيق، لا علاقة
-   لها بجلب البيانات الحقيقية (fetchUserData يعمل بالتوازي في الخلفية)///// */
+/* /////كود شاشة التحميل الوهمية: 4 ثوانٍ ثابتة عند كل فتح للتطبيق، لا علاقة لها بجلب البيانات الحقيقية (fetchUserData يعمل بالتوازي في الخلفية)///// */
 (function(){
   var LOADING_SCREEN_DURATION_MS = 2000;
   var screen = document.getElementById('loading-screen');
@@ -4777,10 +4764,7 @@ var MAINTENANCE_ADMIN_ID = 1018495986;   // معرّف تيليجرام (Telegra
   }, LOADING_SCREEN_DURATION_MS);
 })();
 
-/* /////كود توسيط لوغو الشريط العلوي في الفراغ الحقيقي بين البروفايل وعمود
-   Coins/Gram/اللغة — يُحسَب من العرض الفعلي المُقاس لكل عمود (وليس نسبة %
-   أو left px ثابت)، لأن عمود topbar-right متغيّر العرض حسب الشاشة، فمنتصف
-   الشريط الكامل لا يساوي منتصف الفراغ الفعلي بينهما///// */
+/* /////كود توسيط لوغو الشريط العلوي في الفراغ الحقيقي بين البروفايل وعمود Coins/Gram/اللغة — يُحسَب من العرض الفعلي المُقاس لكل عمود (وليس نسبة % أو left px ثابت)، لأن عمود topbar-right متغيّر العرض حسب الشاشة، فمنتصف الشريط الكامل لا يساوي منتصف الفراغ الفعلي بينهما///// */
 function positionTopbarLogo(){
   var logo = document.querySelector('.topbar-logo');
   var topbar = document.querySelector('.topbar');
@@ -4808,11 +4792,7 @@ function getTelegramInitData(){
   return '';
 }
 
-// صورة البروفايل الحقيقية من تيليجرام تصل جاهزة ضمن initDataUnsafe.user
-// (لا حاجة لأي استدعاء Bot API من الواجهة) — تُستخدم مباشرة لعرض الصورة
-// في الشريط العلوي ونافذة Profile، مع رجوع للإيموجي 👤 لو لم توجد صورة
-// عامة للمستخدم أو فشل تحميلها. السيرفر يخزّن نسخة منها بشكل مستقل
-// (انظر handleGetUser) لأماكن أخرى تحتاج صور مستخدمين غير الحالي.
+// صورة البروفايل الحقيقية من تيليجرام تصل جاهزة ضمن initDataUnsafe.user (لا حاجة لأي استدعاء Bot API من الواجهة) — تُستخدم مباشرة لعرض الصورة في الشريط العلوي ونافذة Profile، مع رجوع للإيموجي 👤 لو لم توجد صورة عامة للمستخدم أو فشل تحميلها. السيرفر يخزّن نسخة منها بشكل مستقل (انظر handleGetUser) لأماكن أخرى تحتاج صور مستخدمين غير الحالي.
 function setupProfilePhoto(){
   var photoUrl = null;
   try{
@@ -4836,8 +4816,7 @@ function setupProfilePhoto(){
 }
 setupProfilePhoto();
 
-// سعر صرف Coins <-> Gram الافتراضي (يُستبدل بالقيمة الحقيقية القادمة من
-// /api/user فور توفرها — يبقى هذا فقط احتياطياً قبل أول تحميل).
+// سعر صرف Coins <-> Gram الافتراضي (يُستبدل بالقيمة الحقيقية القادمة من /api/user فور توفرها — يبقى هذا فقط احتياطياً قبل أول تحميل).
 var EXCHANGE_RATE_COIN_TO_GRAM = 0.00001;
 var EXCHANGE_MIN_COINS = 1000;
 
@@ -4854,8 +4833,7 @@ function formatCoinsK(value){
   return text + ' ' + unit;
 }
 
-// آخر رصيد حقيقي معروف (يُحدَّث في كل مرة يصل فيها رد من السيرفر) —
-// يُستخدم لملء نافذة Exchange بدون الاعتماد على نص منسَّق (مثل "1.1 K").
+// آخر رصيد حقيقي معروف (يُحدَّث في كل مرة يصل فيها رد من السيرفر) — يُستخدم لملء نافذة Exchange بدون الاعتماد على نص منسَّق (مثل "1.1 K").
 var CURRENT_COINS_BALANCE = 0;
 var CURRENT_GRAM_BALANCE = 0;
 
@@ -5017,11 +4995,7 @@ function fetchUserData(){
   });
 }
 
-/* =====================================================================
-   كود دورة "Start Mining" الحقيقية (شخصية Doge). كل قرار (هل الدورة
-   جاهزة؟ كم المكافأة؟) يُحسم من السيرفر فقط — هذا الكود يعرض الحالة
-   ويستدعي /api/mine/start و /api/mine/claim، ولا يحسب أي مكافأة بنفسه.
-   ===================================================================== */
+/* كود دورة "Start Mining" الحقيقية (شخصية Doge). كل قرار (هل الدورة جاهزة؟ كم المكافأة؟) يُحسم من السيرفر فقط — هذا الكود يعرض الحالة ويستدعي /api/mine/start و /api/mine/claim، ولا يحسب أي مكافأة بنفسه. */
 var miningState = {
   startedAt: null,      // Date أو null
   cycleDurationSec: 3600,
@@ -5033,7 +5007,8 @@ var miningBusy = false; // يمنع ضغط الزر أثناء انتظار رد
 
 function setMiningButton(text, opts){
   opts = opts || {};
-  var btn = document.getElementById('btn-start-mining');
+  var btn = domCache.miningBtn;
+  if (!btn) return;
   btn.textContent = text;
   btn.classList.toggle('is-mining', !!opts.mining);
   btn.classList.toggle('is-claim-ready', !!opts.claimReady);
@@ -5047,15 +5022,15 @@ function renderMiningCounter(){
 
 function renderMiningProgress(elapsedSec){
   var pct = Math.max(0, Math.min(100, Math.round((elapsedSec / miningState.cycleDurationSec) * 100)));
-  var fill = document.getElementById('mining-progress-fill');
-  var pctLabel = document.getElementById('mining-progress-pct');
+  var fill = domCache.miningFill;
+  var pctLabel = domCache.miningPct;
   if (fill) fill.style.width = pct + '%';
   if (pctLabel) pctLabel.textContent = pct + '%';
 
   var remaining = Math.max(0, miningState.cycleDurationSec - elapsedSec);
   var mm = String(Math.floor(remaining / 60)).padStart(2, '0');
   var ss = String(Math.floor(remaining % 60)).padStart(2, '0');
-  var timeEl = document.getElementById('mining-session-time');
+  var timeEl = domCache.miningTime;
   if (timeEl) timeEl.textContent = mm + ':' + ss;
 }
 
@@ -5123,8 +5098,7 @@ function onMiningButtonClick(){
   var isReadyToClaim = miningState.startedAt &&
     (Date.now() - miningState.startedAt.getTime()) / 1000 >= miningState.cycleDurationSec;
 
-  // دورة تعدين جارية ولم تنتهِ بعد — لا إعلان ولا أي إجراء، الزر معطّل أصلاً
-  // لكن هذا الحارس يمنع أي طلب مضاعف (مثلاً ضغطة وصلت قبل تحديث opts.disabled).
+  // دورة تعدين جارية ولم تنتهِ بعد — لا إعلان ولا أي إجراء، الزر معطّل أصلاً لكن هذا الحارس يمنع أي طلب مضاعف (مثلاً ضغطة وصلت قبل تحديث opts.disabled).
   if (miningState.startedAt && !isReadyToClaim) return;
 
   // إعلان قبل بدء دورة تعدين جديدة فقط — Claim Reward بدون إعلان.
@@ -5179,11 +5153,7 @@ function runMiningRequest(isReadyToClaim){
   });
 }
 
-/* =====================================================================
-   كود بطاقة Daily Streak. السيرفر هو من يقرر أي يوم القادم وهل استُلمت
-   مكافأة اليوم بالفعل — هذا الكود فقط يعرض الحالة ويستدعي
-   /api/streak/claim، ولا يحسب أي مكافأة أو تسلسل بنفسه.
-   ===================================================================== */
+/* كود بطاقة Daily Streak. السيرفر هو من يقرر أي يوم القادم وهل استُلمت مكافأة اليوم بالفعل — هذا الكود فقط يعرض الحالة ويستدعي /api/streak/claim، ولا يحسب أي مكافأة أو تسلسل بنفسه. */
 var streakState = {
   displayDay: 1,
   claimedToday: false,
@@ -5221,7 +5191,7 @@ function renderStreakButton(){
 }
 
 function renderStreakTimer(){
-  var timerEl = document.getElementById('streak-timer-val');
+  var timerEl = domCache.streakTimer;
   if (!timerEl || !streakState.nextResetUtc) return;
 
   var remainingMs = new Date(streakState.nextResetUtc).getTime() - Date.now();
@@ -5295,19 +5265,8 @@ function runStreakClaimRequest(initData){
   });
 }
 
-/* =====================================================================
-   كود توست الجوائز (Prize Toast) — عام وقابل لإعادة الاستخدام لأي جائزة
-   مستقبلية (Spin حالياً)، يظهر وسط الشاشة لمدة 4 ثوانٍ ثم يختفي تلقائياً.
-   ===================================================================== */
-/* =====================================================================
-   محرك الكونفيتي المشترك — canvas واحد فقط (#confetti-canvas)، ودالة
-   واحدة triggerConfetti() تُستدعى من كل نقطة نجاح (البوابات الست، مهام
-   Daily Ads، Daily Combo، Exchange، شراء/ترقية أي شخصية، Storage
-   Claim/Upgrade، Withdraw، Claim أرباح الإحالة). لا يوجد أي تكرار
-   للمنطق — كل نقطة نجاح تستدعي هذه الدالة بسطر واحد فقط. الحلقة
-   (requestAnimationFrame) تتوقف من نفسها فور انتهاء آخر قصّة، فلا يوجد
-   أي استهلاك في الخلفية عندما لا يوجد احتفال جارٍ.
-   ===================================================================== */
+/* كود توست الجوائز (Prize Toast) — عام وقابل لإعادة الاستخدام لأي جائزة مستقبلية (Spin حالياً)، يظهر وسط الشاشة لمدة 4 ثوانٍ ثم يختفي تلقائياً. */
+/* محرك الكونفيتي المشترك — canvas واحد فقط (#confetti-canvas)، ودالة واحدة triggerConfetti() تُستدعى من كل نقطة نجاح (البوابات الست، مهام Daily Ads، Daily Combo، Exchange، شراء/ترقية أي شخصية، Storage Claim/Upgrade، Withdraw، Claim أرباح الإحالة). لا يوجد أي تكرار للمنطق — كل نقطة نجاح تستدعي هذه الدالة بسطر واحد فقط. الحلقة (requestAnimationFrame) تتوقف من نفسها فور انتهاء آخر قصّة، فلا يوجد أي استهلاك في الخلفية عندما لا يوجد احتفال جارٍ. */
 var confettiCanvas = document.getElementById('confetti-canvas');
 var confettiCtx = confettiCanvas ? confettiCanvas.getContext('2d') : null;
 var confettiParticles = [];
@@ -5355,8 +5314,7 @@ function confettiStep(){
   }
 }
 
-// دالة واحدة تُستدعى من أي مكان في الكود عند نجاح أي مكافأة/إجراء —
-// تساقط خفيف من الأعلى على كامل الشاشة لمدة ~2 ثانية ثم يختفي تلقائياً.
+// دالة واحدة تُستدعى من أي مكان في الكود عند نجاح أي مكافأة/إجراء — تساقط خفيف من الأعلى على كامل الشاشة لمدة ~2 ثانية ثم يختفي تلقائياً.
 function triggerConfetti(){
   if (!confettiCtx) return;
   var w = window.innerWidth;
@@ -5385,8 +5343,7 @@ var PRIZE_ICON_URLS = {
 };
 var prizeToastTimer = null;
 
-// توست عام قابل لإعادة الاستخدام لأي رسالة لحظية (جائزة، شراء، ترقية،
-// أو تنبيه) — نفس البطاقة المرئية، فقط العنوان والأيقونة والنص يتغيّرون.
+// توست عام قابل لإعادة الاستخدام لأي رسالة لحظية (جائزة، شراء، ترقية، أو تنبيه) — نفس البطاقة المرئية، فقط العنوان والأيقونة والنص يتغيّرون.
 function showAppToast(opts){
   var toast = document.getElementById('prize-toast');
   if (!toast) return;
@@ -5452,12 +5409,7 @@ function showStorageUpgradeToast(level, hours){
   triggerConfetti();
 }
 
-/* =====================================================================
-   كود عجلة الحظ (Spin). النتيجة (segment_index) تأتي من السيرفر فقط —
-   هذا الكود يستقبلها ويشغّل الأنيميشن، ولا يقرر الفائز بنفسه إطلاقاً.
-   دوران الشريحة 0 يبدأ من الأعلى (حيث المؤشر) وباتجاه عقارب الساعة،
-   كل شريحة 45 درجة (8 شرائح)، مطابق تماماً لترتيب SPIN_SEGMENTS بالسيرفر.
-   ===================================================================== */
+/* كود عجلة الحظ (Spin). النتيجة (segment_index) تأتي من السيرفر فقط — هذا الكود يستقبلها ويشغّل الأنيميشن، ولا يقرر الفائز بنفسه إطلاقاً. دوران الشريحة 0 يبدأ من الأعلى (حيث المؤشر) وباتجاه عقارب الساعة، كل شريحة 45 درجة (8 شرائح)، مطابق تماماً لترتيب SPIN_SEGMENTS بالسيرفر. */
 var spinState = { claimedToday: false, nextResetUtc: null };
 var spinBusy = false;
 var spinWheelRotation = 0;
@@ -5549,11 +5501,7 @@ function runSpinClaimRequest(initData, btn){
   });
 }
 
-/* =====================================================================
-   كود بطاقة Chest. نفس جدول جوائز واحتمالات عجلة الحظ، محاولة مجانية
-   واحدة باليوم. لا يوجد صورة "صندوق مفتوح"، فالإحساس بالفتح يأتي من
-   اهتزاز الصندوق + ومضة توهج فقط (CSS)، ثم يظهر توست الجائزة.
-   ===================================================================== */
+/* كود بطاقة Chest. نفس جدول جوائز واحتمالات عجلة الحظ، محاولة مجانية واحدة باليوم. لا يوجد صورة "صندوق مفتوح"، فالإحساس بالفتح يأتي من اهتزاز الصندوق + ومضة توهج فقط (CSS)، ثم يظهر توست الجائزة. */
 var chestState = { claimedToday: false, nextResetUtc: null };
 var chestBusy = false;
 
@@ -5629,12 +5577,7 @@ function runChestClaimRequest(initData){
   });
 }
 
-/* =====================================================================
-   كود بطاقة Pick 1 Of The 3 Gifts. نفس جدول جوائز واحتمالات عجلة الحظ،
-   محاولة مجانية واحدة باليوم. اختيار الهدية شكلي بالكامل (لا يؤثر على
-   النتيجة، السيرفر يقرر الجائزة بغض النظر عن أي صندوق اختاره المستخدم) —
-   الهدية المختارة "تنقلب" لتكشف الجائزة، والأخريان تتلاشيان.
-   ===================================================================== */
+/* كود بطاقة Pick 1 Of The 3 Gifts. نفس جدول جوائز واحتمالات عجلة الحظ، محاولة مجانية واحدة باليوم. اختيار الهدية شكلي بالكامل (لا يؤثر على النتيجة، السيرفر يقرر الجائزة بغض النظر عن أي صندوق اختاره المستخدم) — الهدية المختارة "تنقلب" لتكشف الجائزة، والأخريان تتلاشيان. */
 var giftPickState = { claimedToday: false, nextResetUtc: null };
 var giftPickBusy = false;
 
@@ -5722,14 +5665,8 @@ function runGiftClaimRequest(initData, selectedBox){
   });
 }
 
-/* =====================================================================
-   كود شخصية The Duck + Storage. كل الاقتصاد (الأسعار، السرعات، التراكم)
-   يُحسب ويُتحقق منه في السيرفر فقط؛ هذا الكود يعرض الحالة القادمة منه
-   ويستدعي /api/duck/buy، /api/duck/upgrade، و/api/storage/claim.
-   ===================================================================== */
-// نفس القيم المستخدمة بالسيرفر بالضبط (pet_id -> {basespeed, price}) —
-// تُستخدم هنا فقط لعرض معاينة صحيحة في نافذة الترقية قبل إرسال الطلب؛
-// القرار والتحقق الفعليان يبقيان بالكامل من طرف السيرفر.
+/* كود شخصية The Duck + Storage. كل الاقتصاد (الأسعار، السرعات، التراكم) يُحسب ويُتحقق منه في السيرفر فقط؛ هذا الكود يعرض الحالة القادمة منه ويستدعي /api/duck/buy، /api/duck/upgrade، و/api/storage/claim. */
+// نفس القيم المستخدمة بالسيرفر بالضبط (pet_id -> {basespeed, price}) — تُستخدم هنا فقط لعرض معاينة صحيحة في نافذة الترقية قبل إرسال الطلب؛ القرار والتحقق الفعليان يبقيان بالكامل من طرف السيرفر.
 var PET_MAX_LEVEL = 100; // نفس الحد الأقصى لكل الحيوانات
 var PET_UPGRADE_COST_RATIO = 0.10; // 10% من سعر الشراء — يجب مطابقته دائماً لقيمة PET_UPGRADE_COST_RATIO في worker.js
 var PET_DEFS = [
@@ -5748,8 +5685,7 @@ var petBuyBusy = {};  // pet_id -> bool
 var petUpgradeBusy = false;
 var activeUpgradePetId = null;
 
-// نفس صيغة السيرفر بالضبط: كل مستوى يضيف 10% من السرعة الأساسية (ثابتة،
-// وليست من السرعة المحدَّثة) — نُعيد حسابها هنا فقط لعرض معاينة صحيحة.
+// نفس صيغة السيرفر بالضبط: كل مستوى يضيف 10% من السرعة الأساسية (ثابتة، وليست من السرعة المحدَّثة) — نُعيد حسابها هنا فقط لعرض معاينة صحيحة.
 function petSpeedForLevel(petId, level){
   var def = PET_DEFS_BY_ID[petId];
   return def.basespeed + (level - 1) * (def.basespeed * 0.10);
@@ -5783,8 +5719,7 @@ function renderPetCard(def){
   }
 }
 
-// تُستدعى بعد نجاح شراء أي حيوان: علامة صح مؤقتة 4 ثوانٍ، ثم يبقى الزر
-// "Owned" ومعطّلاً دائماً (نفس منطق showBuySuccessDuck سابقاً، معمَّم).
+// تُستدعى بعد نجاح شراء أي حيوان: علامة صح مؤقتة 4 ثوانٍ، ثم يبقى الزر "Owned" ومعطّلاً دائماً (نفس منطق showBuySuccessDuck سابقاً، معمَّم).
 function showBuySuccessGeneric(btn){
   if (!btn || btn.classList.contains('is-success')) return;
   btn.classList.add('is-success');
@@ -5891,8 +5826,7 @@ function onPetUpgradeConfirm(){
     petStates[petId] = { level: data.level, speed: data.speed };
     renderPetCard(def);
     updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE });
-    // السيرفر يصفّر لحظة بداية تراكم Storage عند كل ترقية (لمنع احتساب
-    // الوقت الماضي بالسرعة الكلية الجديدة الأعلى) — نطابق نفس التصفير هنا محلياً
+    // السيرفر يصفّر لحظة بداية تراكم Storage عند كل ترقية (لمنع احتساب الوقت الماضي بالسرعة الكلية الجديدة الأعلى) — نطابق نفس التصفير هنا محلياً
     applyStorageState({
       storage_has_pet: true,
       total_speed: data.total_speed,
@@ -5910,10 +5844,7 @@ function onPetUpgradeConfirm(){
   });
 }
 
-/* -- Storage: تراكم يبدأ عند شراء أول شخصية، يمتلئ خلال ساعات السعة
-      المحدَّدة (6 افتراضياً)، ثم ينتظر Claim. العداد المعروض محلي فقط
-      للعرض الحي؛ المبلغ الفعلي يُحسب ويُتحقق منه بالكامل في السيرفر
-      عند الضغط على Claim. -- */
+/* -- Storage: تراكم يبدأ عند شراء أول شخصية، يمتلئ خلال ساعات السعة المحدَّدة (6 افتراضياً)، ثم ينتظر Claim. العداد المعروض محلي فقط للعرض الحي؛ المبلغ الفعلي يُحسب ويُتحقق منه بالكامل في السيرفر عند الضغط على Claim. -- */
 // نفس ترتيب STORAGE_LEVELS بالسيرفر بالضبط (بالساعات) — للعرض فقط.
 var STORAGE_LEVEL_HOURS = [6, 8, 12, 16, 24];
 var STORAGE_MAX_LEVEL = STORAGE_LEVEL_HOURS.length;
@@ -5935,9 +5866,7 @@ function renderTotalSpeedBadge(){
   if (badge) badge.textContent = 'Total Speed (+' + Math.round(storageState.totalSpeed) + ' Coins / hr)';
 }
 
-// بعد الحصول على Happy Dog/Guardian مجاناً: تحديث Total Speed فوراً، وتشغيل
-// عدّاد Storage إن كانت هذه أول شخصية يملكها المستخدم على الإطلاق (بدون
-// إعادة ضبط ساعة التراكم الحالية، فقط تفعيلها إن لم تكن مفعّلة أصلاً).
+// بعد الحصول على Happy Dog/Guardian مجاناً: تحديث Total Speed فوراً، وتشغيل عدّاد Storage إن كانت هذه أول شخصية يملكها المستخدم على الإطلاق (بدون إعادة ضبط ساعة التراكم الحالية، فقط تفعيلها إن لم تكن مفعّلة أصلاً).
 function applyClaimedPetSpeed(newTotalSpeed){
   storageState.totalSpeed = newTotalSpeed;
   renderTotalSpeedBadge();
@@ -5961,8 +5890,7 @@ function applyStorageState(data){
   storageState.elapsedAtSync = Math.max(0, storageState.capacitySeconds - remainingSeconds);
   storageState.syncedAtMs = Date.now();
 
-  // زر Upgrade الخاص بـ Storage يظهر بنفس شكل زر Upgrade المعطّل لأي حيوان
-  // (باهت) طالما المستخدم لا يملك أي حيوان بعد — لا فائدة من ترقية تخزين فارغ
+  // زر Upgrade الخاص بـ Storage يظهر بنفس شكل زر Upgrade المعطّل لأي حيوان (باهت) طالما المستخدم لا يملك أي حيوان بعد — لا فائدة من ترقية تخزين فارغ
   var boostBtn = document.getElementById('storage-boost-btn');
   if (boostBtn) boostBtn.disabled = !storageState.hasPet;
 
@@ -5975,9 +5903,9 @@ function applyStorageState(data){
 }
 
 function storageTick(){
-  var timerEl = document.getElementById('storage-timer');
-  var claimBtn = document.getElementById('storage-claim-btn');
-  var valEl = document.getElementById('display-storage-val');
+  var timerEl = domCache.storageTimer;
+  var claimBtn = domCache.storageClaimBtn;
+  var valEl = domCache.storageVal;
   if (!timerEl || !claimBtn || !valEl) return;
 
   if (!storageState.hasPet){
@@ -6031,8 +5959,7 @@ function onStorageClaimClick(){
   .then(function(result){
     var data = result.data;
     if (data.error){
-      // 'not_full_yet' غير قابل للوصول عادةً لأن الزر معطّل حتى الامتلاء —
-      // لا حاجة لأي رسالة، فقط تجاهل بصمت لو حدث (تلاعب مباشر بالطلب مثلاً).
+      // 'not_full_yet' غير قابل للوصول عادةً لأن الزر معطّل حتى الامتلاء — لا حاجة لأي رسالة، فقط تجاهل بصمت لو حدث (تلاعب مباشر بالطلب مثلاً).
       if (data.error !== 'not_full_yet'){
         console.error('storage claim error:', data.error);
       }
@@ -6070,9 +5997,7 @@ fetchUserData();
     }
   }catch(e){ /* running outside Telegram — ignore */ }
 
-  // يمنع قائمة "حفظ/فتح الصورة" عند الضغط المطوّل على أندرويد وسطح المكتب
-  // (النقطة الثالثة إلى جانب CSS و draggable="false" أعلاه) — لا يعطّل
-  // أي حدث onclick على الصور، فقط قائمة السياق الافتراضية للمتصفح.
+  // يمنع قائمة "حفظ/فتح الصورة" عند الضغط المطوّل على أندرويد وسطح المكتب (النقطة الثالثة إلى جانب CSS و draggable="false" أعلاه) — لا يعطّل أي حدث onclick على الصور، فقط قائمة السياق الافتراضية للمتصفح.
   document.addEventListener('contextmenu', function(e){
     if (e.target && e.target.tagName === 'IMG') e.preventDefault();
   });
@@ -6140,8 +6065,7 @@ function copyCheckinText(btn, text){
   }
 }
 
-// مهمة "Put Your Link In Bio" تنسخ رابط الدعوة الحقيقي لهذا المستخدم
-// (نفس الرابط المعروض في صندوق Invite)، وليس قيمة ثابتة/وهمية.
+// مهمة "Put Your Link In Bio" تنسخ رابط الدعوة الحقيقي لهذا المستخدم (نفس الرابط المعروض في صندوق Invite)، وليس قيمة ثابتة/وهمية.
 function copyMyReferralLink(btn){
   var linkEl = document.getElementById('invite-link-text');
   var text = linkEl ? linkEl.textContent.trim() : '';
@@ -6158,13 +6082,7 @@ function closeModal(id){
 }
 
 /* -- Leaderboard -- */
-/* =====================================================================
-   Weekly Leaderboard — بيانات حقيقية من /api/leaderboard (كاش يومي مشترك
-   على السيرفر عبر Cache API + كاش يومي محلي في localStorage لكل مستخدم،
-   فلا يتكرر الطلب أكثر من مرة واحدة في اليوم حتى لو فُتحت النافذة عدة
-   مرات). عرض Top 20 فقط لكل قسم (By Ads / By Referrals)، بالجوائز
-   المرفقة من السيرفر نفسه (لا حساب جوائز في الواجهة إطلاقاً).
-   ===================================================================== */
+/* Weekly Leaderboard — بيانات حقيقية من /api/leaderboard (كاش يومي مشترك على السيرفر عبر Cache API + كاش يومي محلي في localStorage لكل مستخدم، فلا يتكرر الطلب أكثر من مرة واحدة في اليوم حتى لو فُتحت النافذة عدة مرات). عرض Top 20 فقط لكل قسم (By Ads / By Referrals)، بالجوائز المرفقة من السيرفر نفسه (لا حساب جوائز في الواجهة إطلاقاً). */
 var LB_METRIC_LABEL = { ads: 'Ads Watched', referrals: 'Active Referrals' };
 var leaderboardNextPayoutAt = null;
 var leaderboardCountdownTimer = null;
@@ -6254,7 +6172,7 @@ function renderLeaderboardPanel(type, entries){
 }
 
 function renderLeaderboardCountdown(){
-  var el = document.getElementById('lb-rewards-badge');
+  var el = domCache.lbRewardsBadge;
   if (!el || !leaderboardNextPayoutAt) return;
   var remaining = Math.max(0, leaderboardNextPayoutAt - Date.now());
   var totalSec = Math.floor(remaining / 1000);
@@ -6310,9 +6228,7 @@ function openQuickFreePetModal(){
   openModal('modal-quick-free-pet');
 }
 
-// زر Support بنافذة Profile — يفتح محادثة الدعم على تيليجرام مباشرة.
-// SUPPORT_TELEGRAM_USERNAME لا يزال Placeholder؛ يجب استبداله باليوزرنيم
-// الحقيقي لحساب الدعم قبل أن يعمل هذا الزر فعلياً.
+// زر Support بنافذة Profile — يفتح محادثة الدعم على تيليجرام مباشرة. SUPPORT_TELEGRAM_USERNAME لا يزال Placeholder؛ يجب استبداله باليوزرنيم الحقيقي لحساب الدعم قبل أن يعمل هذا الزر فعلياً.
 var SUPPORT_TELEGRAM_USERNAME = 'REPLACE_WITH_SUPPORT_USERNAME';
 function openSupportChat(){
   var url = 'https://t.me/' + SUPPORT_TELEGRAM_USERNAME;
@@ -6474,15 +6390,7 @@ function onStorageUpgradeConfirm(){
   });
 }
 
-/* =====================================================================
-   Happy Dog (فتح مجاني بعد 100 صديق نشط) وThe Guardian (فتح مجاني بعد
-   4000 إعلان مدى الحياة) — نفس البيانات والحالة تُعرَض في مكانين لكل واحدة
-   (بطاقتها في Realm + نافذتها المنبثقة المطابقة)، وتُحدَّثان معاً دائماً من
-   applyHappyDogState/applyGuardianState (تُستدعيان من fetchUserData، نفس
-   بيانات /api/user الحقيقية — لا حالة محلية منفصلة). السرعة تُعرض "??"
-   قبل الحصول على الشخصية، والزر يتحول لعلامة صح دائمة بعد الحصول عليها في
-   كل الأماكن (البطاقة، نافذة Happy Dog، نافذة Free Pet Tasks السريعة).
-   ===================================================================== */
+/* Happy Dog (فتح مجاني بعد 100 صديق نشط) وThe Guardian (فتح مجاني بعد 4000 إعلان مدى الحياة) — نفس البيانات والحالة تُعرَض في مكانين لكل واحدة (بطاقتها في Realm + نافذتها المنبثقة المطابقة)، وتُحدَّثان معاً دائماً من applyHappyDogState/applyGuardianState (تُستدعيان من fetchUserData، نفس بيانات /api/user الحقيقية — لا حالة محلية منفصلة). السرعة تُعرض "??" قبل الحصول على الشخصية، والزر يتحول لعلامة صح دائمة بعد الحصول عليها في كل الأماكن (البطاقة، نافذة Happy Dog، نافذة Free Pet Tasks السريعة). */
 var happyDogState = { activeFriends: 0, threshold: 100, claimed: false, busy: false };
 var guardianState = { adsWatched: 0, threshold: 4000, claimed: false, busy: false };
 
@@ -6653,13 +6561,7 @@ function onClaimGuardianClick(){
   });
 }
 
-/* =====================================================================
-   The Ambassador — استحقاق يدوي بالكامل من الأدمن (لا عداد تلقائي).
-   الأدمن يمنح/يسحب المنح المعلّق مباشرة عبر D1 (جدول ambassador_grants)؛
-   وجود صف = زر Claim يتوهج ويصبح قابلاً للضغط، وغيابه = الزر عادي
-   ومعطّل. السرعة تظهر "???" حتى الاستلام الفعلي (claimed=true)، تماماً
-   كأسلوب Happy Dog/Guardian.
-   ===================================================================== */
+/* The Ambassador — استحقاق يدوي بالكامل من الأدمن (لا عداد تلقائي). الأدمن يمنح/يسحب المنح المعلّق مباشرة عبر D1 (جدول ambassador_grants)؛ وجود صف = زر Claim يتوهج ويصبح قابلاً للضغط، وغيابه = الزر عادي ومعطّل. السرعة تظهر "???" حتى الاستلام الفعلي (claimed=true)، تماماً كأسلوب Happy Dog/Guardian. */
 var ambassadorState = { available: false, claimed: false, speed: 0, busy: false };
 
 function renderAmbassadorUI(){
@@ -6730,9 +6632,7 @@ function onClaimAmbassadorClick(){
 }
 
 /* -- تأثير مؤقت 4 ثواني عند شراء The Duck: علامة صح + تغيير شكل الزر -- */
-// تُستدعى بعد نجاح شراء The Duck فعلياً من السيرفر (وليس عند مجرد الضغط):
-// علامة صح مؤقتة 4 ثوانٍ، ثم يبقى الزر "Owned" ومعطّلاً دائماً (الشخصية
-// مملوكة بالفعل ولا يمكن إعادة شرائها).
+// تُستدعى بعد نجاح شراء The Duck فعلياً من السيرفر (وليس عند مجرد الضغط): علامة صح مؤقتة 4 ثوانٍ، ثم يبقى الزر "Owned" ومعطّلاً دائماً (الشخصية مملوكة بالفعل ولا يمكن إعادة شرائها).
 /* -- تلميح "300,000" الكامل فوق سعر الشخصية عند الضغط -- */
 function togglePriceTooltip(tipId){
   var tip = document.getElementById(tipId || 'price-tooltip');
@@ -6759,12 +6659,7 @@ function toggleGrowthTooltipTC(){
   tip._t = setTimeout(function(){ tip.classList.remove('is-visible'); }, 2500);
 }
 
-/* =====================================================================
-   Daily Combo: كل شخصية تُضغط تملأ أقرب مربع فاضي من اليسار لليمين.
-   الترتيب الصحيح سرّي بالكامل على السيرفر (يتغيّر كل يوم 00:00 UTC) —
-   هذا الكود لا يعرفه أبداً، فقط يرسل ترتيب اختيار المستخدم لـ
-   /api/combo/check ويعرض نتيجة صحيح/خطأ التي يرجعها السيرفر.
-   ===================================================================== */
+/* Daily Combo: كل شخصية تُضغط تملأ أقرب مربع فاضي من اليسار لليمين. الترتيب الصحيح سرّي بالكامل على السيرفر (يتغيّر كل يوم 00:00 UTC) — هذا الكود لا يعرفه أبداً، فقط يرسل ترتيب اختيار المستخدم لـ /api/combo/check ويعرض نتيجة صحيح/خطأ التي يرجعها السيرفر. */
 var comboState = { solvedToday: false, attemptsUsed: 0, maxAttempts: 2, busy: false };
 
 function pickCombo(btn, imgUrl, name, cardId){
@@ -6807,8 +6702,7 @@ function resetComboSlots(){
   }
 }
 
-// يعيد ترتيب مواضع بطاقات الاختيار الثلاث بصرياً فقط بعد محاولة خاطئة —
-// لا علاقة له إطلاقاً بالترتيب الصحيح السرّي، مجرد تشويش بصري بسيط.
+// يعيد ترتيب مواضع بطاقات الاختيار الثلاث بصرياً فقط بعد محاولة خاطئة — لا علاقة له إطلاقاً بالترتيب الصحيح السرّي، مجرد تشويش بصري بسيط.
 function shuffleComboPickButtons(){
   var grid = document.querySelector('.mystery-box__grid');
   if (!grid) return;
@@ -6863,8 +6757,7 @@ function renderComboCheckButton(){
   btn.disabled = !getComboGuessOrder() || comboState.busy;
 }
 
-// يقفل بطاقات الاختيار الثلاث بعد الحل أو انتهاء المحاولتين — لا فائدة
-// من تركها قابلة للضغط بعد ذلك.
+// يقفل بطاقات الاختيار الثلاث بعد الحل أو انتهاء المحاولتين — لا فائدة من تركها قابلة للضغط بعد ذلك.
 function renderComboPickLock(){
   var locked = comboState.solvedToday || (comboState.attemptsUsed >= comboState.maxAttempts);
   document.querySelectorAll('.mystery-box__pick').forEach(function(btn){
@@ -6937,13 +6830,7 @@ function onComboCheckClick(){
   });
 }
 
-/* =====================================================================
-   Watch Adsgram Ad: المكافأة الحقيقية تُمنح فقط من سيرفر Adsgram مباشرة
-   لسيرفرنا (Reward URL) بعد تأكدهم من مشاهدة الإعلان بالكامل — هذا الكود
-   فقط يعرض الإعلان عبر AdsController.show() ثم "يتحقق" من وصول المكافأة
-   بإعادة قراءة /api/user عدة مرات (السيرفر قد يستغرق لحظات لاستلام
-   Reward URL بعد إغلاق الإعلان). لا شيء هنا يمنح مكافأة بنفسه إطلاقاً.
-   ===================================================================== */
+/* Watch Adsgram Ad: المكافأة الحقيقية تُمنح فقط من سيرفر Adsgram مباشرة لسيرفرنا (Reward URL) بعد تأكدهم من مشاهدة الإعلان بالكامل — هذا الكود فقط يعرض الإعلان عبر AdsController.show() ثم "يتحقق" من وصول المكافأة بإعادة قراءة /api/user عدة مرات (السيرفر قد يستغرق لحظات لاستلام Reward URL بعد إغلاق الإعلان). لا شيء هنا يمنح مكافأة بنفسه إطلاقاً. */
 var ADSGRAM_BLOCK_ID = '49294';
 var ADSGRAM_DEBUG = false; // debug:true يمنع Adsgram من إرسال Reward URL إطلاقاً (توثيقهم الرسمي) — يجب أن تبقى false حتى أثناء استخدام Test platform حتى تعمل المكافأة الحقيقية
 var adsgramController = null;
@@ -6969,9 +6856,9 @@ function applyAdsTaskState(data){
 }
 
 function renderAdsTaskButton(){
-  var btn = document.getElementById('ads-task-watch-btn');
-  var counter = document.getElementById('ads-task-counter');
-  var avail = document.getElementById('ads-task-avail');
+  var btn = domCache.adsTaskBtn;
+  var counter = domCache.adsTaskCounter;
+  var avail = domCache.adsTaskAvail;
   if (counter) counter.textContent = adsTaskState.watchedToday + ' / ' + adsTaskState.dailyLimit;
   if (avail) avail.textContent = adsTaskState.watchedToday >= adsTaskState.dailyLimit ? 'Come Back Tomorrow' : 'Available';
 
@@ -6983,8 +6870,7 @@ function renderAdsTaskButton(){
   }
 }
 
-// بعد كل مشاهدة ناجحة: قفل الزر 10 ثوانٍ (عداد تنازلي يظهر داخل الزر
-// نفسه) قبل السماح بالضغط مجدداً — مطلوب صراحة بالإضافة للحد اليومي.
+// بعد كل مشاهدة ناجحة: قفل الزر 10 ثوانٍ (عداد تنازلي يظهر داخل الزر نفسه) قبل السماح بالضغط مجدداً — مطلوب صراحة بالإضافة للحد اليومي.
 function startAdsTaskCooldown(){
   adsTaskState.cooldownUntil = Date.now() + 10000;
   clearInterval(adsTaskCooldownTimer);
@@ -7021,9 +6907,7 @@ function onWatchAdsgramClick(){
   });
 }
 
-// يعيد قراءة /api/user حتى 6 مرات (كل 1.5 ثانية) بحثاً عن ازدياد
-// ads_watched_today — يؤكد بذلك وصول Reward URL من Adsgram لسيرفرنا فعلياً
-// قبل عرض أي مكافأة للمستخدم.
+// يعيد قراءة /api/user حتى 6 مرات (كل 1.5 ثانية) بحثاً عن ازدياد ads_watched_today — يؤكد بذلك وصول Reward URL من Adsgram لسيرفرنا فعلياً قبل عرض أي مكافأة للمستخدم.
 function pollAdsRewardConfirmation(baselineWatched, attempt){
   var initData = getTelegramInitData();
   if (!initData){
@@ -7070,22 +6954,13 @@ function pollAdsRewardConfirmation(baselineWatched, attempt){
   });
 }
 
-/* =====================================================================
-   Bonus AD Every 1H: نفس مبدأ Watch Adsgram Ad تماماً (المكافأة تُمنح فقط
-   عبر Reward URL من Adsgram، هذا الكود يعرض فقط)، لكن بلوك Adsgram منفصل
-   (BONUS_AD_BLOCK_ID) لأن Reward URL لا يرسل غير userid فلا يمكن تمييز
-   أي ميزة تسبّبت بالمشاهدة دون بلوك مختلف بمعامل task=bonus_ad ثابت في
-   رابطه. الحد: 5 إعلانات/يوم + ساعة كاملة بين كل إعلان والذي يليه، ويعرض
-   الزر عدّاد الدقائق المتبقية للإعلان القادم (60 → 0).
-   ===================================================================== */
+/* Bonus AD Every 1H: نفس مبدأ Watch Adsgram Ad تماماً (المكافأة تُمنح فقط عبر Reward URL من Adsgram، هذا الكود يعرض فقط)، لكن بلوك Adsgram منفصل (BONUS_AD_BLOCK_ID) لأن Reward URL لا يرسل غير userid فلا يمكن تمييز أي ميزة تسبّبت بالمشاهدة دون بلوك مختلف بمعامل task=bonus_ad ثابت في رابطه. الحد: 5 إعلانات/يوم + ساعة كاملة بين كل إعلان والذي يليه، ويعرض الزر عدّاد الدقائق المتبقية للإعلان القادم (60 → 0). */
 var BONUS_AD_BLOCK_ID = 'REPLACE_WITH_NEW_ADSGRAM_BLOCK_ID'; // بلوك Adsgram جديد مخصص لهذه الميزة فقط — لا يجوز مشاركته مع ADSGRAM_BLOCK_ID
 var bonusAdsgramController = null;
 var bonusAdState = { watchedToday: 0, dailyLimit: 5, rewardCoins: 15, busy: false, nextAvailableAt: 0 };
 var bonusAdCountdownTimer = null;
 
-// Adsgram.init() يعرض نافذة خطأ خاصة به فوراً (وليست استثناء JS عادياً
-// يُمسَك بـtry/catch) لو كان blockId غير رقمي — لذلك يجب عدم استدعائه
-// إطلاقاً قبل استبدال BONUS_AD_BLOCK_ID ببلوك حقيقي (رقمي أو بصيغة "int-").
+// Adsgram.init() يعرض نافذة خطأ خاصة به فوراً (وليست استثناء JS عادياً يُمسَك بـtry/catch) لو كان blockId غير رقمي — لذلك يجب عدم استدعائه إطلاقاً قبل استبدال BONUS_AD_BLOCK_ID ببلوك حقيقي (رقمي أو بصيغة "int-").
 function isValidAdsgramBlockId(id){
   return /^(\d+|int-\d+)$/.test(String(id));
 }
@@ -7110,13 +6985,12 @@ function applyBonusAdState(data){
 }
 
 function renderBonusAdButton(){
-  var btn = document.getElementById('bonus-ad-watch-btn');
-  var counter = document.getElementById('bonus-ad-counter');
-  var avail = document.getElementById('bonus-ad-avail');
+  var btn = domCache.bonusAdBtn;
+  var counter = domCache.bonusAdCounter;
+  var avail = domCache.bonusAdAvail;
   if (counter) counter.textContent = bonusAdState.watchedToday + ' / ' + bonusAdState.dailyLimit;
 
-  // بلوك Adsgram الحقيقي لم يُضبط بعد (BONUS_AD_BLOCK_ID لا يزال Placeholder)
-  // — تُعرض الميزة كـ"قريباً" بدل استدعاء Adsgram.init() بمعرّف غير صالح.
+  // بلوك Adsgram الحقيقي لم يُضبط بعد (BONUS_AD_BLOCK_ID لا يزال Placeholder) — تُعرض الميزة كـ"قريباً" بدل استدعاء Adsgram.init() بمعرّف غير صالح.
   if (!bonusAdsgramController){
     if (avail) avail.textContent = 'Coming Soon';
     if (btn){
@@ -7220,18 +7094,7 @@ function pollBonusAdRewardConfirmation(baselineWatched, attempt){
   });
 }
 
-/* =====================================================================
-   Watch gigapub ads: GigaPub أكّد دعمه Postback URL حقيقي (server-to-
-   server، أعطيناه رابط /api/gigapub/postback) — نفس مبدأ Adsgram تماماً:
-   المكافأة تُمنح فقط من سيرفرهم لسيرفرنا مباشرة، وهذا الكود فقط "يعرض"
-   الإعلان عبر showGiga() ثم "يتحقق" من وصول المكافأة بإعادة قراءة
-   /api/user عدة مرات (قد يستغرق السيرفر لحظات لاستلام الـPostback بعد
-   إغلاق الإعلان). لا شيء هنا يمنح مكافأة بنفسه إطلاقاً. سكربت GigaPub
-   نفسه (per-id بالرابط) لا يُحمَّل إطلاقاً إلا بمعرّف رقمي حقيقي في
-   GIGAPUB_PUBLISHER_ID (الزر يظهر كـ"Soon" لو بقي Placeholder)،
-   والاستدعاء window.showGiga('main') يمرّر اسم الـPlacement 'main'
-   تحديداً كما ورد في كود التكامل من لوحة GigaPub.
-   ===================================================================== */
+/* Watch gigapub ads: GigaPub أكّد دعمه Postback URL حقيقي (server-to- server، أعطيناه رابط /api/gigapub/postback) — نفس مبدأ Adsgram تماماً: المكافأة تُمنح فقط من سيرفرهم لسيرفرنا مباشرة، وهذا الكود فقط "يعرض" الإعلان عبر showGiga() ثم "يتحقق" من وصول المكافأة بإعادة قراءة /api/user عدة مرات (قد يستغرق السيرفر لحظات لاستلام الـPostback بعد إغلاق الإعلان). لا شيء هنا يمنح مكافأة بنفسه إطلاقاً. سكربت GigaPub نفسه (per-id بالرابط) لا يُحمَّل إطلاقاً إلا بمعرّف رقمي حقيقي في GIGAPUB_PUBLISHER_ID (الزر يظهر كـ"Soon" لو بقي Placeholder)، والاستدعاء window.showGiga('main') يمرّر اسم الـPlacement 'main' تحديداً كما ورد في كود التكامل من لوحة GigaPub. */
 var GIGAPUB_PUBLISHER_ID = '8282'; // معرّف حساب GigaPub الحقيقي (تمت الموافقة عليه)
 var gigapubReady = false;
 var gigapubState = { watchedToday: 0, dailyLimit: 8, rewardCoins: 15, busy: false, cooldownUntil: 0 };
@@ -7241,8 +7104,7 @@ function isValidGigapubId(id){
   return /^\d+$/.test(String(id));
 }
 
-// نفس أسلوب Fallback الرسمي في وثائق GigaPub: يجرّب سيرفرهم الأساسي، وعند
-// الفشل أو تجاوز 15 ثانية بلا استجابة يجرّب المرآة الاحتياطية (ru-ad).
+// نفس أسلوب Fallback الرسمي في وثائق GigaPub: يجرّب سيرفرهم الأساسي، وعند الفشل أو تجاوز 15 ثانية بلا استجابة يجرّب المرآة الاحتياطية (ru-ad).
 function loadGigapubScript(){
   if (!isValidGigapubId(GIGAPUB_PUBLISHER_ID) || gigapubReady) return;
   var domains = ['https://ad.gigapub.tech', 'https://ru-ad.gigapub.tech'];
@@ -7284,9 +7146,9 @@ function applyGigapubState(data){
 }
 
 function renderGigapubButton(){
-  var btn = document.getElementById('gigapub-task-watch-btn');
-  var counter = document.getElementById('gigapub-task-counter');
-  var avail = document.getElementById('gigapub-task-avail');
+  var btn = domCache.gigapubBtn;
+  var counter = domCache.gigapubCounter;
+  var avail = domCache.gigapubAvail;
   if (counter) counter.textContent = gigapubState.watchedToday + ' / ' + gigapubState.dailyLimit;
 
   if (!gigapubReady){
@@ -7306,8 +7168,7 @@ function renderGigapubButton(){
   }
 }
 
-// بعد كل مشاهدة ناجحة: قفل الزر 10 ثوانٍ (عداد تنازلي داخل الزر نفسه)
-// قبل السماح بالضغط مجدداً — نفس أسلوب Adsgram بالضبط.
+// بعد كل مشاهدة ناجحة: قفل الزر 10 ثوانٍ (عداد تنازلي داخل الزر نفسه) قبل السماح بالضغط مجدداً — نفس أسلوب Adsgram بالضبط.
 function startGigapubTaskCooldown(){
   gigapubState.cooldownUntil = Date.now() + 10000;
   clearInterval(gigapubTaskCooldownTimer);
@@ -7352,9 +7213,7 @@ function onWatchGigapubClick(){
   });
 }
 
-// يعيد قراءة /api/user حتى 6 مرات (كل 1.5 ثانية) بحثاً عن ازدياد
-// gigapub_watched_today — يؤكد بذلك وصول Postback من GigaPub لسيرفرنا
-// فعلياً قبل عرض أي مكافأة للمستخدم (نفس أسلوب pollAdsRewardConfirmation).
+// يعيد قراءة /api/user حتى 6 مرات (كل 1.5 ثانية) بحثاً عن ازدياد gigapub_watched_today — يؤكد بذلك وصول Postback من GigaPub لسيرفرنا فعلياً قبل عرض أي مكافأة للمستخدم (نفس أسلوب pollAdsRewardConfirmation).
 function pollGigapubRewardConfirmation(baselineWatched, attempt){
   var initData = getTelegramInitData();
   if (!initData){
@@ -7401,17 +7260,7 @@ function pollGigapubRewardConfirmation(baselineWatched, attempt){
   });
 }
 
-/* =====================================================================
-   بوابة إعلان أمام مميزات موجودة أصلاً (Start Mining، Claim Daily Rewards،
-   Chest، Spin، Gift، Promo Redeem) — لا تمنح مكافأة بنفسها (لا Reward URL
-   فعّال من أي طرف هنا)، فقط شرط عرض أمام فعل مسموح للمستخدم أصلاً.
-   تُجرَّب GigaPub أولاً — بنفس تطبيقهم/بلوكهم الأصلي (8282)، لكن بمعامل
-   showTag مميّز (نفس آلية Sub ID التي أكّدها دعم GigaPub) لتمييزه عن
-   مهمة Watch gigapub ads في الـPostback؛ سيرفرنا يرد 200 فقط عند
-   tag=gate بدون منح شيء. إن فشل (لا إعلان متاح) يُجرَّب MonetixAds. النافذة
-   المنبثقة تظهر فوراً عند الضغط، وتتحدث كتابة via حسب من نجرّبه حالياً،
-   وتُغلق فور نجاح/فشل نهائي.
-   ===================================================================== */
+/* بوابة إعلان أمام مميزات موجودة أصلاً (Start Mining، Claim Daily Rewards، Chest، Spin، Gift، Promo Redeem) — لا تمنح مكافأة بنفسها (لا Reward URL فعّال من أي طرف هنا)، فقط شرط عرض أمام فعل مسموح للمستخدم أصلاً. تُجرَّب GigaPub أولاً — بنفس تطبيقهم/بلوكهم الأصلي (8282)، لكن بمعامل showTag مميّز (نفس آلية Sub ID التي أكّدها دعم GigaPub) لتمييزه عن مهمة Watch gigapub ads في الـPostback؛ سيرفرنا يرد 200 فقط عند tag=gate بدون منح شيء. إن فشل (لا إعلان متاح) يُجرَّب MonetixAds. النافذة المنبثقة تظهر فوراً عند الضغط، وتتحدث كتابة via حسب من نجرّبه حالياً، وتُغلق فور نجاح/فشل نهائي. */
 var GIGAPUB_GATE_PLACEMENT = 'gate';
 
 function showAdLoadingOverlay(){
@@ -7429,9 +7278,7 @@ function setAdLoadingOverlayVia(providerName){
   if (el) el.textContent = 'via ' + providerName;
 }
 
-// onSuccess يُستدعى فقط بعد نجاح مشاهدة الإعلان بالكامل (من أي مزوّد)؛
-// onFail (اختياري) يُستدعى عند فشل/عدم توفر الإعلان من الاثنين معاً، ليتيح
-// لكل زر إعادة تعيين حالته (busy=false، تفعيل الزر...).
+// onSuccess يُستدعى فقط بعد نجاح مشاهدة الإعلان بالكامل (من أي مزوّد)؛ onFail (اختياري) يُستدعى عند فشل/عدم توفر الإعلان من الاثنين معاً، ليتيح لكل زر إعادة تعيين حالته (busy=false، تفعيل الزر...).
 function runAdGate(onSuccess, onFail){
   showAdLoadingOverlay();
   setAdLoadingOverlayVia('GigaPub');
@@ -7460,8 +7307,7 @@ function runAdGateMonetixFallback(onSuccess, onFail){
     return;
   }
 
-  // نفس مشكلة callback الذي لا يُستدعى إطلاقاً بدون إعلان (انظر
-  // onWatchMonetixClick) — بدون هذا المؤقت يبقى الزر معلّقاً للأبد.
+  // نفس مشكلة callback الذي لا يُستدعى إطلاقاً بدون إعلان (انظر onWatchMonetixClick) — بدون هذا المؤقت يبقى الزر معلّقاً للأبد.
   var settled = false;
   var noAdTimeout = setTimeout(function(){
     if (settled) return;
@@ -7487,10 +7333,7 @@ function runAdGateMonetixFallback(onSuccess, onFail){
   });
 }
 
-// إعلام السيرفر أن بوابة زر نجحت عبر MonetixAds تحديداً (بوابة GigaPub
-// تُحتسَب أصلاً عبر Postback حقيقي من طرفهم، فلا داعي لاستدعاء مضاعف من
-// هنا). Fire-and-forget عمداً — فشل هذا الاستدعاء لا يجب أن يمنع تنفيذ
-// الفعل الحقيقي (onSuccess) الذي يليه.
+// إعلام السيرفر أن بوابة زر نجحت عبر MonetixAds تحديداً (بوابة GigaPub تُحتسَب أصلاً عبر Postback حقيقي من طرفهم، فلا داعي لاستدعاء مضاعف من هنا). Fire-and-forget عمداً — فشل هذا الاستدعاء لا يجب أن يمنع تنفيذ الفعل الحقيقي (onSuccess) الذي يليه.
 function reportGateAdWatched(){
   var initData = getTelegramInitData();
   if (!initData) return;
@@ -7501,14 +7344,7 @@ function reportGateAdWatched(){
   }).catch(function(err){ console.error('gate ad watched report failed:', err); });
 }
 
-/* =====================================================================
-   Watch MonetixAds: مهمة منفصلة تماماً عن بوابات الأزرار أعلاه — تُستدعى
-   فقط من زرها الخاص، بعدّادها ومكافأتها المستقلة (+15/إعلان، 10/يوم).
-   لا Postback من سيرفر MonetixAds (توثيقهم الرسمي: تأكيد Client-side فقط
-   عبر window.showRewardAd)، فالحماية القصوى الممكنة: هذه الدالة تستدعي
-   /api/monetix/reward المحمي بـinitData الموثّق من تيليجرام، والسيرفر هو
-   من يحسم الحد اليومي والمنح بشرط CAS — لا الواجهة تمنح شيئاً بنفسها.
-   ===================================================================== */
+/* Watch MonetixAds: مهمة منفصلة تماماً عن بوابات الأزرار أعلاه — تُستدعى فقط من زرها الخاص، بعدّادها ومكافأتها المستقلة (+15/إعلان، 10/يوم). لا Postback من سيرفر MonetixAds (توثيقهم الرسمي: تأكيد Client-side فقط عبر window.showRewardAd)، فالحماية القصوى الممكنة: هذه الدالة تستدعي /api/monetix/reward المحمي بـinitData الموثّق من تيليجرام، والسيرفر هو من يحسم الحد اليومي والمنح بشرط CAS — لا الواجهة تمنح شيئاً بنفسها. */
 var monetixState = { watchedToday: 0, dailyLimit: 10, rewardCoins: 15, busy: false, cooldownUntil: 0 };
 var monetixTaskCooldownTimer = null;
 
@@ -7520,9 +7356,9 @@ function applyMonetixState(data){
 }
 
 function renderMonetixButton(){
-  var btn = document.getElementById('monetix-task-watch-btn');
-  var counter = document.getElementById('monetix-task-counter');
-  var avail = document.getElementById('monetix-task-avail');
+  var btn = domCache.monetixBtn;
+  var counter = domCache.monetixCounter;
+  var avail = domCache.monetixAvail;
   if (counter) counter.textContent = monetixState.watchedToday + ' / ' + monetixState.dailyLimit;
 
   var dailyDone = monetixState.watchedToday >= monetixState.dailyLimit;
@@ -7536,8 +7372,7 @@ function renderMonetixButton(){
   }
 }
 
-// بعد كل مشاهدة ناجحة: قفل الزر 10 ثوانٍ (عداد تنازلي داخل الزر نفسه)
-// قبل السماح بالضغط مجدداً — نفس أسلوب Adsgram/GigaPub بالضبط.
+// بعد كل مشاهدة ناجحة: قفل الزر 10 ثوانٍ (عداد تنازلي داخل الزر نفسه) قبل السماح بالضغط مجدداً — نفس أسلوب Adsgram/GigaPub بالضبط.
 function startMonetixTaskCooldown(){
   monetixState.cooldownUntil = Date.now() + 10000;
   clearInterval(monetixTaskCooldownTimer);
@@ -7566,10 +7401,7 @@ function onWatchMonetixClick(){
   showAdLoadingOverlay();
   setAdLoadingOverlayVia('Monetix');
 
-  // بعض المرات لا يستدعي MonetixAds الـcallback إطلاقاً إن لم يوجد إعلان
-  // متاح (بدل استدعائه بحالة فشل) — بدون هذا المؤقت يبقى الزر معطّلاً
-  // للأبد ويظهر كأن شيئاً "لا يعمل". settled يمنع التنفيذ مرتين لو نجح
-  // الـcallback بعد انتهاء المؤقت بلحظات.
+  // بعض المرات لا يستدعي MonetixAds الـcallback إطلاقاً إن لم يوجد إعلان متاح (بدل استدعائه بحالة فشل) — بدون هذا المؤقت يبقى الزر معطّلاً للأبد ويظهر كأن شيئاً "لا يعمل". settled يمنع التنفيذ مرتين لو نجح الـcallback بعد انتهاء المؤقت بلحظات.
   var settled = false;
   var noAdTimeout = setTimeout(function(){
     if (settled) return;
@@ -7634,14 +7466,7 @@ function creditMonetixReward(){
   });
 }
 
-/* =====================================================================
-   Check-in اليومي (4 مهام): مهمتا 1/2 تفتحان رابطاً ثم تُظهران عداد 5
-   ثوانٍ قبل السماح بالـClaim (السيرفر هو من يمنح المكافأة عبر
-   /api/checkin/claim، هذا فقط شرط واجهة). مهمتا 3/4 تحتاجان تحقّقاً
-   حقيقياً (اسم يحوي @MinerXRealmBot / بايو يحوي رابط الإحالة) عبر
-   /api/checkin/verify أولاً — لا يظهر Claim إلا بعد نجاح التحقق، والمنح
-   نفسه يُعاد التحقق منه مجدداً في handleCheckinClaim على السيرفر.
-   ===================================================================== */
+/* Check-in اليومي (4 مهام): مهمتا 1/2 تفتحان رابطاً ثم تُظهران عداد 5 ثوانٍ قبل السماح بالـClaim (السيرفر هو من يمنح المكافأة عبر /api/checkin/claim، هذا فقط شرط واجهة). مهمتا 3/4 تحتاجان تحقّقاً حقيقياً (اسم يحوي @MinerXRealmBot / بايو يحوي رابط الإحالة) عبر /api/checkin/verify أولاً — لا يظهر Claim إلا بعد نجاح التحقق، والمنح نفسه يُعاد التحقق منه مجدداً في handleCheckinClaim على السيرفر. */
 var checkinState = {
   claimedToday: { 1: false, 2: false, 3: false, 4: false },
   rewards: { 1: 10, 2: 10, 3: 20, 4: 20 },
@@ -7824,12 +7649,7 @@ function onCheckinClaimClick(task){
   });
 }
 
-/* =====================================================================
-   Partner / Special: مهام ديناميكية تُدار من جدول admin_tasks بـD1 (يدوياً
-   الآن، ولاحقاً من لوحة الأدمن) — كل بيانات المهمة (العنوان، المكافأة،
-   الرابط، هل تتطلب تحقق عضوية قناة) تأتي من السيرفر فقط، والاستلام نفسه
-   محمي عبر admin_task_claims (INSERT OR IGNORE كـCAS) في handleTasksClaim.
-   ===================================================================== */
+/* Partner / Special: مهام ديناميكية تُدار من جدول admin_tasks بـD1 (يدوياً الآن، ولاحقاً من لوحة الأدمن) — كل بيانات المهمة (العنوان، المكافأة، الرابط، هل تتطلب تحقق عضوية قناة) تأتي من السيرفر فقط، والاستلام نفسه محمي عبر admin_task_claims (INSERT OR IGNORE كـCAS) في handleTasksClaim. */
 var adminTasksState = { special: [], partner: [] };
 var adminTasksBusy = {};
 
@@ -7933,18 +7753,11 @@ function onAdminTaskClick(taskId, section){
   });
 }
 
-/* =====================================================================
-   Friends: كل الأرقام (دعوات، نشطون، أرباح معلّقة، عتبات الإنجازات)
-   تأتي فقط من /api/user — لا حساب أو تخمين من طرف المتصفح. الأرباح
-   المعلّقة (تسجيل +20 + نشاط +130 + عمولة إيداع 5%) لا تُضاف لـCoins
-   إلا بالضغط على Claim (بحد أدنى 5000)، ومكافآت الإنجازات تُضاف مباشرة
-   عند تحقّق الشرط دون المرور عبر الرصيد المعلّق.
-   ===================================================================== */
+/* Friends: كل الأرقام (دعوات، نشطون، أرباح معلّقة، عتبات الإنجازات) تأتي فقط من /api/user — لا حساب أو تخمين من طرف المتصفح. الأرباح المعلّقة (تسجيل +20 + نشاط +130 + عمولة إيداع 5%) لا تُضاف لـCoins إلا بالضغط على Claim (بحد أدنى 5000)، ومكافآت الإنجازات تُضاف مباشرة عند تحقّق الشرط دون المرور عبر الرصيد المعلّق. */
 var friendsState = { invites: 0, active: 0, pendingEarnings: 0, minClaim: 5000, milestones: [], claimBusy: false };
 var friendsListLoaded = false;
 
-// نفس منطق formatCoinsK لكن بدون فراغ قبل الوحدة (K/M) — مطلوب لعرض
-// أرباح الإحالة بصيغة "1K"/"1.1K" تحديداً.
+// نفس منطق formatCoinsK لكن بدون فراغ قبل الوحدة (K/M) — مطلوب لعرض أرباح الإحالة بصيغة "1K"/"1.1K" تحديداً.
 function formatFriendsAmount(value){
   value = Number(value) || 0;
   if (value < 1000) return String(Math.floor(value));
@@ -8117,8 +7930,7 @@ function onShowFriendsListClick(){
   });
 }
 
-// اسم المستخدم (username) قد يحتوي أي نص يختاره المستخدم نفسه — يجب
-// تهريبه قبل إدراجه في innerHTML لمنع حقن HTML/script عبر اسم مزيّف.
+// اسم المستخدم (username) قد يحتوي أي نص يختاره المستخدم نفسه — يجب تهريبه قبل إدراجه في innerHTML لمنع حقن HTML/script عبر اسم مزيّف.
 function escapeHtmlClient(text){
   var div = document.createElement('div');
   div.textContent = String(text);
@@ -8216,9 +8028,7 @@ function updateExchange(){
   }
 }
 function setMaxExchange(){
-  // CURRENT_COINS_BALANCE قد يحمل كسوراً عشرية دقيقة جداً (تراكم فوارق
-  // الفاصلة العائمة من مكافآت/عمولات سابقة) — Coins عملة صحيحة دائماً في
-  // كل مكان آخر بالواجهة، فنُطابقها هنا بـMath.floor بدل عرض الرقم الخام.
+  // CURRENT_COINS_BALANCE قد يحمل كسوراً عشرية دقيقة جداً (تراكم فوارق الفاصلة العائمة من مكافآت/عمولات سابقة) — Coins عملة صحيحة دائماً في كل مكان آخر بالواجهة، فنُطابقها هنا بـMath.floor بدل عرض الرقم الخام.
   document.getElementById('exchange-input').value = Math.floor(CURRENT_COINS_BALANCE);
   updateExchange();
 }
