@@ -119,6 +119,15 @@ const REFERRAL_MIN_CLAIM_COINS = 5000;
 const ACTIVE_FRIEND_ADS_THRESHOLD = 10;
 
 // =====================================================================
+// Weekly Leaderboard: ترتيب أسبوعي بقسمين (By Ads / By Referrals) من
+// weekly_ads_watched/weekly_active_referrals (عدادان منفصلان تماماً عن
+// lifetime_ads_watched/active_referrals_count، يُصفَّران فقط هما كل جمعة
+// 00:30 UTC بعد منح الجوائز — انظر handleLeaderboardPayout وscheduled()).
+// =====================================================================
+const LEADERBOARD_RANK_LIMIT = 20;
+const LEADERBOARD_PRIZES = [20000, 15000, 10000, 5000, 5000, 5000, 5000, 5000, 5000, 5000]; // رتب 1-10، 11-20 بلا جائزة
+
+// =====================================================================
 // "نشط" يعتمد الآن على lifetime_ads_watched (عدّاد موحّد: GigaPub وMonetixAds
 // — مهمتاهما الحقيقيتان + بوابات الأزرار الست كلها — انظر
 // bumpLifetimeAdsWatched)، بدل ads_task_total الخاص بـAdsgram وحده، لأن
@@ -222,10 +231,17 @@ function storageLevelForCapacityHours(capacityHours) {
 }
 
 export default {
-  // يعمل تلقائياً كل يوم عند 00:00 UTC (Cron Trigger بلا أي تكلفة إضافية —
-  // استدعاء واحد فقط باليوم، لا علاقة له بحصة الطلبات العادية أو rows read).
+  // Cron Triggers بلا أي تكلفة إضافية — استدعاء واحد فقط لكل جدولة، لا
+  // علاقة له بحصة الطلبات العادية أو rows read. يفرّق بين الجدولتين عبر
+  // event.cron كي لا تُنفَّذ مهمة اليوم الأخرى بالخطأ عند تنفيذ الأسبوعية.
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(generateDailyCombo(env));
+    if (event.cron === "0 0 * * *") {
+      // يومياً 00:00 UTC: يختار تركيبة Daily Combo الجديدة ويرسلها للأدمن فقط.
+      ctx.waitUntil(generateDailyCombo(env));
+    } else if (event.cron === "30 0 * * 5") {
+      // أسبوعياً الجمعة 00:30 UTC فقط: توزيع جوائز Weekly Leaderboard.
+      ctx.waitUntil(handleLeaderboardPayout(env));
+    }
   },
 
   async fetch(request, env) {
@@ -379,6 +395,12 @@ export default {
     // (إجمالي الإيداع/السحب) لا حاجة لتكرارها في أكثر نقطة استدعاءً بالتطبيق.
     if (url.pathname === "/api/profile" && request.method === "POST") {
       return handleProfile(request, env);
+    }
+
+    // نقطة منفصلة عن /api/user عمداً — تُستدعى فقط عند فتح نافذة Leaderboard
+    // فعلياً، ومحمية بكاش يومي (Cache API) لا يلمس D1 إلا مرة واحدة يومياً.
+    if (url.pathname === "/api/leaderboard" && request.method === "POST") {
+      return handleLeaderboard(request, env);
     }
 
     // Everything else -> serve the Mini App static files. الصفحة الرئيسية
@@ -1804,8 +1826,10 @@ async function bumpLifetimeAdsWatched(env, telegramId) {
   const previous = row.lifetime_ads_watched || 0;
   const newTotal = previous + 1;
 
+  // weekly_ads_watched يتراكم هنا بجانب lifetime_ads_watched (نفس شرط CAS)
+  // — يُصفَّر فقط أسبوعياً عبر handleLeaderboardPayout، لا علاقة له بهذا الشرط.
   const updateResult = await env.DB.prepare(
-    "UPDATE users SET lifetime_ads_watched = ? WHERE telegram_id = ? AND lifetime_ads_watched = ?"
+    "UPDATE users SET lifetime_ads_watched = ?, weekly_ads_watched = weekly_ads_watched + 1 WHERE telegram_id = ? AND lifetime_ads_watched = ?"
   ).bind(newTotal, telegramId, previous).run();
 
   if (!updateResult.meta || updateResult.meta.changes === 0) return;
@@ -1817,8 +1841,10 @@ async function bumpLifetimeAdsWatched(env, telegramId) {
     ).bind(REFERRAL_ACTIVE_BONUS_COINS, row.referred_by, telegramId).run();
 
     if (activateResult.meta && activateResult.meta.changes > 0) {
+      // weekly_active_referrals لصالح المُحيل — نفس منطق active_referrals_count
+      // لكن يُصفَّر أسبوعياً (Weekly Leaderboard، قسم By Referrals).
       await env.DB.prepare(
-        `UPDATE users SET referral_pending_earnings = referral_pending_earnings + ?, active_referrals_count = active_referrals_count + 1
+        `UPDATE users SET referral_pending_earnings = referral_pending_earnings + ?, active_referrals_count = active_referrals_count + 1, weekly_active_referrals = weekly_active_referrals + 1
          WHERE telegram_id = ?`
       ).bind(REFERRAL_ACTIVE_BONUS_COINS, row.referred_by).run();
     }
@@ -2059,6 +2085,115 @@ async function handleClaimAmbassador(request, env) {
     coins: updatedUser.coins,
     storage_credited: preClaimAccrued
   });
+}
+
+// =====================================================================
+// نقطة /api/leaderboard — Weekly Leaderboard (By Ads وBy Referrals معاً في
+// استجابة واحدة، لا طلبان منفصلان). كاش عبر Cache API (caches.default —
+// بلا أي حد قراءة/كتابة يومي، بعكس KV) بصلاحية محسوبة حتى 00:00 UTC
+// القادمة. أول طلب فقط بعد انتهاء الصلاحية ينفّذ استعلامي D1 (بالـindex،
+// أعلى 20 فقط بصرف النظر عن عدد المستخدمين الإجمالي)، وكل الطلبات بعده
+// لنفس اليوم تُقرأ من الكاش مباشرة بلا أي لمس لـD1. شرط WHERE > 0 يمنع
+// عرض/منح جوائز لمستخدمين بلا أي نشاط حقيقي هذا الأسبوع.
+// =====================================================================
+async function handleLeaderboard(request, env) {
+  const auth = await authenticateRequest(request, env);
+  if (!auth.ok) return auth.response;
+
+  const cache = caches.default;
+  const cacheKey = new Request("https://internal.minerxrealm/leaderboard-cache");
+
+  const cached = await cache.match(cacheKey);
+  if (cached) return cached;
+
+  const [adsResult, refsResult] = await Promise.all([
+    env.DB.prepare(
+      `SELECT telegram_id, username, photo_url, weekly_ads_watched AS val
+       FROM users WHERE weekly_ads_watched > 0
+       ORDER BY weekly_ads_watched DESC LIMIT ?`
+    ).bind(LEADERBOARD_RANK_LIMIT).all(),
+    env.DB.prepare(
+      `SELECT telegram_id, username, photo_url, weekly_active_referrals AS val
+       FROM users WHERE weekly_active_referrals > 0
+       ORDER BY weekly_active_referrals DESC LIMIT ?`
+    ).bind(LEADERBOARD_RANK_LIMIT).all()
+  ]);
+
+  const shape = (rows) => (rows.results || []).map((r, i) => ({
+    rank: i + 1,
+    name: r.username || ("Player " + r.telegram_id),
+    photo_url: r.photo_url || null,
+    value: r.val,
+    prize: LEADERBOARD_PRIZES[i] || 0
+  }));
+
+  const payload = {
+    ads: shape(adsResult),
+    referrals: shape(refsResult),
+    next_payout_at: nextLeaderboardPayoutAt()
+  };
+
+  const response = jsonResponse(payload);
+  response.headers.set("Cache-Control", "public, max-age=" + secondsUntilNextMidnightUTC());
+  await cache.put(cacheKey, response.clone());
+  return response;
+}
+
+// =====================================================================
+// يُنفَّذ مرة واحدة أسبوعياً فقط (الجمعة 00:30 UTC عبر scheduled()) — يمنح
+// جوائز Top 20 لكل قسم فعلياً (بحساب طازج من D1 مباشرة، لا من كاش العرض
+// اليومي، لأن هذا يمنح عملات حقيقية)، ثم يُصفّر العدادين الأسبوعيين. كل
+// هذا في batch() واحد ذرّي يبدأ بـINSERT في leaderboard_payouts (قيد
+// PRIMARY KEY على week_key) — لو كان هذا الأسبوع مدفوعاً مسبقاً، يفشل هذا
+// الإدراج فتفشل الدفعة كلها ولا يُمنح أو يُصفَّر أي شيء إطلاقاً.
+// =====================================================================
+async function handleLeaderboardPayout(env) {
+  const weekKey = isoWeekKeyUTC();
+
+  const [adsResult, refsResult] = await Promise.all([
+    env.DB.prepare(
+      `SELECT telegram_id, weekly_ads_watched AS val FROM users
+       WHERE weekly_ads_watched > 0 ORDER BY weekly_ads_watched DESC LIMIT ?`
+    ).bind(LEADERBOARD_RANK_LIMIT).all(),
+    env.DB.prepare(
+      `SELECT telegram_id, weekly_active_referrals AS val FROM users
+       WHERE weekly_active_referrals > 0 ORDER BY weekly_active_referrals DESC LIMIT ?`
+    ).bind(LEADERBOARD_RANK_LIMIT).all()
+  ]);
+
+  const stmts = [
+    env.DB.prepare("INSERT INTO leaderboard_payouts (week_key, paid_at) VALUES (?, ?)")
+      .bind(weekKey, Date.now())
+  ];
+
+  const creditWinners = (rows) => {
+    (rows.results || []).forEach((r, i) => {
+      const prize = LEADERBOARD_PRIZES[i] || 0;
+      if (prize <= 0) return;
+      stmts.push(env.DB.prepare("UPDATE users SET coins = coins + ? WHERE telegram_id = ?").bind(prize, r.telegram_id));
+      stmts.push(env.DB.prepare(
+        "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'leaderboard_reward', ?, 'coins')"
+      ).bind(r.telegram_id, prize));
+    });
+  };
+  creditWinners(adsResult);
+  creditWinners(refsResult);
+
+  // تصفير مقيّد فقط بمن شارك فعلياً هذا الأسبوع (لا كل المستخدمين) —
+  // تكلفة كتابة أقل، ونفس النتيجة تماماً لمن لم يتحرك عداده أصلاً.
+  stmts.push(env.DB.prepare(
+    "UPDATE users SET weekly_ads_watched = 0, weekly_active_referrals = 0 WHERE weekly_ads_watched != 0 OR weekly_active_referrals != 0"
+  ));
+
+  try {
+    await env.DB.batch(stmts);
+  } catch (e) {
+    // week_key مكرر (دُفع مسبقاً) أو أي فشل آخر — الدفعة كلها لم تُنفَّذ إطلاقاً
+    console.error("leaderboard payout skipped/failed:", e?.message || e);
+    return;
+  }
+
+  await caches.default.delete(new Request("https://internal.minerxrealm/leaderboard-cache"));
 }
 
 // =====================================================================
@@ -2828,6 +2963,43 @@ function shiftUTCDate(dateStr, deltaDays) {
 // تاريخ اليوم الحالي بتوقيت UTC بصيغة YYYY-MM-DD (لتصفير عداد الدورات كل 00:00 UTC)
 function todayUTC() {
   return new Date().toISOString().slice(0, 10);
+}
+
+// أقرب جمعة 00:30 UTC قادمة (موعد توزيع جوائز Weekly Leaderboard) بالمللي
+// ثانية — يُرسَل للواجهة فقط لعرض عدّاد تنازلي حقيقي، لا نص ثابت.
+function nextLeaderboardPayoutAt() {
+  const now = new Date();
+  const result = new Date(Date.UTC(
+    now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 30, 0, 0
+  ));
+  const currentDay = result.getUTCDay(); // 0=الأحد..6=السبت، الجمعة=5
+  let daysUntilFriday = (5 - currentDay + 7) % 7;
+  if (daysUntilFriday === 0 && now.getTime() >= result.getTime()) {
+    daysUntilFriday = 7; // اليوم جمعة لكن تجاوزنا 00:30 بالفعل — الجمعة القادمة
+  }
+  result.setUTCDate(result.getUTCDate() + daysUntilFriday);
+  return result.getTime();
+}
+
+// ثوانٍ متبقية حتى 00:00 UTC القادمة — TTL لكاش Leaderboard اليومي
+// (Cache API)، بحد أدنى 60 ثانية لتفادي max-age صفري/سالب عند حافة اليوم.
+function secondsUntilNextMidnightUTC() {
+  const now = new Date();
+  const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0, 0));
+  return Math.max(60, Math.floor((next.getTime() - now.getTime()) / 1000));
+}
+
+// مفتاح فريد لهذا الأسبوع بالتحديد بصيغة "YYYY-Www" (رقم أسبوع ISO) —
+// حماية Idempotency الحقيقية لتوزيع جوائز Weekly Leaderboard (قيد
+// PRIMARY KEY في leaderboard_payouts، لا مجرد علم يُقرأ ثم يُكتَب).
+function isoWeekKeyUTC() {
+  const now = new Date();
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  return d.getUTCFullYear() + "-W" + String(weekNo).padStart(2, "0");
 }
 
 // يحوّل created_at (مللي ثانية) إلى صيغة DD-MM-YYYY لعرضها في نافذة Profile

@@ -265,3 +265,23 @@ CREATE TABLE IF NOT EXISTS ambassador_grants (
   speed INTEGER NOT NULL,
   granted_at INTEGER NOT NULL
 );
+
+-- -- Weekly Leaderboard (By Ads / By Referrals، جوائز حقيقية كل جمعة 00:30 UTC) --
+-- weekly_ads_watched/weekly_active_referrals: عدادان أسبوعيان منفصلان
+-- تماماً عن lifetime_ads_watched/active_referrals_count (لا يُصفَّران أبداً)
+-- — هذان فقط يُصفَّران أسبوعياً عبر scheduled()/handleLeaderboardPayout
+-- بعد منح الجوائز. Index على كل عمود يجعل "أعلى 20" ثابت التكلفة (~20 صف)
+-- بصرف النظر عن عدد المستخدمين. عرض النتيجة يومياً عبر Cache API (لا KV)
+-- بصلاحية محسوبة حتى 00:00 UTC القادمة — انظر handleLeaderboard.
+ALTER TABLE users ADD COLUMN weekly_ads_watched INTEGER DEFAULT 0;
+ALTER TABLE users ADD COLUMN weekly_active_referrals INTEGER DEFAULT 0;
+
+CREATE INDEX IF NOT EXISTS idx_weekly_ads_watched ON users(weekly_ads_watched DESC);
+CREATE INDEX IF NOT EXISTS idx_weekly_active_referrals ON users(weekly_active_referrals DESC);
+
+-- حماية عدم التكرار (Idempotency) لتوزيع الجوائز — قيد PRIMARY KEY على
+-- week_key، لا مجرد علم يُقرأ ثم يُكتَب (نفس أسلوب admin_task_claims).
+CREATE TABLE IF NOT EXISTS leaderboard_payouts (
+  week_key TEXT PRIMARY KEY,
+  paid_at INTEGER NOT NULL
+);

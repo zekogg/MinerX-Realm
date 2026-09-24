@@ -2774,6 +2774,9 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   padding:0 4px; margin-bottom:10px;
   font-size:9.5px; font-weight:800; letter-spacing:.8px; text-transform:uppercase; color:var(--ink-faint);
 }
+.lb-empty{
+  text-align:center; padding:26px 12px; font-size:12px; color:var(--ink-faint);
+}
 .lb-list{ display:flex; flex-direction:column; gap:8px; max-height:340px; overflow-y:auto; }
 .lb-row{
   display:flex; align-items:center; gap:10px;
@@ -4471,7 +4474,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
       </div>
 
       <div class="lb-scroll">
-      <div class="lb-rewards-badge">Rewards in 7D :00:30</div>
+      <div class="lb-rewards-badge" id="lb-rewards-badge">Rewards in —</div>
 
       <div class="lb-tabs">
         <button class="lb-tab is-active" data-lb-tab="ads">By Ads</button>
@@ -4479,463 +4482,23 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
       </div>
 
       <div class="lb-panel is-active" id="lb-panel-ads">
-      <div class="lb-podium">
-        <div class="lb-podium__place lb-podium__place--2">
-          <div class="lb-avatar lb-avatar--md lb-avatar--silver">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            <span class="lb-podium__rank-badge">2</span>
-          </div>
-          <div class="lb-podium__name">Player</div>
-          <div class="lb-podium__meta">Ads Watched: 0</div>
-          <div class="lb-podium__coins"><img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:19px;height:19px;flex-shrink:0;vertical-align:middle;">15K</div>
-          <div class="lb-podium__base lb-podium__base--2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M7 5H4a1 1 0 0 0-1 1v1a4 4 0 0 0 4 4"/><path d="M17 5h3a1 1 0 0 1 1 1v1a4 4 0 0 1-4 4"/></svg></div>
-        </div>
-        <div class="lb-podium__place lb-podium__place--1">
-          <svg class="lb-podium__crown" viewBox="0 0 24 24" fill="#e3a542" stroke="none"><path d="M3 8l4 3 5-6 5 6 4-3-2 11H5z"/></svg>
-          <div class="lb-avatar lb-avatar--lg lb-avatar--gold">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            <span class="lb-podium__rank-badge lb-podium__rank-badge--gold">1</span>
-          </div>
-          <div class="lb-podium__name">Player</div>
-          <div class="lb-podium__meta">Ads Watched: 0</div>
-          <div class="lb-podium__coins"><img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:19px;height:19px;flex-shrink:0;vertical-align:middle;">20K</div>
-          <div class="lb-podium__base lb-podium__base--1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M7 5H4a1 1 0 0 0-1 1v1a4 4 0 0 0 4 4"/><path d="M17 5h3a1 1 0 0 1 1 1v1a4 4 0 0 1-4 4"/></svg></div>
-        </div>
-        <div class="lb-podium__place lb-podium__place--3">
-          <div class="lb-avatar lb-avatar--md lb-avatar--bronze">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            <span class="lb-podium__rank-badge lb-podium__rank-badge--bronze">3</span>
-          </div>
-          <div class="lb-podium__name">Player</div>
-          <div class="lb-podium__meta">Ads Watched: 0</div>
-          <div class="lb-podium__coins"><img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:19px;height:19px;flex-shrink:0;vertical-align:middle;">10K</div>
-          <div class="lb-podium__base lb-podium__base--3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M7 5H4a1 1 0 0 0-1 1v1a4 4 0 0 0 4 4"/><path d="M17 5h3a1 1 0 0 1 1 1v1a4 4 0 0 1-4 4"/></svg></div>
-        </div>
-      </div>
-
+        <div class="lb-podium" id="lb-podium-ads"></div>
         <div class="lb-ranks-head">
           <span>Ranks 4–20</span>
           <span>Prizes</span>
         </div>
-        <div class="lb-list">
-          <div class="lb-row" data-rank="4">
-            <div class="lb-row__rank">4</div>
-            <div class="lb-avatar lb-avatar--sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            </div>
-            <div class="lb-row__info">
-              <div class="lb-row__name">Player</div>
-              <div class="lb-row__meta">Ads Watched: 0</div>
-            </div>
-            <div class="lb-row__coins"><img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:20px;height:20px;flex-shrink:0;vertical-align:middle;">5K</div>
-          </div>
-          <div class="lb-row" data-rank="5">
-            <div class="lb-row__rank">5</div>
-            <div class="lb-avatar lb-avatar--sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            </div>
-            <div class="lb-row__info">
-              <div class="lb-row__name">Player</div>
-              <div class="lb-row__meta">Ads Watched: 0</div>
-            </div>
-            <div class="lb-row__coins"><img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:20px;height:20px;flex-shrink:0;vertical-align:middle;">5K</div>
-          </div>
-          <div class="lb-row" data-rank="6">
-            <div class="lb-row__rank">6</div>
-            <div class="lb-avatar lb-avatar--sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            </div>
-            <div class="lb-row__info">
-              <div class="lb-row__name">Player</div>
-              <div class="lb-row__meta">Ads Watched: 0</div>
-            </div>
-            <div class="lb-row__coins"><img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:20px;height:20px;flex-shrink:0;vertical-align:middle;">5K</div>
-          </div>
-          <div class="lb-row" data-rank="7">
-            <div class="lb-row__rank">7</div>
-            <div class="lb-avatar lb-avatar--sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            </div>
-            <div class="lb-row__info">
-              <div class="lb-row__name">Player</div>
-              <div class="lb-row__meta">Ads Watched: 0</div>
-            </div>
-            <div class="lb-row__coins"><img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:20px;height:20px;flex-shrink:0;vertical-align:middle;">5K</div>
-          </div>
-          <div class="lb-row" data-rank="8">
-            <div class="lb-row__rank">8</div>
-            <div class="lb-avatar lb-avatar--sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            </div>
-            <div class="lb-row__info">
-              <div class="lb-row__name">Player</div>
-              <div class="lb-row__meta">Ads Watched: 0</div>
-            </div>
-            <div class="lb-row__coins"><img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:20px;height:20px;flex-shrink:0;vertical-align:middle;">5K</div>
-          </div>
-          <div class="lb-row" data-rank="9">
-            <div class="lb-row__rank">9</div>
-            <div class="lb-avatar lb-avatar--sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            </div>
-            <div class="lb-row__info">
-              <div class="lb-row__name">Player</div>
-              <div class="lb-row__meta">Ads Watched: 0</div>
-            </div>
-            <div class="lb-row__coins"><img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:20px;height:20px;flex-shrink:0;vertical-align:middle;">5K</div>
-          </div>
-          <div class="lb-row" data-rank="10">
-            <div class="lb-row__rank">10</div>
-            <div class="lb-avatar lb-avatar--sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            </div>
-            <div class="lb-row__info">
-              <div class="lb-row__name">Player</div>
-              <div class="lb-row__meta">Ads Watched: 0</div>
-            </div>
-            <div class="lb-row__coins"><img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:20px;height:20px;flex-shrink:0;vertical-align:middle;">5K</div>
-          </div>
-          <div class="lb-row" data-rank="11">
-            <div class="lb-row__rank">11</div>
-            <div class="lb-avatar lb-avatar--sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            </div>
-            <div class="lb-row__info">
-              <div class="lb-row__name">Player</div>
-              <div class="lb-row__meta">Ads Watched: 0</div>
-            </div>
-            
-          </div>
-          <div class="lb-row" data-rank="12">
-            <div class="lb-row__rank">12</div>
-            <div class="lb-avatar lb-avatar--sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            </div>
-            <div class="lb-row__info">
-              <div class="lb-row__name">Player</div>
-              <div class="lb-row__meta">Ads Watched: 0</div>
-            </div>
-            
-          </div>
-          <div class="lb-row" data-rank="13">
-            <div class="lb-row__rank">13</div>
-            <div class="lb-avatar lb-avatar--sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            </div>
-            <div class="lb-row__info">
-              <div class="lb-row__name">Player</div>
-              <div class="lb-row__meta">Ads Watched: 0</div>
-            </div>
-            
-          </div>
-          <div class="lb-row" data-rank="14">
-            <div class="lb-row__rank">14</div>
-            <div class="lb-avatar lb-avatar--sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            </div>
-            <div class="lb-row__info">
-              <div class="lb-row__name">Player</div>
-              <div class="lb-row__meta">Ads Watched: 0</div>
-            </div>
-            
-          </div>
-          <div class="lb-row" data-rank="15">
-            <div class="lb-row__rank">15</div>
-            <div class="lb-avatar lb-avatar--sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            </div>
-            <div class="lb-row__info">
-              <div class="lb-row__name">Player</div>
-              <div class="lb-row__meta">Ads Watched: 0</div>
-            </div>
-            
-          </div>
-          <div class="lb-row" data-rank="16">
-            <div class="lb-row__rank">16</div>
-            <div class="lb-avatar lb-avatar--sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            </div>
-            <div class="lb-row__info">
-              <div class="lb-row__name">Player</div>
-              <div class="lb-row__meta">Ads Watched: 0</div>
-            </div>
-            
-          </div>
-          <div class="lb-row" data-rank="17">
-            <div class="lb-row__rank">17</div>
-            <div class="lb-avatar lb-avatar--sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            </div>
-            <div class="lb-row__info">
-              <div class="lb-row__name">Player</div>
-              <div class="lb-row__meta">Ads Watched: 0</div>
-            </div>
-            
-          </div>
-          <div class="lb-row" data-rank="18">
-            <div class="lb-row__rank">18</div>
-            <div class="lb-avatar lb-avatar--sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            </div>
-            <div class="lb-row__info">
-              <div class="lb-row__name">Player</div>
-              <div class="lb-row__meta">Ads Watched: 0</div>
-            </div>
-            
-          </div>
-          <div class="lb-row" data-rank="19">
-            <div class="lb-row__rank">19</div>
-            <div class="lb-avatar lb-avatar--sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            </div>
-            <div class="lb-row__info">
-              <div class="lb-row__name">Player</div>
-              <div class="lb-row__meta">Ads Watched: 0</div>
-            </div>
-            
-          </div>
-          <div class="lb-row" data-rank="20">
-            <div class="lb-row__rank">20</div>
-            <div class="lb-avatar lb-avatar--sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            </div>
-            <div class="lb-row__info">
-              <div class="lb-row__name">Player</div>
-              <div class="lb-row__meta">Ads Watched: 0</div>
-            </div>
-            
-          </div>
-        </div>
+        <div class="lb-list" id="lb-list-ads"></div>
+        <div class="lb-empty" id="lb-empty-ads" style="display:none;">No activity yet this week — be the first!</div>
       </div>
 
       <div class="lb-panel" id="lb-panel-referrals">
-      <div class="lb-podium">
-        <div class="lb-podium__place lb-podium__place--2">
-          <div class="lb-avatar lb-avatar--md lb-avatar--silver">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            <span class="lb-podium__rank-badge">2</span>
-          </div>
-          <div class="lb-podium__name">Player</div>
-          <div class="lb-podium__meta">Active Referrals: 0</div>
-          <div class="lb-podium__coins"><img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:19px;height:19px;flex-shrink:0;vertical-align:middle;">15K</div>
-          <div class="lb-podium__base lb-podium__base--2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M7 5H4a1 1 0 0 0-1 1v1a4 4 0 0 0 4 4"/><path d="M17 5h3a1 1 0 0 1 1 1v1a4 4 0 0 1-4 4"/></svg></div>
-        </div>
-        <div class="lb-podium__place lb-podium__place--1">
-          <svg class="lb-podium__crown" viewBox="0 0 24 24" fill="#e3a542" stroke="none"><path d="M3 8l4 3 5-6 5 6 4-3-2 11H5z"/></svg>
-          <div class="lb-avatar lb-avatar--lg lb-avatar--gold">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            <span class="lb-podium__rank-badge lb-podium__rank-badge--gold">1</span>
-          </div>
-          <div class="lb-podium__name">Player</div>
-          <div class="lb-podium__meta">Active Referrals: 0</div>
-          <div class="lb-podium__coins"><img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:19px;height:19px;flex-shrink:0;vertical-align:middle;">20K</div>
-          <div class="lb-podium__base lb-podium__base--1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M7 5H4a1 1 0 0 0-1 1v1a4 4 0 0 0 4 4"/><path d="M17 5h3a1 1 0 0 1 1 1v1a4 4 0 0 1-4 4"/></svg></div>
-        </div>
-        <div class="lb-podium__place lb-podium__place--3">
-          <div class="lb-avatar lb-avatar--md lb-avatar--bronze">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            <span class="lb-podium__rank-badge lb-podium__rank-badge--bronze">3</span>
-          </div>
-          <div class="lb-podium__name">Player</div>
-          <div class="lb-podium__meta">Active Referrals: 0</div>
-          <div class="lb-podium__coins"><img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:19px;height:19px;flex-shrink:0;vertical-align:middle;">10K</div>
-          <div class="lb-podium__base lb-podium__base--3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M7 5H4a1 1 0 0 0-1 1v1a4 4 0 0 0 4 4"/><path d="M17 5h3a1 1 0 0 1 1 1v1a4 4 0 0 1-4 4"/></svg></div>
-        </div>
-      </div>
-
+        <div class="lb-podium" id="lb-podium-referrals"></div>
         <div class="lb-ranks-head">
           <span>Ranks 4–20</span>
           <span>Prizes</span>
         </div>
-        <div class="lb-list">
-          <div class="lb-row" data-rank="4">
-            <div class="lb-row__rank">4</div>
-            <div class="lb-avatar lb-avatar--sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            </div>
-            <div class="lb-row__info">
-              <div class="lb-row__name">Player</div>
-              <div class="lb-row__meta">Active Referrals: 0</div>
-            </div>
-            <div class="lb-row__coins"><img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:20px;height:20px;flex-shrink:0;vertical-align:middle;">5K</div>
-          </div>
-          <div class="lb-row" data-rank="5">
-            <div class="lb-row__rank">5</div>
-            <div class="lb-avatar lb-avatar--sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            </div>
-            <div class="lb-row__info">
-              <div class="lb-row__name">Player</div>
-              <div class="lb-row__meta">Active Referrals: 0</div>
-            </div>
-            <div class="lb-row__coins"><img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:20px;height:20px;flex-shrink:0;vertical-align:middle;">5K</div>
-          </div>
-          <div class="lb-row" data-rank="6">
-            <div class="lb-row__rank">6</div>
-            <div class="lb-avatar lb-avatar--sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            </div>
-            <div class="lb-row__info">
-              <div class="lb-row__name">Player</div>
-              <div class="lb-row__meta">Active Referrals: 0</div>
-            </div>
-            <div class="lb-row__coins"><img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:20px;height:20px;flex-shrink:0;vertical-align:middle;">5K</div>
-          </div>
-          <div class="lb-row" data-rank="7">
-            <div class="lb-row__rank">7</div>
-            <div class="lb-avatar lb-avatar--sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            </div>
-            <div class="lb-row__info">
-              <div class="lb-row__name">Player</div>
-              <div class="lb-row__meta">Active Referrals: 0</div>
-            </div>
-            <div class="lb-row__coins"><img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:20px;height:20px;flex-shrink:0;vertical-align:middle;">5K</div>
-          </div>
-          <div class="lb-row" data-rank="8">
-            <div class="lb-row__rank">8</div>
-            <div class="lb-avatar lb-avatar--sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            </div>
-            <div class="lb-row__info">
-              <div class="lb-row__name">Player</div>
-              <div class="lb-row__meta">Active Referrals: 0</div>
-            </div>
-            <div class="lb-row__coins"><img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:20px;height:20px;flex-shrink:0;vertical-align:middle;">5K</div>
-          </div>
-          <div class="lb-row" data-rank="9">
-            <div class="lb-row__rank">9</div>
-            <div class="lb-avatar lb-avatar--sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            </div>
-            <div class="lb-row__info">
-              <div class="lb-row__name">Player</div>
-              <div class="lb-row__meta">Active Referrals: 0</div>
-            </div>
-            <div class="lb-row__coins"><img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:20px;height:20px;flex-shrink:0;vertical-align:middle;">5K</div>
-          </div>
-          <div class="lb-row" data-rank="10">
-            <div class="lb-row__rank">10</div>
-            <div class="lb-avatar lb-avatar--sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            </div>
-            <div class="lb-row__info">
-              <div class="lb-row__name">Player</div>
-              <div class="lb-row__meta">Active Referrals: 0</div>
-            </div>
-            <div class="lb-row__coins"><img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:20px;height:20px;flex-shrink:0;vertical-align:middle;">5K</div>
-          </div>
-          <div class="lb-row" data-rank="11">
-            <div class="lb-row__rank">11</div>
-            <div class="lb-avatar lb-avatar--sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            </div>
-            <div class="lb-row__info">
-              <div class="lb-row__name">Player</div>
-              <div class="lb-row__meta">Active Referrals: 0</div>
-            </div>
-            
-          </div>
-          <div class="lb-row" data-rank="12">
-            <div class="lb-row__rank">12</div>
-            <div class="lb-avatar lb-avatar--sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            </div>
-            <div class="lb-row__info">
-              <div class="lb-row__name">Player</div>
-              <div class="lb-row__meta">Active Referrals: 0</div>
-            </div>
-            
-          </div>
-          <div class="lb-row" data-rank="13">
-            <div class="lb-row__rank">13</div>
-            <div class="lb-avatar lb-avatar--sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            </div>
-            <div class="lb-row__info">
-              <div class="lb-row__name">Player</div>
-              <div class="lb-row__meta">Active Referrals: 0</div>
-            </div>
-            
-          </div>
-          <div class="lb-row" data-rank="14">
-            <div class="lb-row__rank">14</div>
-            <div class="lb-avatar lb-avatar--sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            </div>
-            <div class="lb-row__info">
-              <div class="lb-row__name">Player</div>
-              <div class="lb-row__meta">Active Referrals: 0</div>
-            </div>
-            
-          </div>
-          <div class="lb-row" data-rank="15">
-            <div class="lb-row__rank">15</div>
-            <div class="lb-avatar lb-avatar--sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            </div>
-            <div class="lb-row__info">
-              <div class="lb-row__name">Player</div>
-              <div class="lb-row__meta">Active Referrals: 0</div>
-            </div>
-            
-          </div>
-          <div class="lb-row" data-rank="16">
-            <div class="lb-row__rank">16</div>
-            <div class="lb-avatar lb-avatar--sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            </div>
-            <div class="lb-row__info">
-              <div class="lb-row__name">Player</div>
-              <div class="lb-row__meta">Active Referrals: 0</div>
-            </div>
-            
-          </div>
-          <div class="lb-row" data-rank="17">
-            <div class="lb-row__rank">17</div>
-            <div class="lb-avatar lb-avatar--sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            </div>
-            <div class="lb-row__info">
-              <div class="lb-row__name">Player</div>
-              <div class="lb-row__meta">Active Referrals: 0</div>
-            </div>
-            
-          </div>
-          <div class="lb-row" data-rank="18">
-            <div class="lb-row__rank">18</div>
-            <div class="lb-avatar lb-avatar--sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            </div>
-            <div class="lb-row__info">
-              <div class="lb-row__name">Player</div>
-              <div class="lb-row__meta">Active Referrals: 0</div>
-            </div>
-            
-          </div>
-          <div class="lb-row" data-rank="19">
-            <div class="lb-row__rank">19</div>
-            <div class="lb-avatar lb-avatar--sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            </div>
-            <div class="lb-row__info">
-              <div class="lb-row__name">Player</div>
-              <div class="lb-row__meta">Active Referrals: 0</div>
-            </div>
-            
-          </div>
-          <div class="lb-row" data-rank="20">
-            <div class="lb-row__rank">20</div>
-            <div class="lb-avatar lb-avatar--sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-            </div>
-            <div class="lb-row__info">
-              <div class="lb-row__name">Player</div>
-              <div class="lb-row__meta">Active Referrals: 0</div>
-            </div>
-
-          </div>
-        </div>
+        <div class="lb-list" id="lb-list-referrals"></div>
+        <div class="lb-empty" id="lb-empty-referrals" style="display:none;">No activity yet this week — be the first!</div>
       </div>
       </div>
     </div>
@@ -6595,8 +6158,147 @@ function closeModal(id){
 }
 
 /* -- Leaderboard -- */
+/* =====================================================================
+   Weekly Leaderboard — بيانات حقيقية من /api/leaderboard (كاش يومي مشترك
+   على السيرفر عبر Cache API + كاش يومي محلي في localStorage لكل مستخدم،
+   فلا يتكرر الطلب أكثر من مرة واحدة في اليوم حتى لو فُتحت النافذة عدة
+   مرات). عرض Top 20 فقط لكل قسم (By Ads / By Referrals)، بالجوائز
+   المرفقة من السيرفر نفسه (لا حساب جوائز في الواجهة إطلاقاً).
+   ===================================================================== */
+var LB_METRIC_LABEL = { ads: 'Ads Watched', referrals: 'Active Referrals' };
+var leaderboardNextPayoutAt = null;
+var leaderboardCountdownTimer = null;
+
+function lbCacheKey(){
+  return 'lb_cache_' + new Date().toISOString().slice(0, 10);
+}
+
+function getCachedLeaderboardData(){
+  try {
+    var raw = localStorage.getItem(lbCacheKey());
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (e) { return null; }
+}
+
+function setCachedLeaderboardData(data){
+  try { localStorage.setItem(lbCacheKey(), JSON.stringify(data)); } catch (e) {}
+}
+
+function lbAvatarInner(entry){
+  if (entry.photo_url){
+    return '<img draggable="false" src="' + escapeHtmlClient(entry.photo_url) + '" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">';
+  }
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>';
+}
+
+function lbCoinsHtml(prize, size){
+  return '<img draggable="false" src="' + PRIZE_ICON_URLS.coins + '" alt="Coin" class="icon-coin" style="width:' + size + 'px;height:' + size + 'px;flex-shrink:0;vertical-align:middle;">' + formatFriendsAmount(prize);
+}
+
+function renderLeaderboardPanel(type, entries){
+  var podiumEl = document.getElementById('lb-podium-' + type);
+  var listEl = document.getElementById('lb-list-' + type);
+  var emptyEl = document.getElementById('lb-empty-' + type);
+  if (!podiumEl || !listEl) return;
+
+  if (!entries || entries.length === 0){
+    podiumEl.innerHTML = '';
+    listEl.innerHTML = '';
+    if (emptyEl) emptyEl.style.display = '';
+    return;
+  }
+  if (emptyEl) emptyEl.style.display = 'none';
+
+  var top3 = entries.slice(0, 3);
+  // ترتيب العرض على المنصة: الثاني - الأول - الثالث (نفس التصميم الأصلي)
+  var slots = [
+    { entry: top3[1], place: '2', avatar: 'lb-avatar--md lb-avatar--silver', badge: '' },
+    { entry: top3[0], place: '1', avatar: 'lb-avatar--lg lb-avatar--gold', badge: 'lb-podium__rank-badge--gold', crown: true },
+    { entry: top3[2], place: '3', avatar: 'lb-avatar--md lb-avatar--bronze', badge: 'lb-podium__rank-badge--bronze' }
+  ];
+
+  var podiumHtml = '';
+  slots.forEach(function(slot){
+    var entry = slot.entry;
+    if (!entry) return;
+    podiumHtml +=
+      '<div class="lb-podium__place lb-podium__place--' + slot.place + '">' +
+        (slot.crown ? '<svg class="lb-podium__crown" viewBox="0 0 24 24" fill="#e3a542" stroke="none"><path d="M3 8l4 3 5-6 5 6 4-3-2 11H5z"/></svg>' : '') +
+        '<div class="lb-avatar ' + slot.avatar + '">' +
+          lbAvatarInner(entry) +
+          '<span class="lb-podium__rank-badge ' + slot.badge + '">' + entry.rank + '</span>' +
+        '</div>' +
+        '<div class="lb-podium__name">' + escapeHtmlClient(entry.name) + '</div>' +
+        '<div class="lb-podium__meta">' + LB_METRIC_LABEL[type] + ': ' + entry.value + '</div>' +
+        '<div class="lb-podium__coins">' + lbCoinsHtml(entry.prize, 19) + '</div>' +
+        '<div class="lb-podium__base lb-podium__base--' + slot.place + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M7 5H4a1 1 0 0 0-1 1v1a4 4 0 0 0 4 4"/><path d="M17 5h3a1 1 0 0 1 1 1v1a4 4 0 0 1-4 4"/></svg></div>' +
+      '</div>';
+  });
+  podiumEl.innerHTML = podiumHtml;
+
+  var listHtml = '';
+  entries.slice(3, 20).forEach(function(entry){
+    listHtml +=
+      '<div class="lb-row" data-rank="' + entry.rank + '">' +
+        '<div class="lb-row__rank">' + entry.rank + '</div>' +
+        '<div class="lb-avatar lb-avatar--sm">' + lbAvatarInner(entry) + '</div>' +
+        '<div class="lb-row__info">' +
+          '<div class="lb-row__name">' + escapeHtmlClient(entry.name) + '</div>' +
+          '<div class="lb-row__meta">' + LB_METRIC_LABEL[type] + ': ' + entry.value + '</div>' +
+        '</div>' +
+        (entry.prize > 0 ? '<div class="lb-row__coins">' + lbCoinsHtml(entry.prize, 20) + '</div>' : '') +
+      '</div>';
+  });
+  listEl.innerHTML = listHtml;
+}
+
+function renderLeaderboardCountdown(){
+  var el = document.getElementById('lb-rewards-badge');
+  if (!el || !leaderboardNextPayoutAt) return;
+  var remaining = Math.max(0, leaderboardNextPayoutAt - Date.now());
+  var totalSec = Math.floor(remaining / 1000);
+  var days = Math.floor(totalSec / 86400);
+  var hh = String(Math.floor((totalSec % 86400) / 3600)).padStart(2, '0');
+  var mm = String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0');
+  var ss = String(totalSec % 60).padStart(2, '0');
+  el.textContent = 'Rewards in ' + days + 'D ' + hh + ':' + mm + ':' + ss;
+}
+
+function applyLeaderboardData(data){
+  renderLeaderboardPanel('ads', data.ads);
+  renderLeaderboardPanel('referrals', data.referrals);
+  leaderboardNextPayoutAt = data.next_payout_at;
+  renderLeaderboardCountdown();
+  if (!leaderboardCountdownTimer){
+    leaderboardCountdownTimer = setInterval(renderLeaderboardCountdown, 1000);
+  }
+}
+
 function openLeaderboardModal(){
   openModal('modal-leaderboard');
+
+  var cached = getCachedLeaderboardData();
+  if (cached){
+    applyLeaderboardData(cached);
+    return;
+  }
+
+  var initData = getTelegramInitData();
+  if (!initData) return;
+
+  fetch('/api/leaderboard', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: initData })
+  })
+  .then(function(res){ return res.json(); })
+  .then(function(data){
+    if (data.error) return;
+    setCachedLeaderboardData(data);
+    applyLeaderboardData(data);
+  })
+  .catch(function(err){ console.error('leaderboard fetch failed:', err); });
 }
 
 /* -- The Mysterious Free Pet -- */
