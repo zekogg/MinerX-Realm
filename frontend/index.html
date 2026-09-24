@@ -5025,8 +5025,7 @@ function fetchUserData(){
       invites: data.user.friends_invites,
       active: data.user.friends_active,
       pending_earnings: data.user.friends_pending_earnings,
-      min_claim: data.user.friends_min_claim,
-      milestones: data.user.friends_milestones
+      min_claim: data.user.friends_min_claim
     });
     applyPetsState(data.user.pets);
     applyStorageState({
@@ -6059,6 +6058,7 @@ fetchUserData();
       btn.classList.toggle('is-active', active);
     });
     if (pageId === 'page-wallet' && typeof loadTxHistory === 'function') loadTxHistory();
+    if (pageId === 'page-friends' && typeof fetchFriendsMilestones === 'function') fetchFriendsMilestones();
   }
 
   navButtons.forEach(function(btn){
@@ -7850,9 +7850,33 @@ function applyFriendsState(data){
   friendsState.active = data.active || 0;
   friendsState.pendingEarnings = data.pending_earnings || 0;
   friendsState.minClaim = data.min_claim || 5000;
-  friendsState.milestones = data.milestones || [];
   renderFriendsStats();
-  renderMilestones();
+}
+
+// milestone_missions بيانات ثابتة لا تعتمد على المستخدم — تُجلَب فقط عند أول
+// فتح فعلي لصفحة Friends (وليس مع كل /api/user)، مرة واحدة لكل جلسة.
+var friendsMilestonesFetched = false;
+function fetchFriendsMilestones(){
+  if (friendsMilestonesFetched) return;
+  var initData = getTelegramInitData();
+  if (!initData) return;
+  friendsMilestonesFetched = true;
+
+  fetch('/api/friends/milestones', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: initData })
+  })
+  .then(function(res){ return res.json(); })
+  .then(function(data){
+    if (!data.milestones) return;
+    friendsState.milestones = data.milestones;
+    renderMilestones();
+  })
+  .catch(function(err){
+    console.error('fetch friends milestones failed:', err);
+    friendsMilestonesFetched = false; // اسمح بإعادة المحاولة عند فتح الصفحة مجدداً
+  });
 }
 
 function renderFriendsStats(){

@@ -324,6 +324,10 @@ async function routeRequest(request, env, url) {
       return handleFriendsList(request, env);
     }
 
+    if (url.pathname === "/api/friends/milestones" && request.method === "POST") {
+      return handleFriendsMilestones(request, env);
+    }
+
     if (url.pathname === "/api/checkin/claim" && request.method === "POST") {
       return handleCheckinClaim(request, env);
     }
@@ -491,14 +495,6 @@ async function handleGetUser(request, env) {
   view.ambassador_available = !!ambassadorGrant;
   view.ambassador_claimed = !!pets.ambassador;
 
-  const milestonesResult = await env.DB.prepare(
-    "SELECT friends_required, reward FROM milestone_missions ORDER BY friends_required ASC"
-  ).all();
-  view.friends_milestones = (milestonesResult.results || []).map((m) => ({
-    count: m.friends_required,
-    reward: m.reward,
-    claimed: !!user[`milestone_${m.friends_required}_claimed`]
-  }));
 
   view.checkin_claimed_today = {
     1: user.checkin1_claimed_date === today,
@@ -2223,6 +2219,32 @@ async function handleFriendsClaimMilestone(request, env) {
   ).bind(telegramId).first();
 
   return jsonResponse({ reward: milestone.reward, coins: user.coins });
+}
+
+// ===================================================================== نقطة /api/friends/milestones — تُستدعى فقط عند أول فتح فعلي لصفحة Friends (وليس مع كل /api/user)، لأن milestone_missions بيانات ثابتة لا تعتمد على المستخدم إطلاقاً ولا داعي لقراءتها في أكثر نقطة استدعاءً بالتطبيق. =====================================================================
+async function handleFriendsMilestones(request, env) {
+  const auth = await authenticateRequest(request, env);
+  if (!auth.ok) return auth.response;
+  const { telegramId } = auth;
+
+  const [user, milestonesResult] = await Promise.all([
+    env.DB.prepare(
+      "SELECT milestone_10_claimed, milestone_25_claimed, milestone_50_claimed, milestone_100_claimed FROM users WHERE telegram_id = ?"
+    ).bind(telegramId).first(),
+    env.DB.prepare(
+      "SELECT friends_required, reward FROM milestone_missions ORDER BY friends_required ASC"
+    ).all()
+  ]);
+
+  if (!user) return jsonResponse({ error: "user_not_found" }, 404);
+
+  const milestones = (milestonesResult.results || []).map((m) => ({
+    count: m.friends_required,
+    reward: m.reward,
+    claimed: !!user[`milestone_${m.friends_required}_claimed`]
+  }));
+
+  return jsonResponse({ milestones });
 }
 
 // ===================================================================== نقطة /api/friends/list — تُستدعى فقط عند ضغط المستخدم على "Show The List" (وليس مع كل /api/user) لتفادي أي كلفة إضافية على أكثر نقطة استدعاءً بالتطبيق. LIMIT 100 يحدّ من كلفة القراءة حتى لمُحيل ضخم جداً. =====================================================================
