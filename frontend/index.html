@@ -6991,7 +6991,7 @@ function onWatchAdsgramClick(){
   });
 }
 
-// يعيد قراءة /api/user حتى 6 مرات (كل 1.5 ثانية) بحثاً عن ازدياد ads_watched_today — يؤكد بذلك وصول Reward URL من Adsgram لسيرفرنا فعلياً قبل عرض أي مكافأة للمستخدم.
+// يعيد قراءة /api/user مرتين كحد أقصى (فحص فوري + إعادة واحدة بعد 4 ثوانٍ) بحثاً عن ازدياد ads_watched_today — يؤكد بذلك وصول Reward URL من Adsgram لسيرفرنا فعلياً قبل عرض أي مكافأة للمستخدم.
 function pollAdsRewardConfirmation(baselineWatched, attempt){
   var initData = getTelegramInitData();
   if (!initData){
@@ -7023,8 +7023,8 @@ function pollAdsRewardConfirmation(baselineWatched, attempt){
       return;
     }
 
-    if (attempt < 6){
-      setTimeout(function(){ pollAdsRewardConfirmation(baselineWatched, attempt + 1); }, 1500);
+    if (attempt < 1){
+      setTimeout(function(){ pollAdsRewardConfirmation(baselineWatched, attempt + 1); }, 4000);
     } else {
       adsTaskState.busy = false;
       renderAdsTaskButton();
@@ -7163,8 +7163,8 @@ function pollBonusAdRewardConfirmation(baselineWatched, attempt){
       return;
     }
 
-    if (attempt < 6){
-      setTimeout(function(){ pollBonusAdRewardConfirmation(baselineWatched, attempt + 1); }, 1500);
+    if (attempt < 1){
+      setTimeout(function(){ pollBonusAdRewardConfirmation(baselineWatched, attempt + 1); }, 4000);
     } else {
       bonusAdState.busy = false;
       renderBonusAdButton();
@@ -7297,7 +7297,7 @@ function onWatchGigapubClick(){
   });
 }
 
-// يعيد قراءة /api/user حتى 6 مرات (كل 1.5 ثانية) بحثاً عن ازدياد gigapub_watched_today — يؤكد بذلك وصول Postback من GigaPub لسيرفرنا فعلياً قبل عرض أي مكافأة للمستخدم (نفس أسلوب pollAdsRewardConfirmation).
+// يعيد قراءة /api/user مرتين كحد أقصى (فحص فوري + إعادة واحدة بعد 4 ثوانٍ) بحثاً عن ازدياد gigapub_watched_today — يؤكد بذلك وصول Postback من GigaPub لسيرفرنا فعلياً قبل عرض أي مكافأة للمستخدم (نفس أسلوب pollAdsRewardConfirmation).
 function pollGigapubRewardConfirmation(baselineWatched, attempt){
   var initData = getTelegramInitData();
   if (!initData){
@@ -7329,8 +7329,8 @@ function pollGigapubRewardConfirmation(baselineWatched, attempt){
       return;
     }
 
-    if (attempt < 6){
-      setTimeout(function(){ pollGigapubRewardConfirmation(baselineWatched, attempt + 1); }, 1500);
+    if (attempt < 1){
+      setTimeout(function(){ pollGigapubRewardConfirmation(baselineWatched, attempt + 1); }, 4000);
     } else {
       gigapubState.busy = false;
       renderGigapubButton();
