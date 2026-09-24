@@ -4744,6 +4744,45 @@ var MAINTENANCE_ADMIN_ID = 1018495986;   // معرّف تيليجرام (Telegra
   }
 })();
 
+/* /////أداة تشخيص Eruda + عدّاد rows_read لكل طلب API — للأدمن فقط (نفس MAINTENANCE_ADMIN_ID)، لا تُحمَّل ولا تعمل إطلاقاً لأي مستخدم آخر///// */
+(function(){
+  var userId = null;
+  try{
+    if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user){
+      userId = window.Telegram.WebApp.initDataUnsafe.user.id;
+    }
+  }catch(e){}
+  if (userId !== MAINTENANCE_ADMIN_ID) return;
+
+  var erudaScript = document.createElement('script');
+  erudaScript.src = 'https://cdn.jsdelivr.net/npm/eruda';
+  erudaScript.onload = function(){
+    try{ eruda.init(); }catch(e){}
+  };
+  document.head.appendChild(erudaScript);
+
+  // يعترض fetch لعرض _debug (الذي يرفقه السيرفر فقط لطلبات الأدمن) في كونسل Eruda —
+  // لا يغيّر الـresponse المُستخدَم فعلياً من بقية الكود (نقرأ نسخة clone فقط).
+  var originalFetch = window.fetch;
+  window.fetch = function(){
+    var fetchArgs = arguments;
+    return originalFetch.apply(this, fetchArgs).then(function(res){
+      try{
+        var reqUrl = fetchArgs[0];
+        if (typeof reqUrl === 'string' && reqUrl.indexOf('/api/') === 0){
+          res.clone().json().then(function(data){
+            if (data && data._debug){
+              var d = data._debug;
+              console.log('[D1] ' + d.route + ' → queries: ' + d.queries + ' | rows_read: ' + d.rows_read + (d.rows_read_exact ? '' : ' (تقريبي، يستثني first())') + ' | rows_written: ' + d.rows_written);
+            }
+          }).catch(function(){});
+        }
+      }catch(e){}
+      return res;
+    });
+  };
+})();
+
 /* /////كود شاشة التحميل الوهمية: 4 ثوانٍ ثابتة عند كل فتح للتطبيق، لا علاقة لها بجلب البيانات الحقيقية (fetchUserData يعمل بالتوازي في الخلفية)///// */
 (function(){
   var LOADING_SCREEN_DURATION_MS = 2000;
