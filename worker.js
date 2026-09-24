@@ -441,6 +441,13 @@ async function handleGetUser(request, env) {
       ]);
     }
 
+    // فتح البوت عبر رابط Mini App المباشر (t.me/MinerXRealmBot/app) لا يُرسل /start
+    // إطلاقاً، فهذا أول فتح فعلي هو الفرصة الوحيدة لإرسال رسالة الترحيب. أي فشل هنا
+    // (مثلاً تيليجرام لم يُنشئ محادثة خاصة بعد) لا يجب أن يمنع إنشاء المستخدم إطلاقاً.
+    try {
+      await sendWelcomeMessage(env, telegramId);
+    } catch (e) { /* تجاهل — لا علاقة له بنجاح إنشاء المستخدم أو تحميل التطبيق */ }
+
     user = await env.DB.prepare(userQuery).bind(today, telegramId).first();
   } else if (photoUrl && photoUrl !== user.photo_url) {
     // تحديث الصورة المخزَّنة فقط لو تغيّرت فعلاً (نادر) — تفيد لاحقاً بعرض صور الأصدقاء بأماكن كقائمة Friends التي لا تملك initData الخاص بهم.
@@ -2866,17 +2873,7 @@ async function handleTelegram(request, env) {
   const message = update.message;
 
   if (message && message.text === "/start") {
-    await sendMessage(env, message.chat.id, {
-      text: "Welcome to MinerXRealm!\nStart mining now and earn coins for free.",
-      reply_markup: {
-        inline_keyboard: [[
-          {
-            text: "Open App",
-            web_app: { url: WEBAPP_URL }
-          }
-        ]]
-      }
-    });
+    await sendWelcomeMessage(env, message.chat.id);
   }
 
   // أزرار Approve/Reject لطلبات السحب — فقط ADMIN_TELEGRAM_ID يُنفَّذ له أي إجراء، أي ضغطة من أي شخص آخر تُرفض بتنبيه بدون أي تأثير على البيانات.
@@ -2894,6 +2891,25 @@ async function sendMessage(env, chatId, payload) {
     body: JSON.stringify({ chat_id: chatId, ...payload })
   });
   return res.json().catch(() => null);
+}
+
+// نفس رسالة /start بالضبط — تُستدعى أيضاً من handleGetUser عند إنشاء صف مستخدم جديد،
+// لأن فتح البوت عبر رابط Mini App المباشر (t.me/MinerXRealmBot/app) لا يُرسل /start
+// إطلاقاً (يفتح التطبيق مباشرة متجاوزاً محادثة البوت)، فهذه الطريقة الوحيدة لضمان
+// وصول رسالة الترحيب لأول فتح فعلي. فشل الإرسال هنا لا يجب أن يمنع إنشاء المستخدم أو
+// تحميل التطبيق أبداً — لذلك يُستدعى دائماً داخل try/catch من طرف المستدعي.
+async function sendWelcomeMessage(env, chatId) {
+  await sendMessage(env, chatId, {
+    text: "Welcome to MinerXRealm!\nStart mining now and earn coins for free.",
+    reply_markup: {
+      inline_keyboard: [[
+        {
+          text: "Open App",
+          web_app: { url: WEBAPP_URL }
+        }
+      ]]
+    }
+  });
 }
 
 async function editMessage(env, chatId, messageId, payload) {
