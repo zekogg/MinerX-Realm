@@ -133,6 +133,98 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
+    // أداة تشخيص خاصة بالأدمن فقط (ADMIN_TELEGRAM_ID) — لا تُغيّر أي منطق موجود
+    // ولا تُنفَّذ إطلاقاً لغير الأدمن: تعدّ عدد استعلامات D1 و rows_read/written
+    // خلال هذا الطلب فقط، وترفقها في رد الـAPI كحقل _debug ليعرضه Eruda بالواجهة.
+    const dbStats = { queries: 0, rows_read: 0, rows_written: 0, rows_read_exact: true };
+    let isAdminDebug = false;
+    if (request.method === "POST") {
+      try {
+        const peekBody = await request.clone().json();
+        if (peekBody && peekBody.initData && await validateInitData(peekBody.initData, env.BOT_TOKEN)) {
+          const tgUser = JSON.parse(new URLSearchParams(peekBody.initData).get("user") || "null");
+          if (tgUser && tgUser.id === ADMIN_TELEGRAM_ID) isAdminDebug = true;
+        }
+      } catch (e) { /* أي فشل هنا يعني فقط عدم تفعيل التشخيص — لا يؤثر على الطلب نفسه */ }
+    }
+
+    let dbEnv = env;
+    if (isAdminDebug) {
+      // REAL_STMT يسمح باستخراج العنصر الحقيقي (D1PreparedStatement) من خلف
+      // أي Proxy قبل تمريره لـ.batch() الحقيقي — بعض معالجات المكافآت (تعدين،
+      // storage، شراء/ترقية الحيوانات، سحب/إيداع...) تبني عناصر batch عبر
+      // env.DB.prepare().bind() ثم تمررها لـ.batch(); لو مرّرنا الـProxy نفسه
+      // بدل العنصر الحقيقي قد يفشل تنفيذ D1 الفعلي — هذا يضمن عدم حدوث ذلك
+      // حتى لحساب الأدمن نفسه أثناء استخدام أي ميزة عادية بالتطبيق.
+      const REAL_STMT = Symbol("realStmt");
+      const wrapStatement = (stmt) => new Proxy(stmt, {
+        get(target, prop) {
+          if (prop === REAL_STMT) return target;
+          if (prop === "bind") return (...args) => wrapStatement(target.bind(...args));
+          if (prop === "run" || prop === "all") {
+            return async (...args) => {
+              const result = await target[prop](...args);
+              dbStats.queries++;
+              if (result && result.meta) {
+                dbStats.rows_read += result.meta.rows_read || 0;
+                dbStats.rows_written += result.meta.rows_written || 0;
+              }
+              return result;
+            };
+          }
+          if (prop === "first" || prop === "raw") {
+            return async (...args) => {
+              dbStats.queries++;
+              dbStats.rows_read_exact = false; // first()/raw() لا يرجعان rows_read من Cloudflare أصلاً
+              return target[prop](...args);
+            };
+          }
+          return target[prop];
+        }
+      });
+      dbEnv = new Proxy(env, {
+        get(target, prop) {
+          if (prop !== "DB") return target[prop];
+          return new Proxy(target.DB, {
+            get(dbTarget, dbProp) {
+              if (dbProp === "prepare") return (sql) => wrapStatement(dbTarget.prepare(sql));
+              if (dbProp === "batch") {
+                return async (stmts) => {
+                  const realStmts = stmts.map((s) => (s && s[REAL_STMT]) ? s[REAL_STMT] : s);
+                  const results = await dbTarget.batch(realStmts);
+                  dbStats.queries += stmts.length;
+                  for (const r of results) {
+                    if (r && r.meta) {
+                      dbStats.rows_read += r.meta.rows_read || 0;
+                      dbStats.rows_written += r.meta.rows_written || 0;
+                    }
+                  }
+                  return results;
+                };
+              }
+              return dbTarget[dbProp];
+            }
+          });
+        }
+      });
+    }
+
+    const response = await routeRequest(request, dbEnv, url);
+    if (!isAdminDebug) return response;
+
+    try {
+      const ct = response.headers.get("content-type") || "";
+      if (!ct.includes("application/json")) return response;
+      const data = await response.clone().json();
+      data._debug = { route: url.pathname, ...dbStats };
+      return new Response(JSON.stringify(data), { status: response.status, headers: response.headers });
+    } catch (e) {
+      return response; // أي فشل بالإرفاق يعيد الرد الأصلي كما هو دون أي تأثير
+    }
+  }
+};
+
+async function routeRequest(request, env, url) {
     // Telegram sends updates here
     if (url.pathname === "/telegram-webhook") {
       return handleTelegram(request, env);
@@ -291,8 +383,7 @@ export default {
       return noCacheResponse;
     }
     return assetResponse;
-  }
-};
+}
 
 // ===================================================================== نقطة /api/user — تُستدعى من الواجهة عند فتح التطبيق. تتحقق من initData (توقيع تيليجرام)، تنشئ صف المستخدم لو ما كان موجود، وترجع بياناته (الرصيد، السرعة، حالة التعدين، إلخ) عشان الواجهة تعرضها بدل الأرقام الثابتة. =====================================================================
 async function handleGetUser(request, env) {
