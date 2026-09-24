@@ -458,10 +458,6 @@ async function handleGetUser(request, env) {
   view = withDailyPrizeView(view, "last_chest_date", "chest_claimed_today", "chest_next_reset_utc");
   view = withDailyPrizeView(view, "last_giftpick_date", "giftpick_claimed_today", "giftpick_next_reset_utc");
   view = withStorageView(view);
-  // معدّل "Coins/hr" المعروض أعلى صفحة Realm بجانب زر Prizes — يُحسَب من
-  // مكافأة/مدة دورة Start Mining نفسها (لا قيمة ثابتة منفصلة) حتى يبقى
-  // مطابقاً تلقائياً لو تغيّرت MINING_REWARD_COINS أو MINING_CYCLE_SECONDS.
-  view.mining_reward_coins_per_hour = Math.round(MINING_REWARD_COINS * 3600 / MINING_CYCLE_SECONDS);
   view.exchange_rate_coin_to_gram = EXCHANGE_RATE_COIN_TO_GRAM;
   view.exchange_min_coins = EXCHANGE_MIN_COINS;
   view.withdraw_min_gram = WITHDRAW_MIN_GRAM;

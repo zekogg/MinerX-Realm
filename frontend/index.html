@@ -3209,7 +3209,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
             <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/54404f088855f864d7dbeb9a6adcf4e37fe5db6d/frontend/Leaderboard%20icon.svg" alt="Leaderboard" style="width:33.25px;height:33.25px;">
             <span>Prizes</span>
           </button>
-          <div class="earn-rate"><b id="mining-rate-display">65</b><span>Coins/hr</span></div>
+          <div class="earn-rate">65<span>Coins/hr</span></div>
           <button class="pet-trigger" onclick="openFreePetModal()">
             <span class="pet-trigger__icon">🦴</span>
             <span>Free Pet</span>
@@ -4894,10 +4894,6 @@ function updateBalanceDisplay(u){
   var gramText = Number(u.gram).toFixed(2);
   var gramWalletText = Number(u.gram).toFixed(3);
 
-  if (typeof u.mining_reward_coins_per_hour === 'number'){
-    var miningRateEl = document.getElementById('mining-rate-display');
-    if (miningRateEl) miningRateEl.textContent = u.mining_reward_coins_per_hour;
-  }
   if (typeof u.exchange_rate_coin_to_gram === 'number'){
     EXCHANGE_RATE_COIN_TO_GRAM = u.exchange_rate_coin_to_gram;
   }
