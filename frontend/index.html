@@ -8726,11 +8726,14 @@ function renderFriendsList(friends){
   container.innerHTML = friends.map(function(f){
     var safeName = escapeHtmlClient(f.name);
     var initials = String(f.name).trim().slice(0, 2).toUpperCase();
+    var metaHtml = f.active
+      ? '<div class="friend-row__meta" style="color:var(--c-ad-avail-text);font-weight:700;">Active</div>'
+      : '<div class="friend-row__meta">' + f.ads_watched + ' Ads Watched</div>';
     return (
       '<div class="card friend-row">' +
         '<div class="friend-row__avatar">' + escapeHtmlClient(initials) + '</div>' +
         '<div class="friend-row__name">' + safeName + '</div>' +
-        '<div class="friend-row__meta">' + f.ads_watched + ' Ads Watched</div>' +
+        metaHtml +
         '<div class="friend-row__earn">+' + formatFriendsAmount(f.earned_coins) + ' Coins</div>' +
       '</div>'
     );
