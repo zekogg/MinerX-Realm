@@ -2920,14 +2920,14 @@ async function sendWelcomeMessage(env, chatId) {
     reply_markup: {
       inline_keyboard: [
         [
-          { text: "Open App", web_app: { url: WEBAPP_URL } }
+          { text: "🎮 Open App", web_app: { url: WEBAPP_URL } }
         ],
         [
-          { text: "📺 Channel", url: NEWS_CHANNEL_URL },
+          { text: "💰 Payouts", url: PAYOUTS_CHANNEL_URL },
           { text: "🎧 Support", url: `https://t.me/${SUPPORT_USERNAME}` }
         ],
         [
-          { text: "💰 Payouts", url: PAYOUTS_CHANNEL_URL }
+          { text: "📺 Channel", url: NEWS_CHANNEL_URL }
         ]
       ]
     }
