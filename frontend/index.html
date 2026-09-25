@@ -4856,7 +4856,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 
       <button class="modal-cta" id="withdraw-cta" onclick="submitWithdrawRequest()" disabled>Withdraw</button>
       <div class="modal-footnote">
-        Fee: <b id="withdraw-fee-label">0.02</b> Gram<br>
+        Fee: <b id="withdraw-fee-label">5%</b><br>
         Withdrawals usually take several minutes, but sometimes up to 24 hours.
       </div>
       <div class="modal-notice">
@@ -5095,8 +5095,8 @@ function updateBalanceDisplay(u){
   if (typeof u.withdraw_min_gram === 'number'){
     WITHDRAW_MIN_GRAM = u.withdraw_min_gram;
   }
-  if (typeof u.withdraw_fee_gram === 'number'){
-    WITHDRAW_FLAT_FEE = u.withdraw_fee_gram;
+  if (typeof u.withdraw_fee_rate === 'number'){
+    WITHDRAW_FEE_RATE = u.withdraw_fee_rate;
   }
   if ('next_withdraw_allowed_at' in u){
     NEXT_WITHDRAW_ALLOWED_AT = u.next_withdraw_allowed_at;
@@ -9059,7 +9059,7 @@ function pollDepositStatus(initData){
 }
 
 /* -- Withdraw -- */
-var WITHDRAW_FLAT_FEE = 0.02;
+var WITHDRAW_FEE_RATE = 0.05;
 var WITHDRAW_MIN_GRAM = 0.1;
 var NEXT_WITHDRAW_ALLOWED_AT = null;
 var withdrawCooldownTimer = null;
@@ -9073,14 +9073,14 @@ function openWithdrawModal(){
   document.getElementById('withdraw-amount').value = '';
   document.getElementById('withdraw-address').value = '';
   document.getElementById('withdraw-min-label').textContent = WITHDRAW_MIN_GRAM;
-  document.getElementById('withdraw-fee-label').textContent = WITHDRAW_FLAT_FEE;
+  document.getElementById('withdraw-fee-label').textContent = (WITHDRAW_FEE_RATE * 100) + '%';
   updateWithdraw();
   refreshWithdrawCooldown();
   openModal('modal-withdraw');
 }
 function updateWithdraw(){
   var val = parseFloat(document.getElementById('withdraw-amount').value) || 0;
-  var out = Math.max(0, val - WITHDRAW_FLAT_FEE);
+  var out = Math.max(0, val - (val * WITHDRAW_FEE_RATE));
   document.getElementById('withdraw-output').textContent = out.toFixed(4);
   var cta = document.getElementById('withdraw-cta');
   var onCooldown = NEXT_WITHDRAW_ALLOWED_AT && Date.now() < NEXT_WITHDRAW_ALLOWED_AT;

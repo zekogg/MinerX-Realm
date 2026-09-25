@@ -41,7 +41,7 @@ const DEPOSIT_CHECK_RETRY_DELAY_MS = 15_000;
 
 // ===================================================================== إعدادات السحب (Withdraw): سحب يدوي بالكامل — المستخدم يطلب، يُخصم المبلغ فوراً من رصيده (حجز)، ويُرسَل منشور للقناة الإدارية بزري Approve/Reject. لا يوجد فحص بلوكتشين آلي هنا (الإرسال يدوي من الأدمن خارج البوت بالكامل). "Amount" الظاهر في الرسائل = المبلغ الصافي (Net) بعد خصم الرسوم — هو الرقم الذي يجب على الأدمن إرساله فعلياً. =====================================================================
 const WITHDRAW_MIN_GRAM = 0.1;
-const WITHDRAW_FEE_GRAM = 0.02;
+const WITHDRAW_FEE_RATE = 0.05; // 5% من مبلغ السحب (وليس رسماً ثابتاً)
 const WITHDRAW_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 ساعة، تبدأ فور الطلب بغض النظر عن النتيجة
 const ADMIN_TELEGRAM_ID = 1018495986;
 const ADMIN_CHANNEL_ID = -1004325013522;
@@ -504,7 +504,7 @@ async function handleGetUser(request, env) {
   view.exchange_rate_coin_to_gram = EXCHANGE_RATE_COIN_TO_GRAM;
   view.exchange_min_coins = EXCHANGE_MIN_COINS;
   view.withdraw_min_gram = WITHDRAW_MIN_GRAM;
-  view.withdraw_fee_gram = WITHDRAW_FEE_GRAM;
+  view.withdraw_fee_rate = WITHDRAW_FEE_RATE;
   view.next_withdraw_allowed_at = user.last_withdraw_request_at
     ? user.last_withdraw_request_at + WITHDRAW_COOLDOWN_MS
     : null;
@@ -1543,7 +1543,8 @@ async function handleWithdrawRequest(request, env) {
 
   const now = Date.now();
   const cooldownCutoff = now - WITHDRAW_COOLDOWN_MS;
-  const netGram = Math.max(0, amountGram - WITHDRAW_FEE_GRAM);
+  const feeGram = amountGram * WITHDRAW_FEE_RATE;
+  const netGram = Math.max(0, amountGram - feeGram);
 
   // شرط CAS واحد يضمن ذرّياً: الرصيد كافٍ + انتهاء فترة الـ24 ساعة معاً — يمنع سباقاً بين طلبين متزامنين من نفس المستخدم يتجاوزان أي من الشرطين.
   const reserveStmt = env.DB.prepare(
@@ -1556,7 +1557,7 @@ async function handleWithdrawRequest(request, env) {
     `INSERT INTO withdrawals
        (telegram_id, raw_username, first_name, amount_gram, fee_gram, net_gram, address, status, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)`
-  ).bind(telegramId, rawUsername, firstName, amountGram, WITHDRAW_FEE_GRAM, netGram, address, now);
+  ).bind(telegramId, rawUsername, firstName, amountGram, feeGram, netGram, address, now);
 
   const txnStmt = env.DB.prepare(
     "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'withdraw_request', ?, 'gram')"
