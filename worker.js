@@ -2267,12 +2267,10 @@ async function handleAdminAmbassadorRevoke(request, env) {
   const targetId = parseInt(body.target_id, 10);
   if (!Number.isInteger(targetId)) return jsonResponse({ error: "invalid_target_id" }, 400);
 
+  // نتحقق من الحالتين معاً (وليس واحدة فقط ثم نتوقف) — في حال تصادم نادر جداً (استلام
+  // المستخدم للـAmbassador في نفس اللحظة التي يسحبها الأدمن منه) قد ينشأ منح معلّق جديد
+  // بعد الاستلام مباشرة؛ حذف الحالتين معاً هنا يضمن عدم ترك أي أثر متبقٍّ في كل الأحوال.
   const pendingGrant = await env.DB.prepare("SELECT 1 FROM ambassador_grants WHERE telegram_id = ?").bind(targetId).first();
-  if (pendingGrant) {
-    await env.DB.prepare("DELETE FROM ambassador_grants WHERE telegram_id = ?").bind(targetId).run();
-    return jsonResponse({ ok: true, mode: "pending_removed" });
-  }
-
   const petRow = await env.DB.prepare(
     `SELECT p.current_speed, u.total_speed, s.capacity_hours, s.last_claim_at
      FROM user_pets p
@@ -2280,7 +2278,13 @@ async function handleAdminAmbassadorRevoke(request, env) {
      LEFT JOIN user_storage s ON s.telegram_id = p.telegram_id
      WHERE p.telegram_id = ? AND p.pet_id = 'ambassador'`
   ).bind(targetId).first();
-  if (!petRow) return jsonResponse({ error: "not_found" }, 404);
+
+  if (!pendingGrant && !petRow) return jsonResponse({ error: "not_found" }, 404);
+
+  if (!petRow) {
+    await env.DB.prepare("DELETE FROM ambassador_grants WHERE telegram_id = ?").bind(targetId).run();
+    return jsonResponse({ ok: true, mode: "pending_removed" });
+  }
 
   const capacitySeconds = (petRow.capacity_hours || STORAGE_DEFAULT_CAPACITY_HOURS) * 3600;
   let preRevokeAccrued = 0;
@@ -2301,6 +2305,9 @@ async function handleAdminAmbassadorRevoke(request, env) {
     stmts.push(env.DB.prepare(
       "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'storage_auto_collect', ?, 'coins')"
     ).bind(targetId, preRevokeAccrued));
+  }
+  if (pendingGrant) {
+    stmts.push(env.DB.prepare("DELETE FROM ambassador_grants WHERE telegram_id = ?").bind(targetId));
   }
   await env.DB.batch(stmts);
 
