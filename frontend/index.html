@@ -1289,6 +1289,18 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 }
 .friends-empty-note{ text-align:center; font-size:10.5px; color:var(--ink-faint); font-weight:600; margin:6px 0 14px; }
 
+/* -- أسهم التنقل بين صفحات Friends List (10 لكل صفحة) — تصميم زجاجي (Glassmorphism) -- */
+.friends-list-nav{ display:flex; justify-content:center; align-items:center; gap:16px; margin:10px 0; }
+.friends-list-nav__btn{
+  width:34px; height:34px; border-radius:50%; flex-shrink:0;
+  background:rgba(255,255,255,.08);
+  backdrop-filter:blur(var(--glass-blur)); -webkit-backdrop-filter:blur(var(--glass-blur));
+  border:1px solid rgba(255,255,255,.2);
+  color:var(--ink); font-size:16px; font-weight:700;
+  display:flex; align-items:center; justify-content:center; cursor:pointer;
+}
+.friends-list-nav__btn:disabled{ opacity:.3; cursor:default; }
+
 /* /////كود قسم Reward Tiers (صفحة Friends)///// */
 .reward-tiers{ margin:18px 0; }
 .reward-tiers__title{
@@ -1989,17 +2001,6 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   display:flex; align-items:center; justify-content:center; gap:4px;
 }
 .pet-card__btn svg{ width:11px; height:11px; }
-/* -- حالة "Owned" الدائمة بعد الشراء: أخضر شفاف متدرج (نفس أسلوب Claim Reward) -- */
-.pet-card__btn.is-owned,
-.db-action-btn--buy.is-owned,
-.tc-action-btn--buy.is-owned{
-  background:linear-gradient(155deg, rgba(111,191,115,.4), rgba(74,222,128,.2), rgba(111,191,115,.32));
-  border-color:rgba(111,191,115,.5);
-  color:#eafdec;
-  box-shadow:none;
-  text-shadow:none;
-  opacity:1;
-}
 .pet-card__btn.is-success,
 .db-action-btn--buy.is-success,
 .tc-action-btn--buy.is-success{
@@ -3842,6 +3843,10 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
       <div class="friends-list-title">Friends List</div>
 
       <div id="friends-list-container"></div>
+      <div class="friends-list-nav" id="friends-list-nav" style="display:none;">
+        <button class="friends-list-nav__btn" id="friends-list-prev" onclick="friendsListGoPage(-1)" disabled>‹</button>
+        <button class="friends-list-nav__btn" id="friends-list-next" onclick="friendsListGoPage(1)">›</button>
+      </div>
       <button class="friends-show-list-btn" id="btn-show-friends-list" onclick="onShowFriendsListClick()">Show The List</button>
     </section>
 
@@ -5906,6 +5911,9 @@ function petSpeedForLevel(petId, level){
   return def.basespeed + (level - 1) * (def.basespeed * 0.10);
 }
 
+// أيقونة ✓ تُستخدَم كحالة "مملوكة" دائمة (سواء فور الشراء أو عند إعادة فتح التطبيق لاحقاً) — نفس الأيقونة في كل الحالات.
+var PET_BUY_CHECK_SVG = '<svg class="pet-card__btn-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+
 function renderPetCard(def){
   var state = petStates[def.id] || { level: 0, speed: 0 };
 
@@ -5923,27 +5931,22 @@ function renderPetCard(def){
   var buyBtn = document.getElementById(def.buyBtnId);
   if (buyBtn && !buyBtn.classList.contains('is-success')){
     if (state.level > 0){
-      buyBtn.textContent = 'Owned';
+      buyBtn.innerHTML = PET_BUY_CHECK_SVG;
       buyBtn.disabled = true;
-      buyBtn.classList.add('is-owned');
+      buyBtn.classList.add('is-success');
     } else {
       buyBtn.textContent = 'Buy';
       buyBtn.disabled = false;
-      buyBtn.classList.remove('is-owned');
+      buyBtn.classList.remove('is-success');
     }
   }
 }
 
-// تُستدعى بعد نجاح شراء أي حيوان: علامة صح مؤقتة 4 ثوانٍ، ثم يبقى الزر "Owned" ومعطّلاً دائماً (نفس منطق showBuySuccessDuck سابقاً، معمَّم).
+// تُستدعى بعد نجاح شراء أي حيوان: علامة صح خضراء تبقى دائماً ومعطَّلة (الشخصية مملوكة بالفعل ولا يمكن إعادة شرائها) — نفس شكل حالة الامتلاك عند إعادة فتح التطبيق لاحقاً (renderPetCard).
 function showBuySuccessGeneric(btn){
   if (!btn || btn.classList.contains('is-success')) return;
   btn.classList.add('is-success');
-  btn.innerHTML = '<svg class="pet-card__btn-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
-  setTimeout(function(){
-    btn.classList.remove('is-success');
-    btn.classList.add('is-owned');
-    btn.textContent = 'Owned';
-  }, 4000);
+  btn.innerHTML = PET_BUY_CHECK_SVG;
 }
 
 // بيانات الحيوانات المملوكة + Happy Dog/Guardian/Ambassador + Storage — تُجلَب
@@ -6905,8 +6908,6 @@ function onClaimAmbassadorClick(){
   });
 }
 
-/* -- تأثير مؤقت 4 ثواني عند شراء The Duck: علامة صح + تغيير شكل الزر -- */
-// تُستدعى بعد نجاح شراء The Duck فعلياً من السيرفر (وليس عند مجرد الضغط): علامة صح مؤقتة 4 ثوانٍ، ثم يبقى الزر "Owned" ومعطّلاً دائماً (الشخصية مملوكة بالفعل ولا يمكن إعادة شرائها).
 /* -- تلميح "300,000" الكامل فوق سعر الشخصية عند الضغط -- */
 function togglePriceTooltip(tipId){
   var tip = document.getElementById(tipId || 'price-tooltip');
@@ -8501,7 +8502,9 @@ function adminAmbassadorRevoke(){
 
 /* Friends: كل الأرقام (دعوات، نشطون، أرباح معلّقة، عتبات الإنجازات) تأتي فقط من /api/user — لا حساب أو تخمين من طرف المتصفح. الأرباح المعلّقة (تسجيل +20 + نشاط +130 + عمولة إيداع 5%) لا تُضاف لـCoins إلا بالضغط على Claim (بحد أدنى 5000)، ومكافآت الإنجازات تُضاف مباشرة عند تحقّق الشرط دون المرور عبر الرصيد المعلّق. */
 var friendsState = { invites: 0, active: 0, pendingEarnings: 0, minClaim: 5000, milestones: [], claimBusy: false };
-var friendsListLoaded = false;
+// صفحة واحدة (10) لكل طلب — pages تُخزِّن كل صفحة سبق جلبها فعلاً (بمفتاح رقم الصفحة) حتى لا
+// يُعاد جلبها من السيرفر عند الرجوع للخلف بالسهم. hasMore يأتي من السيرفر نفسه (has_more).
+var friendsListState = { loaded: false, page: 0, pages: {}, hasMore: false, busy: false };
 
 // نفس منطق formatCoinsK لكن بدون فراغ قبل الوحدة (K/M) — مطلوب لعرض أرباح الإحالة بصيغة "1K"/"1.1K" تحديداً.
 function formatFriendsAmount(value){
@@ -8684,27 +8687,73 @@ function onClaimMilestoneClick(tier){
 }
 
 function onShowFriendsListClick(){
-  if (friendsListLoaded) return;
-  var initData = getTelegramInitData();
-  if (!initData) return;
-
+  if (friendsListState.loaded) return;
   var btn = document.getElementById('btn-show-friends-list');
   if (btn) btn.textContent = 'Loading...';
+
+  fetchFriendsListPage(0, function(ok){
+    if (!ok){ if (btn) btn.textContent = 'Show The List'; return; }
+    friendsListState.loaded = true;
+    if (btn) btn.remove();
+  });
+}
+
+// يجلب صفحة واحدة (10 أصدقاء) من السيرفر فقط إن لم تكن مُخزَّنة مسبقاً في friendsListState.pages —
+// الرجوع لصفحة زارها المستخدم من قبل (بالسهم يسار) يُعرَض مباشرة من الذاكرة بلا أي طلب جديد.
+function fetchFriendsListPage(page, callback){
+  if (friendsListState.pages[page]){
+    friendsListState.page = page;
+    renderFriendsList();
+    if (callback) callback(true);
+    return;
+  }
+
+  var initData = getTelegramInitData();
+  if (!initData){ if (callback) callback(false); return; }
+
+  friendsListState.busy = true;
+  updateFriendsListNav();
 
   fetch('/api/friends/list', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData: initData })
+    body: JSON.stringify({ initData: initData, page: page })
   })
   .then(function(res){ return res.json(); })
   .then(function(data){
-    friendsListLoaded = true;
-    renderFriendsList(data.friends || []);
-    if (btn) btn.remove();
+    friendsListState.busy = false;
+    friendsListState.pages[page] = data.friends || [];
+    friendsListState.hasMore = !!data.has_more;
+    friendsListState.page = page;
+    renderFriendsList();
+    if (callback) callback(true);
   })
   .catch(function(){
-    if (btn) btn.textContent = 'Show The List';
+    friendsListState.busy = false;
+    updateFriendsListNav();
+    if (callback) callback(false);
   });
+}
+
+function friendsListGoPage(delta){
+  if (friendsListState.busy) return;
+  var target = friendsListState.page + delta;
+  if (target < 0) return;
+  if (delta > 0 && !friendsListState.hasMore) return;
+  fetchFriendsListPage(target);
+}
+
+function updateFriendsListNav(){
+  var nav = document.getElementById('friends-list-nav');
+  var prevBtn = document.getElementById('friends-list-prev');
+  var nextBtn = document.getElementById('friends-list-next');
+  if (!nav) return;
+
+  // الأسهم لا تظهر إطلاقاً إلا لو تجاوز عدد الأصدقاء 10 (صفحة أولى ممتلئة + وجود صفحة تالية، أو المستخدم تجاوز الصفحة الأولى أصلاً).
+  var show = friendsListState.page > 0 || friendsListState.hasMore;
+  nav.style.display = show ? '' : 'none';
+  if (prevBtn) prevBtn.disabled = friendsListState.busy || friendsListState.page === 0;
+  if (nextBtn) nextBtn.disabled = friendsListState.busy || !friendsListState.hasMore;
 }
 
 // اسم المستخدم (username) قد يحتوي أي نص يختاره المستخدم نفسه — يجب تهريبه قبل إدراجه في innerHTML لمنع حقن HTML/script عبر اسم مزيّف.
@@ -8714,9 +8763,12 @@ function escapeHtmlClient(text){
   return div.innerHTML;
 }
 
-function renderFriendsList(friends){
+function renderFriendsList(){
   var container = document.getElementById('friends-list-container');
   if (!container) return;
+
+  var friends = friendsListState.pages[friendsListState.page] || [];
+  updateFriendsListNav();
 
   if (friends.length === 0){
     container.innerHTML = '<div class="friends-empty-note">No friends invited yet</div>';
@@ -8726,11 +8778,14 @@ function renderFriendsList(friends){
   container.innerHTML = friends.map(function(f){
     var safeName = escapeHtmlClient(f.name);
     var initials = String(f.name).trim().slice(0, 2).toUpperCase();
+    var metaHtml = f.active
+      ? '<div class="friend-row__meta" style="color:var(--c-ad-avail-text);font-weight:700;">Active</div>'
+      : '<div class="friend-row__meta">' + f.ads_watched + ' Ads Watched</div>';
     return (
       '<div class="card friend-row">' +
         '<div class="friend-row__avatar">' + escapeHtmlClient(initials) + '</div>' +
         '<div class="friend-row__name">' + safeName + '</div>' +
-        '<div class="friend-row__meta">' + f.ads_watched + ' Ads Watched</div>' +
+        metaHtml +
         '<div class="friend-row__earn">+' + formatFriendsAmount(f.earned_coins) + ' Coins</div>' +
       '</div>'
     );
