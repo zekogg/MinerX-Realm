@@ -4314,6 +4314,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
           <div class="pf-stat-row"><span class="pf-stat-label">Registered Date</span><span class="pf-stat-val" id="pf-stat-registered">01-01-2026</span></div>
           <div class="pf-stat-row"><span class="pf-stat-label">Referrals</span><span class="pf-stat-val" id="pf-stat-referrals">0</span></div>
           <div class="pf-stat-row"><span class="pf-stat-label">Active Referrals</span><span class="pf-stat-val" id="pf-stat-active-referrals">0</span></div>
+          <div class="pf-stat-row"><span class="pf-stat-label">Referrals Commission</span><span class="pf-stat-val" id="pf-stat-referral-commission">0</span></div>
           <div class="pf-stat-row"><span class="pf-stat-label">Coins Balance</span><span class="pf-stat-val" id="pf-stat-coins">0</span></div>
           <div class="pf-stat-row"><span class="pf-stat-label">Gram Balance</span><span class="pf-stat-val" id="pf-stat-gram">0</span></div>
           <div class="pf-stat-row"><span class="pf-stat-label">Total Speed</span><span class="pf-stat-val" id="pf-stat-speed">+00000 Coins/hr</span></div>
@@ -4361,6 +4362,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
             <div class="ap-info-row"><span>Registered</span><span id="ap-find-registered">—</span></div>
             <div class="ap-info-row"><span>Invites</span><span id="ap-find-invites">0</span></div>
             <div class="ap-info-row"><span>Active Invites</span><span id="ap-find-active-invites">0</span></div>
+            <div class="ap-info-row"><span>Referrals Commission</span><span id="ap-find-referral-commission">0</span></div>
             <div class="ap-info-row"><span>Total Speed</span><span id="ap-find-speed">+0 Coins/hr</span></div>
             <div class="ap-info-row"><span>Total Deposit</span><span id="ap-find-deposit">0 Gram</span></div>
             <div class="ap-info-row" style="border-bottom:none;"><span>Total Withdraw</span><span id="ap-find-withdraw">0 Gram</span></div>
@@ -6550,6 +6552,9 @@ function openProfileModal(){
     var activeReferralsEl = document.getElementById('pf-stat-active-referrals');
     if (activeReferralsEl) activeReferralsEl.textContent = data.active_invites;
 
+    var referralCommissionEl = document.getElementById('pf-stat-referral-commission');
+    if (referralCommissionEl) referralCommissionEl.textContent = Number(data.referral_commission_total).toLocaleString('en-US', { maximumFractionDigits: 0 });
+
     var coinsEl = document.getElementById('pf-stat-coins');
     if (coinsEl) coinsEl.textContent = Number(data.coins).toLocaleString('en-US', { maximumFractionDigits: 0 });
 
@@ -8132,6 +8137,7 @@ function adminFindUser(){
     document.getElementById('ap-find-registered').textContent = data.registered_date;
     document.getElementById('ap-find-invites').textContent = data.invites;
     document.getElementById('ap-find-active-invites').textContent = data.active_invites;
+    document.getElementById('ap-find-referral-commission').textContent = Number(data.referral_commission_total).toLocaleString('en-US', { maximumFractionDigits: 0 });
     document.getElementById('ap-find-speed').textContent = '+' + Number(data.total_speed).toLocaleString('en-US', { maximumFractionDigits: 0 }) + ' Coins/hr';
     document.getElementById('ap-find-deposit').textContent = Number(data.total_deposit_gram).toFixed(3) + ' Gram';
     document.getElementById('ap-find-withdraw').textContent = Number(data.total_withdraw_gram).toFixed(3) + ' Gram';
@@ -9284,6 +9290,20 @@ function renderTxHistory(items){
   }
 
   var html = items.map(function(item){
+    // عمولة إحالة من إيداع صديق — سطر أرشيف/عرض فقط (توثيق أن الحدث حصل)، بمعزل عن حالة الرصيد المعلَّق الفعلية.
+    if (item.type === 'referral_commission'){
+      return (
+        '<div class="card tx is-pos">' +
+          '<div class="tx__icon">' + TX_ICON_DEPOSIT + '</div>' +
+          '<div class="tx__body">' +
+            '<div class="tx__title">Referral Commission</div>' +
+            '<div class="tx__status is-confirmed">Added to your Referral earnings</div>' +
+          '</div>' +
+          '<div class="tx__amt is-pos"><span>+' + formatFriendsAmount(item.amount) + '</span><img draggable="false" src="' + PRIZE_ICON_URLS.coins + '" class="tx__amt-icon" alt=""></div>' +
+        '</div>'
+      );
+    }
+
     var isWithdraw = item.type === 'withdraw';
     var icon = isWithdraw ? TX_ICON_WITHDRAW : TX_ICON_DEPOSIT;
     var title = isWithdraw ? 'Withdrawal to wallet' : 'Deposit received';

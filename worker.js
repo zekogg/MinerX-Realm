@@ -1464,11 +1464,15 @@ export class DepositChecker {
             if (referrerId) {
               depositBatch.push(
                 this.env.DB.prepare(
-                  "UPDATE users SET referral_pending_earnings = referral_pending_earnings + ? WHERE telegram_id = ?"
-                ).bind(referralCommission, referrerId),
+                  "UPDATE users SET referral_pending_earnings = referral_pending_earnings + ?, referral_deposit_commission_total = referral_deposit_commission_total + ? WHERE telegram_id = ?"
+                ).bind(referralCommission, referralCommission, referrerId),
                 this.env.DB.prepare(
                   "UPDATE referrals SET earned_coins = earned_coins + ? WHERE referrer_id = ? AND referred_id = ?"
-                ).bind(referralCommission, referrerId, telegramId)
+                ).bind(referralCommission, referrerId, telegramId),
+                // سطر أرشيف/عرض فقط لـ Transaction History في Wallet — يوثّق حدوث هذه العمولة تحديداً (توقيتها ومقدارها)، بمعزل عن referral_pending_earnings المتراكم أعلاه الذي يبقى مصدر الحقيقة الوحيد لتحديد متى يُسمح بالـClaim وبأي مبلغ.
+                this.env.DB.prepare(
+                  "INSERT INTO referral_commission_log (telegram_id, amount, created_at) VALUES (?, ?, ?)"
+                ).bind(referrerId, referralCommission, Date.now())
               );
             }
 
@@ -1635,18 +1639,21 @@ async function handleWithdrawRequest(request, env) {
   });
 }
 
-// ===================================================================== نقطة /api/wallet/history — سجل معاملات Wallet: آخر 5 إيداعات مؤكدة (status='confirmed') + آخر 5 طلبات سحب (pending/approved/rejected) — 10 كحد أقصى إجمالاً بعد الدمج والترتيب حسب التاريخ. =====================================================================
+// ===================================================================== نقطة /api/wallet/history — سجل معاملات Wallet: آخر 5 إيداعات مؤكدة (status='confirmed') + آخر 5 طلبات سحب (pending/approved/rejected) + آخر 5 عمولات إحالة من إيداعات الأصدقاء — 10 كحد أقصى إجمالاً بعد الدمج والترتيب حسب التاريخ. عمولة الإحالة هنا سطر عرض/أرشيف فقط (توثيق أن الحدث حصل) — لا علاقة له بلحظة دخول المبلغ فعلياً لـcoins، الذي يبقى معلَّقاً حتى الضغط على Claim بصفحة Friends كما هو الحال دائماً. =====================================================================
 async function handleWalletHistory(request, env) {
   const auth = await authenticateRequest(request, env);
   if (!auth.ok) return auth.response;
   const { telegramId } = auth;
 
-  const [depositsResult, withdrawalsResult] = await env.DB.batch([
+  const [depositsResult, withdrawalsResult, referralCommissionResult] = await env.DB.batch([
     env.DB.prepare(
       "SELECT coins_credited AS amount, created_at FROM deposits WHERE telegram_id = ? AND status = 'confirmed' ORDER BY created_at DESC LIMIT 5"
     ).bind(telegramId),
     env.DB.prepare(
       "SELECT net_gram AS amount, status, created_at FROM withdrawals WHERE telegram_id = ? ORDER BY created_at DESC LIMIT 5"
+    ).bind(telegramId),
+    env.DB.prepare(
+      "SELECT amount, created_at FROM referral_commission_log WHERE telegram_id = ? ORDER BY created_at DESC LIMIT 5"
     ).bind(telegramId)
   ]);
 
@@ -1656,6 +1663,9 @@ async function handleWalletHistory(request, env) {
   }
   for (const row of (withdrawalsResult.results || [])) {
     items.push({ type: "withdraw", amount: row.amount, status: row.status, created_at: row.created_at });
+  }
+  for (const row of (referralCommissionResult.results || [])) {
+    items.push({ type: "referral_commission", amount: row.amount, created_at: row.created_at });
   }
   items.sort((a, b) => b.created_at - a.created_at);
 
@@ -1998,7 +2008,7 @@ async function handleAdminUserFind(request, env) {
 
   const [user, depositResult, withdrawResult] = await Promise.all([
     env.DB.prepare(
-      "SELECT telegram_id, username, coins, gram, total_speed, invites_count, active_referrals_count, created_at FROM users WHERE telegram_id = ?"
+      "SELECT telegram_id, username, coins, gram, total_speed, invites_count, active_referrals_count, referral_deposit_commission_total, created_at FROM users WHERE telegram_id = ?"
     ).bind(targetId).first(),
     env.DB.prepare(
       "SELECT COALESCE(SUM(amount_gram), 0) AS total FROM deposits WHERE telegram_id = ? AND status = 'confirmed'"
@@ -2018,6 +2028,7 @@ async function handleAdminUserFind(request, env) {
     total_speed: user.total_speed,
     invites: user.invites_count || 0,
     active_invites: user.active_referrals_count || 0,
+    referral_commission_total: user.referral_deposit_commission_total || 0,
     registered_date: user.created_at ? formatDateDDMMYYYY(user.created_at) : "—",
     total_deposit_gram: depositResult.total || 0,
     total_withdraw_gram: withdrawResult.total || 0
@@ -2634,7 +2645,7 @@ async function handleProfile(request, env) {
 
   const [user, depositResult, withdrawResult] = await Promise.all([
     env.DB.prepare(
-      "SELECT coins, gram, total_speed, invites_count, active_referrals_count, created_at FROM users WHERE telegram_id = ?"
+      "SELECT coins, gram, total_speed, invites_count, active_referrals_count, referral_deposit_commission_total, created_at FROM users WHERE telegram_id = ?"
     ).bind(telegramId).first(),
     env.DB.prepare(
       "SELECT COALESCE(SUM(amount_gram), 0) AS total FROM deposits WHERE telegram_id = ? AND status = 'confirmed'"
@@ -2655,6 +2666,7 @@ async function handleProfile(request, env) {
     registered_date: user.created_at ? formatDateDDMMYYYY(user.created_at) : "—",
     invites: user.invites_count || 0,
     active_invites: user.active_referrals_count || 0,
+    referral_commission_total: user.referral_deposit_commission_total || 0,
     coins: user.coins,
     gram: user.gram,
     total_speed: user.total_speed,
