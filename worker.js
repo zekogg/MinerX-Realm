@@ -400,6 +400,9 @@ async function routeRequest(request, env, url) {
     if (url.pathname === "/api/admin/tasks/delete" && request.method === "POST") {
       return handleAdminTasksDelete(request, env);
     }
+    if (url.pathname === "/api/admin/tasks/pin" && request.method === "POST") {
+      return handleAdminTasksPin(request, env);
+    }
     if (url.pathname === "/api/admin/promo/create" && request.method === "POST") {
       return handleAdminPromoCreate(request, env);
     }
@@ -2073,10 +2076,11 @@ async function handleAdminTasksList(request, env) {
 
   const section = body.section === "special" ? "special" : "partner";
 
+  // ترتيب المهام المُثبَّتة (pinned_at IS NOT NULL) أولاً بترتيب وقت التثبيت (الأقدم تثبيتاً أولاً — أي مهمة تُثبَّت بعد مهمة مُثبَّتة سابقاً تظهر بعدها مباشرة، وليس قبلها)، ثم باقي المهام العادية بترتيبها الحالي.
   const result = await env.DB.prepare(
-    `SELECT id, title, description, icon_url, reward_coins, link, channel_id, max_claims, claims_count, display_order
+    `SELECT id, title, description, icon_url, reward_coins, link, channel_id, max_claims, claims_count, display_order, pinned_at
      FROM admin_tasks WHERE section = ? AND is_active = 1
-     ORDER BY display_order ASC, id ASC`
+     ORDER BY (pinned_at IS NULL) ASC, pinned_at ASC, display_order ASC, id ASC`
   ).bind(section).all();
 
   return jsonResponse({ tasks: result.results || [] });
@@ -2114,10 +2118,11 @@ async function handleAdminTasksSave(request, env) {
 
   const id = parseInt(body.id, 10);
   if (Number.isInteger(id)) {
+    // "section" هنا ضمن SET (وليس فقط شرط WHERE) عمداً — يسمح بنقل مهمة موجودة من Special إلى Partner أو العكس عند التعديل.
     const result = await env.DB.prepare(
-      `UPDATE admin_tasks SET title = ?, description = ?, icon_url = ?, reward_coins = ?, link = ?, channel_id = ?, max_claims = ?, display_order = ?
-       WHERE id = ? AND section = ?`
-    ).bind(title, description, iconUrl, rewardCoins, link, channelId, maxClaims, displayOrder, id, section).run();
+      `UPDATE admin_tasks SET section = ?, title = ?, description = ?, icon_url = ?, reward_coins = ?, link = ?, channel_id = ?, max_claims = ?, display_order = ?
+       WHERE id = ?`
+    ).bind(section, title, description, iconUrl, rewardCoins, link, channelId, maxClaims, displayOrder, id).run();
     if (!result.meta || result.meta.changes === 0) return jsonResponse({ error: "task_not_found" }, 404);
     return jsonResponse({ ok: true, id });
   }
@@ -2149,6 +2154,31 @@ async function handleAdminTasksDelete(request, env) {
   if (!result.meta || result.meta.changes === 0) return jsonResponse({ error: "task_not_found" }, 404);
 
   return jsonResponse({ ok: true });
+}
+
+// ===================================================================== نقطة /api/admin/tasks/pin — تثبيت/إلغاء تثبيت مهمة أعلى القسم. pinned_at يخزّن وقت التثبيت نفسه (وليس مجرد علم 0/1) لأن ترتيب الظهور بين المهام المُثبَّتة يعتمد عليه مباشرة (الأقدم تثبيتاً يبقى أولاً، انظر ORDER BY في handleAdminTasksList/handleTasksList) — لا حاجة لعمود ترتيب منفصل. =====================================================================
+async function handleAdminTasksPin(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "invalid_body" }, 400);
+  }
+
+  const auth = await authenticateAdmin(request, env, body);
+  if (!auth.ok) return auth.response;
+
+  const id = parseInt(body.id, 10);
+  if (!Number.isInteger(id)) return jsonResponse({ error: "invalid_id" }, 400);
+
+  const pin = !!body.pin;
+  const result = await env.DB.prepare(
+    "UPDATE admin_tasks SET pinned_at = ? WHERE id = ?"
+  ).bind(pin ? Date.now() : null, id).run();
+
+  if (!result.meta || result.meta.changes === 0) return jsonResponse({ error: "task_not_found" }, 404);
+
+  return jsonResponse({ ok: true, pinned: pin });
 }
 
 // ===================================================================== نقطة /api/admin/promo/create — إنشاء كود جديد في جدول promo_codes الموجود مسبقاً (نفس الجدول الذي يقرأه handlePromoRedeem). قيد PRIMARY KEY على code يمنع إنشاء نفس الكود مرتين. =====================================================================
@@ -2817,7 +2847,7 @@ async function handleTasksList(request, env) {
      FROM admin_tasks t
      LEFT JOIN admin_task_claims c ON c.task_id = t.id AND c.telegram_id = ?
      WHERE t.section = ? AND t.is_active = 1 AND (t.max_claims IS NULL OR t.claims_count < t.max_claims)
-     ORDER BY t.display_order ASC, t.id ASC`
+     ORDER BY (t.pinned_at IS NULL) ASC, t.pinned_at ASC, t.display_order ASC, t.id ASC`
   ).bind(telegramId, section).all();
 
   const tasks = (result.results || []).map((t) => ({

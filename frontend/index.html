@@ -1178,7 +1178,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 /* -- بطاقة مهمة مشاهدة إعلان -- */
 .ad-tasks-grid{ display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; }
 /* -- قسم Partner فقط: صف أفقي مضغوط بدل المربع (عمود واحد بعرض كامل) -- */
-#task-panel-partner .ad-tasks-grid, #task-panel-checkin .ad-tasks-grid{ grid-template-columns:1fr; }
+#task-panel-partner .ad-tasks-grid, #task-panel-checkin .ad-tasks-grid, #task-panel-special .ad-tasks-grid{ grid-template-columns:1fr; }
 .partner-task__actions{ display:flex; align-items:center; gap:6px; flex-shrink:0; }
 .partner-task{
   display:flex; align-items:center; gap:12px;
@@ -4425,8 +4425,11 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
       <label class="ap-label" style="margin-top:10px;">Link</label>
       <input class="ap-input" id="ap-task-link" placeholder="https://...">
 
-      <label class="ap-label" style="margin-top:10px;">Channel ID (optional — verifies membership)</label>
-      <input class="ap-input" id="ap-task-channel" placeholder="e.g. @YourChannel">
+      <label class="ap-label" style="margin-top:10px;">Show In</label>
+      <div class="ap-row">
+        <div class="ap-tab" id="ap-task-section-special" onclick="adminSetTaskFormSection('special')">Special</div>
+        <div class="ap-tab" id="ap-task-section-partner" onclick="adminSetTaskFormSection('partner')">Partner</div>
+      </div>
 
       <div class="ap-row" style="margin-top:10px;">
         <div style="flex:1;">
@@ -7939,12 +7942,18 @@ function renderAdminTasks(section){
   if (!list) return;
 
   var tasks = adminTasksState[section] || [];
+
+  // بطاقة "Add Task" في Special (دعوة تواصل الشركاء) تبقى ثابتة دائماً بغض النظر عن
+  // وجود مهام حقيقية، بخلاف بطاقة "No Partner Tasks Yet" في Partner التي تُخفى فقط
+  // عند وجود مهمة حقيقية واحدة على الأقل.
+  if (section === 'partner' && empty){
+    empty.style.display = tasks.length === 0 ? '' : 'none';
+  }
+
   if (tasks.length === 0){
     list.innerHTML = '';
-    if (empty) empty.style.display = '';
     return;
   }
-  if (empty) empty.style.display = 'none';
 
   list.innerHTML = tasks.map(function(t){
     var iconHtml = t.icon_url
@@ -8027,6 +8036,8 @@ var adminPanelState = {
   tasksFetched: { special: false, partner: false },
   editingTaskId: null,
   taskIconDataUrl: null,
+  taskFormSection: 'special',
+  taskChannelId: null,
   foundUser: null
 };
 
@@ -8129,19 +8140,30 @@ function renderAdminPanelTasks(section){
       ? '<img class="ap-task-icon" src="' + escapeHtmlClient(t.icon_url) + '" alt="">'
       : '<div class="ap-task-icon"></div>';
     var limitText = t.max_claims ? (t.claims_count + '/' + t.max_claims + ' claims') : (t.claims_count + ' claims');
+    var isPinned = !!t.pinned_at;
     return (
       '<div class="ap-task-row">' + iconHtml +
         '<div style="flex:1;min-width:0;">' +
-          '<div style="font-size:12px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtmlClient(t.title) + '</div>' +
+          '<div style="font-size:12px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (isPinned ? '📌 ' : '') + escapeHtmlClient(t.title) + '</div>' +
           '<div style="font-size:10px;color:var(--ink-dim);">+' + Number(t.reward_coins) + ' Coins · ' + limitText + '</div>' +
         '</div>' +
         '<div class="ap-task-actions">' +
+          '<span onclick="adminTogglePinTask(' + Number(t.id) + ', ' + (!isPinned) + ')" title="' + (isPinned ? 'Unpin' : 'Pin to top') + '">' + (isPinned ? '📍' : '📌') + '</span>' +
           '<span onclick="adminOpenTaskModal(' + Number(t.id) + ')">✎</span>' +
           '<span onclick="adminDeleteTask(' + Number(t.id) + ')">🗑</span>' +
         '</div>' +
       '</div>'
     );
   }).join('');
+}
+
+function adminTogglePinTask(id, pin){
+  adminApiPost('/api/admin/tasks/pin', { id: id, pin: pin }, function(){
+    adminPanelState.tasksFetched[adminPanelState.currentTaskTab] = false;
+    adminFetchTasks(adminPanelState.currentTaskTab);
+  }, function(){
+    adminToast('Failed to update pin');
+  });
 }
 
 function adminDeleteTask(id){
@@ -8154,18 +8176,31 @@ function adminDeleteTask(id){
   });
 }
 
+function adminSetTaskFormSection(section){
+  adminPanelState.taskFormSection = section;
+  var specialTab = document.getElementById('ap-task-section-special');
+  var partnerTab = document.getElementById('ap-task-section-partner');
+  if (specialTab) specialTab.classList.toggle('is-active', section === 'special');
+  if (partnerTab) partnerTab.classList.toggle('is-active', section === 'partner');
+}
+
 function adminOpenTaskModal(id){
   adminPanelState.editingTaskId = id || null;
   adminPanelState.taskIconDataUrl = null;
   var task = id ? (adminPanelState.tasks[adminPanelState.currentTaskTab] || []).find(function(t){ return t.id === id; }) : null;
 
+  // channel_id لم يعد له حقل بالواجهة (استُبدل بـ"Show In")، لكن قيمته الأصلية (لو كانت
+  // مهمة قديمة أُنشئت مباشرة عبر D1 وتتحقق من عضوية قناة حقيقية) تُحفَظ وتُعاد كما هي دون
+  // أي تغيير عند الحفظ — لا تُصفَّر إلا للمهام الجديدة المُنشأة من اللوحة.
+  adminPanelState.taskChannelId = task ? (task.channel_id || null) : null;
+
   document.getElementById('ap-task-modal-title').textContent = task ? 'Edit Task' : 'Add A Task';
   document.getElementById('ap-task-title').value = task ? task.title : '';
   document.getElementById('ap-task-desc').value = task ? (task.description || '') : '';
   document.getElementById('ap-task-link').value = task ? task.link : '';
-  document.getElementById('ap-task-channel').value = task ? (task.channel_id || '') : '';
   document.getElementById('ap-task-reward').value = task ? task.reward_coins : '';
   document.getElementById('ap-task-maxclaims').value = (task && task.max_claims) ? task.max_claims : '';
+  adminSetTaskFormSection(adminPanelState.currentTaskTab);
 
   var preview = document.getElementById('ap-task-icon-preview');
   if (task && task.icon_url){
@@ -8210,10 +8245,10 @@ function adminSaveTask(){
   var title = document.getElementById('ap-task-title').value.trim();
   var description = document.getElementById('ap-task-desc').value.trim();
   var link = document.getElementById('ap-task-link').value.trim();
-  var channelId = document.getElementById('ap-task-channel').value.trim();
   var reward = parseInt(document.getElementById('ap-task-reward').value, 10);
   var maxClaimsRaw = document.getElementById('ap-task-maxclaims').value.trim();
   var maxClaims = maxClaimsRaw ? parseInt(maxClaimsRaw, 10) : null;
+  var section = adminPanelState.taskFormSection || adminPanelState.currentTaskTab;
 
   if (!title || !link || !Number.isInteger(reward) || reward <= 0){
     adminToast('Fill title, link and a valid reward');
@@ -8222,17 +8257,20 @@ function adminSaveTask(){
 
   adminApiPost('/api/admin/tasks/save', {
     id: adminPanelState.editingTaskId,
-    section: adminPanelState.currentTaskTab,
+    section: section,
     title: title,
     description: description,
     link: link,
-    channel_id: channelId || null,
+    channel_id: adminPanelState.taskChannelId,
     reward_coins: reward,
     max_claims: maxClaims,
     icon_url: adminPanelState.taskIconDataUrl
   }, function(){
     closeModal('modal-admin-task');
-    adminPanelState.tasksFetched[adminPanelState.currentTaskTab] = false;
+    // نُلغي الجلبَين معاً (وليس فقط التبويب الحالي) لأن حفظ التعديل قد يكون نقل المهمة إلى القسم الآخر.
+    adminPanelState.tasksFetched.special = false;
+    adminPanelState.tasksFetched.partner = false;
+    adminPanelState.tasksFetched[adminPanelState.currentTaskTab] = true;
     adminFetchTasks(adminPanelState.currentTaskTab);
   }, function(){
     adminToast('Failed to save task');
