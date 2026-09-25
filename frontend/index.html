@@ -2001,17 +2001,6 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   display:flex; align-items:center; justify-content:center; gap:4px;
 }
 .pet-card__btn svg{ width:11px; height:11px; }
-/* -- حالة "Owned" الدائمة بعد الشراء: أخضر شفاف متدرج (نفس أسلوب Claim Reward) -- */
-.pet-card__btn.is-owned,
-.db-action-btn--buy.is-owned,
-.tc-action-btn--buy.is-owned{
-  background:linear-gradient(155deg, rgba(111,191,115,.4), rgba(74,222,128,.2), rgba(111,191,115,.32));
-  border-color:rgba(111,191,115,.5);
-  color:#eafdec;
-  box-shadow:none;
-  text-shadow:none;
-  opacity:1;
-}
 .pet-card__btn.is-success,
 .db-action-btn--buy.is-success,
 .tc-action-btn--buy.is-success{
@@ -5922,6 +5911,9 @@ function petSpeedForLevel(petId, level){
   return def.basespeed + (level - 1) * (def.basespeed * 0.10);
 }
 
+// أيقونة ✓ تُستخدَم كحالة "مملوكة" دائمة (سواء فور الشراء أو عند إعادة فتح التطبيق لاحقاً) — نفس الأيقونة في كل الحالات.
+var PET_BUY_CHECK_SVG = '<svg class="pet-card__btn-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+
 function renderPetCard(def){
   var state = petStates[def.id] || { level: 0, speed: 0 };
 
@@ -5939,27 +5931,22 @@ function renderPetCard(def){
   var buyBtn = document.getElementById(def.buyBtnId);
   if (buyBtn && !buyBtn.classList.contains('is-success')){
     if (state.level > 0){
-      buyBtn.textContent = 'Owned';
+      buyBtn.innerHTML = PET_BUY_CHECK_SVG;
       buyBtn.disabled = true;
-      buyBtn.classList.add('is-owned');
+      buyBtn.classList.add('is-success');
     } else {
       buyBtn.textContent = 'Buy';
       buyBtn.disabled = false;
-      buyBtn.classList.remove('is-owned');
+      buyBtn.classList.remove('is-success');
     }
   }
 }
 
-// تُستدعى بعد نجاح شراء أي حيوان: علامة صح مؤقتة 4 ثوانٍ، ثم يبقى الزر "Owned" ومعطّلاً دائماً (نفس منطق showBuySuccessDuck سابقاً، معمَّم).
+// تُستدعى بعد نجاح شراء أي حيوان: علامة صح خضراء تبقى دائماً ومعطَّلة (الشخصية مملوكة بالفعل ولا يمكن إعادة شرائها) — نفس شكل حالة الامتلاك عند إعادة فتح التطبيق لاحقاً (renderPetCard).
 function showBuySuccessGeneric(btn){
   if (!btn || btn.classList.contains('is-success')) return;
   btn.classList.add('is-success');
-  btn.innerHTML = '<svg class="pet-card__btn-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
-  setTimeout(function(){
-    btn.classList.remove('is-success');
-    btn.classList.add('is-owned');
-    btn.textContent = 'Owned';
-  }, 4000);
+  btn.innerHTML = PET_BUY_CHECK_SVG;
 }
 
 // بيانات الحيوانات المملوكة + Happy Dog/Guardian/Ambassador + Storage — تُجلَب
@@ -6921,8 +6908,6 @@ function onClaimAmbassadorClick(){
   });
 }
 
-/* -- تأثير مؤقت 4 ثواني عند شراء The Duck: علامة صح + تغيير شكل الزر -- */
-// تُستدعى بعد نجاح شراء The Duck فعلياً من السيرفر (وليس عند مجرد الضغط): علامة صح مؤقتة 4 ثوانٍ، ثم يبقى الزر "Owned" ومعطّلاً دائماً (الشخصية مملوكة بالفعل ولا يمكن إعادة شرائها).
 /* -- تلميح "300,000" الكامل فوق سعر الشخصية عند الضغط -- */
 function togglePriceTooltip(tipId){
   var tip = document.getElementById(tipId || 'price-tooltip');
