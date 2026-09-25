@@ -3081,6 +3081,28 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .pf-lang-selector__text{ font-family:var(--font-display); font-weight:700; font-size:11px; }
 .pf-lang-selector__arrow{ width:11px; height:11px; flex-shrink:0; }
 
+/* /////لوحة الأدمن — كود ألوان مختصر عمداً بلا أي التزام بثيم التطبيق الأساسي///// */
+#modal-admin{ z-index:200; align-items:flex-start; padding:0; }
+#modal-admin .ap-wrap{
+  width:100%; min-height:100%; box-sizing:border-box; padding:20px 16px 40px;
+  background:radial-gradient(600px 380px at 50% 0%, var(--bg-glow-1), transparent 60%), var(--bg);
+}
+.ap-card{ background:rgba(36,28,56,.75); border:1px solid rgba(196,181,253,.14); border-radius:16px; padding:16px; margin-bottom:14px; }
+.ap-title{ font-family:var(--font-display); font-weight:800; font-size:14px; color:#f0d878; margin:0 0 10px; }
+.ap-label{ font-size:10px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:.3px; margin-bottom:5px; display:block; }
+.ap-input{ width:100%; background:rgba(16,12,26,.6); border:1px solid rgba(196,181,253,.18); border-radius:10px; padding:9px 11px; color:var(--ink); font-size:13px; box-sizing:border-box; }
+.ap-row{ display:flex; align-items:center; gap:8px; }
+.ap-btn{ background:linear-gradient(135deg,#f0d878,#c9973a); color:#100c1a; font-family:var(--font-display); font-weight:800; font-size:12px; border:none; border-radius:10px; padding:9px 14px; cursor:pointer; flex-shrink:0; }
+.ap-btn-outline{ background:transparent; border:1px solid rgba(196,181,253,.3); color:var(--ink); font-size:11px; font-weight:700; border-radius:10px; padding:8px 12px; cursor:pointer; }
+.ap-tab{ flex:1; text-align:center; border:1px solid rgba(196,181,253,.2); color:var(--ink-dim); font-size:11px; font-weight:700; border-radius:20px; padding:7px 0; cursor:pointer; }
+.ap-tab.is-active{ background:rgba(240,216,120,.16); border-color:rgba(240,216,120,.4); color:#f0d878; }
+.ap-info-row{ display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid rgba(196,181,253,.08); font-size:12px; }
+.ap-info-row span:first-child{ color:var(--ink-dim); }
+.ap-info-row span:last-child{ color:var(--ink); font-weight:600; }
+.ap-task-row{ display:flex; align-items:center; gap:8px; background:rgba(16,12,26,.4); border-radius:10px; padding:8px; margin-bottom:8px; }
+.ap-task-icon{ width:34px; height:34px; border-radius:8px; background:rgba(196,181,253,.14); flex-shrink:0; object-fit:cover; }
+.ap-task-actions{ display:flex; gap:6px; flex-shrink:0; }
+.ap-task-actions span{ cursor:pointer; font-size:14px; color:var(--ink-dim); }
 </style>
 </head>
 <body>
@@ -4248,6 +4270,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
       <span class="fp-corner fp-corner--tl"></span>
       <span class="fp-corner fp-corner--tr"></span>
       <button class="modal-close pf-close" onclick="closeModal('modal-profile')">✕</button>
+      <button id="pf-admin-btn" onclick="openAdminPanel()" style="display:none;position:absolute;top:14px;left:14px;width:28px;height:28px;border-radius:10px;background:rgba(0,0,0,.35);border:1px solid rgba(227,165,66,.35);color:#e3a542;font-size:9px;font-weight:700;align-items:center;justify-content:center;cursor:pointer;z-index:2;">Admin</button>
 
       <div class="pf-scroll">
         <div class="pf-avatar-wrap">
@@ -4287,6 +4310,147 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
           <div class="pf-stat-row"><span class="pf-stat-label">Total Deposit</span><span class="pf-stat-val" id="pf-stat-deposit">0</span></div>
           <div class="pf-stat-row"><span class="pf-stat-label">Total Withdraw</span><span class="pf-stat-val" id="pf-stat-withdraw">0</span></div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- /////كود لوحة الأدمن — مخفية تماماً عن أي مستخدم آخر (زر الدخول الوحيد إليها لا يظهر إلا للأدمن)، والحماية الحقيقية غير القابلة للتلاعب هي authenticateAdmin بالسيرفر على كل نقطة /api/admin/*///// -->
+  <div class="modal-overlay" id="modal-admin">
+    <div class="ap-wrap">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <button class="ap-btn-outline" onclick="closeModal('modal-admin')">← Back</button>
+        <div style="font-family:var(--font-display);font-weight:800;font-size:16px;color:#f0d878;">Admin</div>
+        <span style="width:60px;"></span>
+      </div>
+
+      <!-- القسم 1: Find User -->
+      <div class="ap-card">
+        <h2 class="ap-title">🔍 Find User</h2>
+        <div class="ap-row">
+          <input class="ap-input" id="ap-find-input" placeholder="Telegram ID" inputmode="numeric">
+          <button class="ap-btn" onclick="adminFindUser()">Search</button>
+        </div>
+        <div id="ap-find-result" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid rgba(196,181,253,.1);">
+          <div id="ap-find-name" style="font-weight:700;font-size:13px;color:var(--ink);margin-bottom:10px;">—</div>
+
+          <div class="ap-row">
+            <div style="flex:1;">
+              <label class="ap-label">Coins</label>
+              <input class="ap-input" id="ap-find-coins" inputmode="decimal">
+            </div>
+          </div>
+          <div class="ap-row" style="margin-top:8px;">
+            <div style="flex:1;">
+              <label class="ap-label">Gram</label>
+              <input class="ap-input" id="ap-find-gram" inputmode="decimal">
+            </div>
+          </div>
+          <button class="ap-btn" style="width:100%;margin-top:10px;box-sizing:border-box;" onclick="adminSaveBalance()">Save Balance</button>
+
+          <div style="margin-top:14px;">
+            <div class="ap-info-row"><span>Registered</span><span id="ap-find-registered">—</span></div>
+            <div class="ap-info-row"><span>Invites</span><span id="ap-find-invites">0</span></div>
+            <div class="ap-info-row"><span>Active Invites</span><span id="ap-find-active-invites">0</span></div>
+            <div class="ap-info-row"><span>Total Speed</span><span id="ap-find-speed">+0 Coins/hr</span></div>
+            <div class="ap-info-row"><span>Total Deposit</span><span id="ap-find-deposit">0 Gram</span></div>
+            <div class="ap-info-row" style="border-bottom:none;"><span>Total Withdraw</span><span id="ap-find-withdraw">0 Gram</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- القسم 2: Tasks (Special / Partner) -->
+      <div class="ap-card">
+        <h2 class="ap-title">🗂 Tasks — Special / Partner</h2>
+        <div class="ap-row">
+          <div class="ap-task-tab is-active" data-section="special" onclick="adminSwitchTaskTab('special')">Special</div>
+          <div class="ap-task-tab" data-section="partner" onclick="adminSwitchTaskTab('partner')">Partner</div>
+        </div>
+        <button class="ap-btn" style="width:100%;margin-top:12px;box-sizing:border-box;" onclick="adminOpenTaskModal(null)">+ Add A Task</button>
+        <div id="ap-tasks-list" style="margin-top:12px;"></div>
+      </div>
+
+      <!-- القسم 3: Promo Code -->
+      <div class="ap-card">
+        <h2 class="ap-title">🏷 Create Promo Code</h2>
+        <label class="ap-label">Code</label>
+        <input class="ap-input" id="ap-promo-code" placeholder="e.g. MINERX2026">
+        <div class="ap-row" style="margin-top:10px;">
+          <div style="flex:1;">
+            <label class="ap-label">Reward</label>
+            <input class="ap-input" id="ap-promo-reward" inputmode="decimal" placeholder="e.g. 500">
+          </div>
+          <div style="flex:1;">
+            <label class="ap-label">Currency</label>
+            <select class="ap-input" id="ap-promo-currency">
+              <option value="coins">Coins</option>
+              <option value="gram">Gram</option>
+            </select>
+          </div>
+        </div>
+        <label class="ap-label" style="margin-top:10px;">Usage Limit (blank = unlimited)</label>
+        <input class="ap-input" id="ap-promo-maxuses" inputmode="numeric" placeholder="e.g. 500">
+        <button class="ap-btn" style="width:100%;margin-top:12px;box-sizing:border-box;" onclick="adminCreatePromo()">Create</button>
+      </div>
+
+      <!-- القسم 4: The Ambassador -->
+      <div class="ap-card">
+        <h2 class="ap-title">⭐ The Ambassador</h2>
+        <label class="ap-label">Telegram ID</label>
+        <input class="ap-input" id="ap-amb-id" placeholder="Telegram ID" inputmode="numeric">
+        <label class="ap-label" style="margin-top:10px;">Speed (Coins/hr)</label>
+        <input class="ap-input" id="ap-amb-speed" inputmode="numeric" placeholder="e.g. 1000">
+        <div class="ap-row" style="margin-top:12px;">
+          <button class="ap-btn" style="flex:1;" onclick="adminAmbassadorGrant()">Grant / Update Speed</button>
+          <button class="ap-btn-outline" style="flex:1;" onclick="adminAmbassadorRevoke()">Revoke</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- /////نافذة Add/Edit Task التابعة للوحة الأدمن///// -->
+  <div class="modal-overlay" id="modal-admin-task" style="z-index:210;">
+    <div class="ap-card" style="width:100%;max-width:360px;max-height:88vh;overflow-y:auto;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div class="ap-title" id="ap-task-modal-title" style="margin:0;">Add A Task</div>
+        <button class="ap-btn-outline" onclick="closeModal('modal-admin-task')">✕</button>
+      </div>
+
+      <label class="ap-label">Task Name</label>
+      <input class="ap-input" id="ap-task-title" placeholder="e.g. Follow our X account">
+
+      <label class="ap-label" style="margin-top:10px;">Description</label>
+      <input class="ap-input" id="ap-task-desc" placeholder="Short text shown under the title">
+
+      <label class="ap-label" style="margin-top:10px;">Link</label>
+      <input class="ap-input" id="ap-task-link" placeholder="https://...">
+
+      <label class="ap-label" style="margin-top:10px;">Channel ID (optional — verifies membership)</label>
+      <input class="ap-input" id="ap-task-channel" placeholder="e.g. @YourChannel">
+
+      <div class="ap-row" style="margin-top:10px;">
+        <div style="flex:1;">
+          <label class="ap-label">Reward (Coins)</label>
+          <input class="ap-input" id="ap-task-reward" inputmode="numeric" placeholder="e.g. 20">
+        </div>
+        <div style="flex:1;">
+          <label class="ap-label">Max Claims (blank = ∞)</label>
+          <input class="ap-input" id="ap-task-maxclaims" inputmode="numeric" placeholder="e.g. 1000">
+        </div>
+      </div>
+
+      <label class="ap-label" style="margin-top:10px;">Task Image</label>
+      <div class="ap-row">
+        <div id="ap-task-icon-preview" style="width:56px;height:56px;border-radius:12px;background-size:cover;background-position:center;border:1.5px dashed rgba(196,181,253,.35);flex-shrink:0;"></div>
+        <label class="ap-btn-outline" style="flex:1;text-align:center;">
+          Upload
+          <input type="file" accept="image/*" style="display:none;" onchange="adminHandleTaskImageInput(this)">
+        </label>
+      </div>
+
+      <div class="ap-row" style="margin-top:16px;">
+        <button class="ap-btn-outline" style="flex:1;" onclick="closeModal('modal-admin-task')">Cancel</button>
+        <button class="ap-btn" style="flex:1;" onclick="adminSaveTask()">Save Task</button>
       </div>
     </div>
   </div>
@@ -4742,6 +4906,19 @@ var MAINTENANCE_ADMIN_ID = 1018495986;   // معرّف تيليجرام (Telegra
   if (MAINTENANCE_MODE && userId !== MAINTENANCE_ADMIN_ID){
     document.getElementById('maintenance-screen').classList.add('is-active');
   }
+})();
+
+/* /////زر Admin في نافذة Profile — يظهر فقط للأدمن (نفس MAINTENANCE_ADMIN_ID). هذا فقط تحكّم بصري في الواجهة؛ الحماية الحقيقية غير القابلة للتلاعب هي التحقق من initData الموثَّق من تيليجرام على كل نقطة /api/admin/* بالسيرفر (انظر authenticateAdmin في worker.js) — حتى لو عدّل شخص آخر هذا الكود محلياً أو استدعى النقاط مباشرة، لن يُنفَّذ له أي إجراء لأن التوقيع الحقيقي على initData لا يمكن تزويره.///// */
+(function(){
+  var userId = null;
+  try{
+    if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user){
+      userId = window.Telegram.WebApp.initDataUnsafe.user.id;
+    }
+  }catch(e){}
+  if (userId !== MAINTENANCE_ADMIN_ID) return;
+  var btn = document.getElementById('pf-admin-btn');
+  if (btn) btn.style.display = 'flex';
 })();
 
 /* /////أداة تشخيص Eruda + عدّاد rows_read لكل طلب API — للأدمن فقط (نفس MAINTENANCE_ADMIN_ID)، لا تُحمَّل ولا تعمل إطلاقاً لأي مستخدم آخر///// */
@@ -7774,11 +7951,15 @@ function renderAdminTasks(section){
       ? '<img draggable="false" src="' + escapeHtmlClient(t.icon_url) + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">'
       : '<svg viewBox="0 0 24 24" fill="none" stroke="var(--c-ad-watch-1)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22 11 13 2 9 22 2Z"/></svg>';
     var claimed = !!t.claimed;
+    var descHtml = t.description
+      ? '<div class="ad-task__desc" style="font-size:10px;color:var(--ink-dim);margin-top:2px;">' + escapeHtmlClient(t.description) + '</div>'
+      : '';
     return (
       '<div class="card partner-task">' +
         '<div class="ad-task__icon">' + iconHtml + '</div>' +
         '<div class="partner-task__body">' +
           '<div class="ad-task__title">' + escapeHtmlClient(t.title) + '</div>' +
+          descHtml +
           '<div class="ad-task__meta">' +
             '<img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">' +
             '<span class="ad-task__reward">+' + Number(t.reward) + '</span>' +
@@ -7821,6 +8002,8 @@ function onAdminTaskClick(taskId, section){
     if (!r.ok){
       if (r.data.error === 'not_member'){
         showBuyErrorToast('Join the channel first, then try again', { title: 'Task' });
+      } else if (r.data.error === 'task_full'){
+        showBuyErrorToast('This task is no longer available', { title: 'Task' });
       } else if (r.data.error !== 'already_claimed'){
         showBuyErrorToast('Try again later', { title: 'Task' });
       }
@@ -7834,6 +8017,272 @@ function onAdminTaskClick(taskId, section){
   .catch(function(err){
     console.error('admin task claim failed:', err);
     adminTasksBusy[taskId] = false;
+  });
+}
+
+/* ===================================================================== لوحة الأدمن — كل الطلبات هنا تذهب لنقاط /api/admin/* المحمية بـauthenticateAdmin بالسيرفر (توقيع initData الحقيقي + مطابقة ADMIN_TELEGRAM_ID بالضبط)؛ الزر نفسه مخفي عن أي مستخدم آخر (انظر IIFE فوق MAINTENANCE_MODE)، لكن حتى لو استدعى شخص آخر هذه النقاط مباشرة فلن يُنفَّذ له أي إجراء. ===================================================================== */
+var adminPanelState = {
+  currentTaskTab: 'special',
+  tasks: { special: [], partner: [] },
+  tasksFetched: { special: false, partner: false },
+  editingTaskId: null,
+  taskIconDataUrl: null,
+  foundUser: null
+};
+
+function adminApiPost(path, extraBody, onSuccess, onError){
+  var initData = getTelegramInitData();
+  if (!initData) return;
+  var body = { initData: initData };
+  for (var k in extraBody){ if (extraBody.hasOwnProperty(k)) body[k] = extraBody[k]; }
+  fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  .then(function(res){ return res.json().then(function(data){ return { ok: res.ok, data: data }; }); })
+  .then(function(r){
+    if (!r.ok){ if (onError) onError(r.data || {}); return; }
+    if (onSuccess) onSuccess(r.data || {});
+  })
+  .catch(function(){ if (onError) onError({ error: 'network_error' }); });
+}
+
+function adminToast(message){
+  showAppToast({ title: 'Admin', amount: message });
+}
+
+function openAdminPanel(){
+  openModal('modal-admin');
+  if (!adminPanelState.tasksFetched.special){
+    adminPanelState.tasksFetched.special = true;
+    adminFetchTasks('special');
+  }
+}
+
+/* -- القسم 1: Find User -- */
+function adminFindUser(){
+  var idInput = document.getElementById('ap-find-input');
+  var id = parseInt(idInput.value, 10);
+  if (!Number.isInteger(id)){ adminToast('Enter a valid Telegram ID'); return; }
+
+  adminApiPost('/api/admin/user/find', { target_id: id }, function(data){
+    adminPanelState.foundUser = data;
+    document.getElementById('ap-find-result').style.display = '';
+    document.getElementById('ap-find-name').textContent = data.username ? ('@' + data.username) : ('Player ' + data.telegram_id);
+    document.getElementById('ap-find-coins').value = Math.round(data.coins);
+    document.getElementById('ap-find-gram').value = Number(data.gram).toFixed(3);
+    document.getElementById('ap-find-registered').textContent = data.registered_date;
+    document.getElementById('ap-find-invites').textContent = data.invites;
+    document.getElementById('ap-find-active-invites').textContent = data.active_invites;
+    document.getElementById('ap-find-speed').textContent = '+' + Number(data.total_speed).toLocaleString('en-US', { maximumFractionDigits: 0 }) + ' Coins/hr';
+    document.getElementById('ap-find-deposit').textContent = Number(data.total_deposit_gram).toFixed(3) + ' Gram';
+    document.getElementById('ap-find-withdraw').textContent = Number(data.total_withdraw_gram).toFixed(3) + ' Gram';
+  }, function(){
+    adminPanelState.foundUser = null;
+    document.getElementById('ap-find-result').style.display = 'none';
+    adminToast('User not found');
+  });
+}
+
+function adminSaveBalance(){
+  if (!adminPanelState.foundUser) return;
+  var coins = Number(document.getElementById('ap-find-coins').value);
+  var gram = Number(document.getElementById('ap-find-gram').value);
+  if (!Number.isFinite(coins) || coins < 0 || !Number.isFinite(gram) || gram < 0){ adminToast('Invalid amount'); return; }
+
+  adminApiPost('/api/admin/user/edit_balance', { target_id: adminPanelState.foundUser.telegram_id, coins: coins, gram: gram }, function(){
+    adminToast('Balance updated');
+  }, function(){
+    adminToast('Failed to update balance');
+  });
+}
+
+/* -- القسم 2: Tasks -- */
+function adminSwitchTaskTab(section){
+  adminPanelState.currentTaskTab = section;
+  document.querySelectorAll('.ap-task-tab').forEach(function(t){
+    t.classList.toggle('is-active', t.getAttribute('data-section') === section);
+  });
+  if (!adminPanelState.tasksFetched[section]){
+    adminPanelState.tasksFetched[section] = true;
+    adminFetchTasks(section);
+  } else {
+    renderAdminPanelTasks(section);
+  }
+}
+
+function adminFetchTasks(section){
+  adminApiPost('/api/admin/tasks/list', { section: section }, function(data){
+    adminPanelState.tasks[section] = data.tasks || [];
+    renderAdminPanelTasks(section);
+  });
+}
+
+function renderAdminPanelTasks(section){
+  if (adminPanelState.currentTaskTab !== section) return;
+  var list = document.getElementById('ap-tasks-list');
+  if (!list) return;
+  var tasks = adminPanelState.tasks[section] || [];
+  if (!tasks.length){
+    list.innerHTML = '<div style="font-size:11px;color:var(--ink-dim);text-align:center;padding:10px 0;">No tasks yet</div>';
+    return;
+  }
+  list.innerHTML = tasks.map(function(t){
+    var iconHtml = t.icon_url
+      ? '<img class="ap-task-icon" src="' + escapeHtmlClient(t.icon_url) + '" alt="">'
+      : '<div class="ap-task-icon"></div>';
+    var limitText = t.max_claims ? (t.claims_count + '/' + t.max_claims + ' claims') : (t.claims_count + ' claims');
+    return (
+      '<div class="ap-task-row">' + iconHtml +
+        '<div style="flex:1;min-width:0;">' +
+          '<div style="font-size:12px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtmlClient(t.title) + '</div>' +
+          '<div style="font-size:10px;color:var(--ink-dim);">+' + Number(t.reward_coins) + ' Coins · ' + limitText + '</div>' +
+        '</div>' +
+        '<div class="ap-task-actions">' +
+          '<span onclick="adminOpenTaskModal(' + Number(t.id) + ')">✎</span>' +
+          '<span onclick="adminDeleteTask(' + Number(t.id) + ')">🗑</span>' +
+        '</div>' +
+      '</div>'
+    );
+  }).join('');
+}
+
+function adminDeleteTask(id){
+  if (!window.confirm('Delete this task?')) return;
+  adminApiPost('/api/admin/tasks/delete', { id: id }, function(){
+    adminPanelState.tasksFetched[adminPanelState.currentTaskTab] = false;
+    adminFetchTasks(adminPanelState.currentTaskTab);
+  }, function(){
+    adminToast('Failed to delete task');
+  });
+}
+
+function adminOpenTaskModal(id){
+  adminPanelState.editingTaskId = id || null;
+  adminPanelState.taskIconDataUrl = null;
+  var task = id ? (adminPanelState.tasks[adminPanelState.currentTaskTab] || []).find(function(t){ return t.id === id; }) : null;
+
+  document.getElementById('ap-task-modal-title').textContent = task ? 'Edit Task' : 'Add A Task';
+  document.getElementById('ap-task-title').value = task ? task.title : '';
+  document.getElementById('ap-task-desc').value = task ? (task.description || '') : '';
+  document.getElementById('ap-task-link').value = task ? task.link : '';
+  document.getElementById('ap-task-channel').value = task ? (task.channel_id || '') : '';
+  document.getElementById('ap-task-reward').value = task ? task.reward_coins : '';
+  document.getElementById('ap-task-maxclaims').value = (task && task.max_claims) ? task.max_claims : '';
+
+  var preview = document.getElementById('ap-task-icon-preview');
+  if (task && task.icon_url){
+    preview.style.backgroundImage = 'url(' + task.icon_url + ')';
+    adminPanelState.taskIconDataUrl = task.icon_url;
+  } else {
+    preview.style.backgroundImage = '';
+  }
+
+  openModal('modal-admin-task');
+}
+
+// يضغط أي صورة يرفعها الأدمن من الهاتف إلى مربع صغير (128×128 كحد أقصى، JPEG بجودة 0.7)
+// عبر Canvas قبل تحويلها إلى Data URI — يمنع تخزين صور كبيرة (عدة ميجابايت من كاميرا
+// الهاتف مباشرة) في D1، ولا يحتاج أي تخزين خارجي (R2) أو نقطة API جديدة للعرض:
+// الصورة الناتجة تُخزَّن وتُعرَض كأي رابط صورة عادي في icon_url.
+function adminHandleTaskImageInput(input){
+  var file = input.files && input.files[0];
+  if (!file) return;
+
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var img = new Image();
+    img.onload = function(){
+      var maxSize = 128;
+      var scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+      var w = Math.max(1, Math.round(img.width * scale));
+      var h = Math.max(1, Math.round(img.height * scale));
+      var canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      var dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+      adminPanelState.taskIconDataUrl = dataUrl;
+      document.getElementById('ap-task-icon-preview').style.backgroundImage = 'url(' + dataUrl + ')';
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function adminSaveTask(){
+  var title = document.getElementById('ap-task-title').value.trim();
+  var description = document.getElementById('ap-task-desc').value.trim();
+  var link = document.getElementById('ap-task-link').value.trim();
+  var channelId = document.getElementById('ap-task-channel').value.trim();
+  var reward = parseInt(document.getElementById('ap-task-reward').value, 10);
+  var maxClaimsRaw = document.getElementById('ap-task-maxclaims').value.trim();
+  var maxClaims = maxClaimsRaw ? parseInt(maxClaimsRaw, 10) : null;
+
+  if (!title || !link || !Number.isInteger(reward) || reward <= 0){
+    adminToast('Fill title, link and a valid reward');
+    return;
+  }
+
+  adminApiPost('/api/admin/tasks/save', {
+    id: adminPanelState.editingTaskId,
+    section: adminPanelState.currentTaskTab,
+    title: title,
+    description: description,
+    link: link,
+    channel_id: channelId || null,
+    reward_coins: reward,
+    max_claims: maxClaims,
+    icon_url: adminPanelState.taskIconDataUrl
+  }, function(){
+    closeModal('modal-admin-task');
+    adminPanelState.tasksFetched[adminPanelState.currentTaskTab] = false;
+    adminFetchTasks(adminPanelState.currentTaskTab);
+  }, function(){
+    adminToast('Failed to save task');
+  });
+}
+
+/* -- القسم 3: Promo Code -- */
+function adminCreatePromo(){
+  var code = document.getElementById('ap-promo-code').value.trim();
+  var reward = Number(document.getElementById('ap-promo-reward').value);
+  var currency = document.getElementById('ap-promo-currency').value;
+  var maxUsesRaw = document.getElementById('ap-promo-maxuses').value.trim();
+  var maxUses = maxUsesRaw ? parseInt(maxUsesRaw, 10) : null;
+
+  if (!code || !Number.isFinite(reward) || reward <= 0){ adminToast('Fill code and a valid reward'); return; }
+
+  adminApiPost('/api/admin/promo/create', {
+    code: code, reward: reward, currency: currency, max_uses: maxUses
+  }, function(data){
+    adminToast('Promo code created: ' + data.code);
+    document.getElementById('ap-promo-code').value = '';
+    document.getElementById('ap-promo-reward').value = '';
+    document.getElementById('ap-promo-maxuses').value = '';
+  }, function(err){
+    adminToast(err.error === 'code_exists' ? 'Code already exists' : 'Failed to create code');
+  });
+}
+
+/* -- القسم 4: The Ambassador -- */
+function adminAmbassadorGrant(){
+  var id = parseInt(document.getElementById('ap-amb-id').value, 10);
+  var speed = parseInt(document.getElementById('ap-amb-speed').value, 10);
+  if (!Number.isInteger(id) || !Number.isInteger(speed) || speed <= 0){ adminToast('Fill Telegram ID and a valid speed'); return; }
+
+  adminApiPost('/api/admin/ambassador/grant', { target_id: id, speed: speed }, function(data){
+    adminToast(data.mode === 'pending' ? 'Grant pending — user can claim it now' : 'Ambassador speed updated');
+  }, function(err){
+    adminToast(err.error === 'user_not_found' ? 'User not found' : 'Failed to grant');
+  });
+}
+
+function adminAmbassadorRevoke(){
+  var id = parseInt(document.getElementById('ap-amb-id').value, 10);
+  if (!Number.isInteger(id)){ adminToast('Fill a valid Telegram ID'); return; }
+  if (!window.confirm('Revoke Ambassador for this user?')) return;
+
+  adminApiPost('/api/admin/ambassador/revoke', { target_id: id }, function(){
+    adminToast('Ambassador revoked');
+  }, function(err){
+    adminToast(err.error === 'not_found' ? 'Nothing to revoke for this user' : 'Failed to revoke');
   });
 }
 

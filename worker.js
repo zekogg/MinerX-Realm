@@ -384,6 +384,32 @@ async function routeRequest(request, env, url) {
       return handleProfile(request, env);
     }
 
+    // نقاط لوحة الأدمن — كلها محمية بـauthenticateAdmin (انظر تعريفها أعلاه)، لا تُنفَّذ إطلاقاً لغير ADMIN_TELEGRAM_ID حتى مع initData حقيقي وموثَّق لحساب آخر.
+    if (url.pathname === "/api/admin/user/find" && request.method === "POST") {
+      return handleAdminUserFind(request, env);
+    }
+    if (url.pathname === "/api/admin/user/edit_balance" && request.method === "POST") {
+      return handleAdminEditBalance(request, env);
+    }
+    if (url.pathname === "/api/admin/tasks/list" && request.method === "POST") {
+      return handleAdminTasksList(request, env);
+    }
+    if (url.pathname === "/api/admin/tasks/save" && request.method === "POST") {
+      return handleAdminTasksSave(request, env);
+    }
+    if (url.pathname === "/api/admin/tasks/delete" && request.method === "POST") {
+      return handleAdminTasksDelete(request, env);
+    }
+    if (url.pathname === "/api/admin/promo/create" && request.method === "POST") {
+      return handleAdminPromoCreate(request, env);
+    }
+    if (url.pathname === "/api/admin/ambassador/grant" && request.method === "POST") {
+      return handleAdminAmbassadorGrant(request, env);
+    }
+    if (url.pathname === "/api/admin/ambassador/revoke" && request.method === "POST") {
+      return handleAdminAmbassadorRevoke(request, env);
+    }
+
     // نقطة منفصلة عن /api/user عمداً — تُستدعى فقط عند فتح نافذة Leaderboard فعلياً، ومحمية بكاش يومي (Cache API) لا يلمس D1 إلا مرة واحدة يومياً.
     if (url.pathname === "/api/leaderboard" && request.method === "POST") {
       return handleLeaderboard(request, env);
@@ -1935,6 +1961,352 @@ async function handleClaimAmbassador(request, env) {
   });
 }
 
+// ===================================================================== لوحة الأدمن — كل نقاط /api/admin/* محمية بطبقتين لا يمكن التلاعب بهما من المتصفح: (1) authenticateRequest نفسها المستخدمة بكل نقطة أخرى بالتطبيق (توقيع HMAC حقيقي من تيليجرام على initData، لا يمكن تزويره من Console)، (2) authenticateAdmin تتحقق أن telegram_id الموثَّق من هذا التوقيع يطابق ADMIN_TELEGRAM_ID بالضبط — أي طلب من أي حساب آخر (حتى مع body مزوَّر يدّعي id الأدمن) يُرفض فوراً بـ403 لأن الid الحقيقي يأتي من initData الموثَّق نفسه، وليس من أي حقل يرسله المتصفح صراحة. =====================================================================
+async function authenticateAdmin(request, env, preParsedBody) {
+  const auth = await authenticateRequest(request, env, preParsedBody);
+  if (!auth.ok) return auth;
+  if (auth.telegramId !== ADMIN_TELEGRAM_ID) {
+    return { ok: false, response: jsonResponse({ error: "forbidden" }, 403) };
+  }
+  return auth;
+}
+
+// ===================================================================== نقطة /api/admin/user/find — بحث عن مستخدم بمعرّف تيليجرام (بحث واحد فقط، بلا أي قائمة/تصفّح). =====================================================================
+async function handleAdminUserFind(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "invalid_body" }, 400);
+  }
+
+  const auth = await authenticateAdmin(request, env, body);
+  if (!auth.ok) return auth.response;
+
+  const targetId = parseInt(body.target_id, 10);
+  if (!Number.isInteger(targetId)) return jsonResponse({ error: "invalid_target_id" }, 400);
+
+  const [user, depositResult, withdrawResult] = await Promise.all([
+    env.DB.prepare(
+      "SELECT telegram_id, username, coins, gram, total_speed, invites_count, active_referrals_count, created_at FROM users WHERE telegram_id = ?"
+    ).bind(targetId).first(),
+    env.DB.prepare(
+      "SELECT COALESCE(SUM(amount_gram), 0) AS total FROM deposits WHERE telegram_id = ? AND status = 'confirmed'"
+    ).bind(targetId).first(),
+    env.DB.prepare(
+      "SELECT COALESCE(SUM(net_gram), 0) AS total FROM withdrawals WHERE telegram_id = ? AND status = 'approved'"
+    ).bind(targetId).first()
+  ]);
+
+  if (!user) return jsonResponse({ error: "user_not_found" }, 404);
+
+  return jsonResponse({
+    telegram_id: user.telegram_id,
+    username: user.username,
+    coins: user.coins,
+    gram: user.gram,
+    total_speed: user.total_speed,
+    invites: user.invites_count || 0,
+    active_invites: user.active_referrals_count || 0,
+    registered_date: user.created_at ? formatDateDDMMYYYY(user.created_at) : "—",
+    total_deposit_gram: depositResult.total || 0,
+    total_withdraw_gram: withdrawResult.total || 0
+  });
+}
+
+// ===================================================================== نقطة /api/admin/user/edit_balance — تعيين رصيد Coins/Gram مباشرة (قيمة مطلقة جديدة، وليست إضافة). الفرق بين القيمة القديمة والجديدة يُسجَّل في transactions (type='admin_adjustment') لكل عملة تغيّرت فعلاً — نفس أسلوب تسجيل كل تغيير رصيد آخر بالتطبيق، حتى تبقى admin_adjustment قابلة للتتبع في سجل المحفظة. =====================================================================
+async function handleAdminEditBalance(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "invalid_body" }, 400);
+  }
+
+  const auth = await authenticateAdmin(request, env, body);
+  if (!auth.ok) return auth.response;
+
+  const targetId = parseInt(body.target_id, 10);
+  if (!Number.isInteger(targetId)) return jsonResponse({ error: "invalid_target_id" }, 400);
+
+  const newCoins = Number(body.coins);
+  const newGram = Number(body.gram);
+  if (!Number.isFinite(newCoins) || newCoins < 0 || !Number.isFinite(newGram) || newGram < 0) {
+    return jsonResponse({ error: "invalid_amount" }, 400);
+  }
+
+  const row = await env.DB.prepare("SELECT coins, gram FROM users WHERE telegram_id = ?").bind(targetId).first();
+  if (!row) return jsonResponse({ error: "user_not_found" }, 404);
+
+  const coinsDelta = newCoins - row.coins;
+  const gramDelta = newGram - row.gram;
+
+  const stmts = [
+    env.DB.prepare("UPDATE users SET coins = ?, gram = ? WHERE telegram_id = ?").bind(newCoins, newGram, targetId)
+  ];
+  if (coinsDelta !== 0) {
+    stmts.push(env.DB.prepare(
+      "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'admin_adjustment', ?, 'coins')"
+    ).bind(targetId, coinsDelta));
+  }
+  if (gramDelta !== 0) {
+    stmts.push(env.DB.prepare(
+      "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'admin_adjustment', ?, 'gram')"
+    ).bind(targetId, gramDelta));
+  }
+  await env.DB.batch(stmts);
+
+  return jsonResponse({ ok: true, coins: newCoins, gram: newGram });
+}
+
+// ===================================================================== نقطة /api/admin/tasks/list — كل مهام قسم Special أو Partner (النشطة فقط)، مع claims_count/max_claims الظاهرين فقط للأدمن (المستخدمون العاديون يستخدمون /api/tasks/list الذي لا يُرجعهما). =====================================================================
+async function handleAdminTasksList(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "invalid_body" }, 400);
+  }
+
+  const auth = await authenticateAdmin(request, env, body);
+  if (!auth.ok) return auth.response;
+
+  const section = body.section === "special" ? "special" : "partner";
+
+  const result = await env.DB.prepare(
+    `SELECT id, title, description, icon_url, reward_coins, link, channel_id, max_claims, claims_count, display_order
+     FROM admin_tasks WHERE section = ? AND is_active = 1
+     ORDER BY display_order ASC, id ASC`
+  ).bind(section).all();
+
+  return jsonResponse({ tasks: result.results || [] });
+}
+
+// ===================================================================== نقطة /api/admin/tasks/save — إضافة مهمة جديدة (بدون id) أو تعديل مهمة موجودة (مع id). icon_url قد يكون رابطاً خارجياً حقيقياً أو Data URI (صورة مضغوطة base64 من الهاتف مباشرة عبر Canvas بالواجهة) — كلاهما يُخزَّن ويُعرَض بنفس الطريقة تماماً بلا أي فرق بكود العرض. =====================================================================
+async function handleAdminTasksSave(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "invalid_body" }, 400);
+  }
+
+  const auth = await authenticateAdmin(request, env, body);
+  if (!auth.ok) return auth.response;
+
+  const section = body.section === "special" ? "special" : "partner";
+  const title = typeof body.title === "string" ? body.title.trim() : "";
+  const description = typeof body.description === "string" ? body.description.trim() : "";
+  const link = typeof body.link === "string" ? body.link.trim() : "";
+  const channelId = typeof body.channel_id === "string" && body.channel_id.trim() ? body.channel_id.trim() : null;
+  const iconUrl = typeof body.icon_url === "string" && body.icon_url.trim() ? body.icon_url.trim() : null;
+  const rewardCoins = parseInt(body.reward_coins, 10);
+  const maxClaims = (body.max_claims === null || body.max_claims === "" || body.max_claims === undefined)
+    ? null : parseInt(body.max_claims, 10);
+  const displayOrder = Number.isInteger(parseInt(body.display_order, 10)) ? parseInt(body.display_order, 10) : 0;
+
+  if (!title || !link || !Number.isInteger(rewardCoins) || rewardCoins <= 0) {
+    return jsonResponse({ error: "invalid_task_data" }, 400);
+  }
+  if (maxClaims !== null && (!Number.isInteger(maxClaims) || maxClaims <= 0)) {
+    return jsonResponse({ error: "invalid_max_claims" }, 400);
+  }
+
+  const id = parseInt(body.id, 10);
+  if (Number.isInteger(id)) {
+    const result = await env.DB.prepare(
+      `UPDATE admin_tasks SET title = ?, description = ?, icon_url = ?, reward_coins = ?, link = ?, channel_id = ?, max_claims = ?, display_order = ?
+       WHERE id = ? AND section = ?`
+    ).bind(title, description, iconUrl, rewardCoins, link, channelId, maxClaims, displayOrder, id, section).run();
+    if (!result.meta || result.meta.changes === 0) return jsonResponse({ error: "task_not_found" }, 404);
+    return jsonResponse({ ok: true, id });
+  }
+
+  const insertResult = await env.DB.prepare(
+    `INSERT INTO admin_tasks (section, title, description, icon_url, reward_coins, link, channel_id, max_claims, claims_count, is_active, display_order, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 1, ?, ?)`
+  ).bind(section, title, description, iconUrl, rewardCoins, link, channelId, maxClaims, displayOrder, Date.now()).run();
+
+  return jsonResponse({ ok: true, id: insertResult.meta.last_row_id });
+}
+
+// ===================================================================== نقطة /api/admin/tasks/delete — حذف ناعم (is_active = 0) وليس DELETE حقيقي، لتفادي ترك صفوف admin_task_claims يتيمة (تشير لمهمة محذوفة) — نفس ما يفعله is_active مسبقاً لإخفاء أي مهمة عن handleTasksList/handleAdminTasksList دون حذف تاريخها. =====================================================================
+async function handleAdminTasksDelete(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "invalid_body" }, 400);
+  }
+
+  const auth = await authenticateAdmin(request, env, body);
+  if (!auth.ok) return auth.response;
+
+  const id = parseInt(body.id, 10);
+  if (!Number.isInteger(id)) return jsonResponse({ error: "invalid_id" }, 400);
+
+  const result = await env.DB.prepare("UPDATE admin_tasks SET is_active = 0 WHERE id = ?").bind(id).run();
+  if (!result.meta || result.meta.changes === 0) return jsonResponse({ error: "task_not_found" }, 404);
+
+  return jsonResponse({ ok: true });
+}
+
+// ===================================================================== نقطة /api/admin/promo/create — إنشاء كود جديد في جدول promo_codes الموجود مسبقاً (نفس الجدول الذي يقرأه handlePromoRedeem). قيد PRIMARY KEY على code يمنع إنشاء نفس الكود مرتين. =====================================================================
+async function handleAdminPromoCreate(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "invalid_body" }, 400);
+  }
+
+  const auth = await authenticateAdmin(request, env, body);
+  if (!auth.ok) return auth.response;
+
+  const code = typeof body.code === "string" ? body.code.trim().toUpperCase() : "";
+  const reward = Number(body.reward);
+  const currency = body.currency === "gram" ? "gram" : "coins";
+  const maxUses = (body.max_uses === null || body.max_uses === "" || body.max_uses === undefined)
+    ? null : parseInt(body.max_uses, 10);
+  const expiresAt = typeof body.expires_at === "string" && body.expires_at.trim() ? body.expires_at.trim() : null;
+
+  if (!code || !Number.isFinite(reward) || reward <= 0) {
+    return jsonResponse({ error: "invalid_promo_data" }, 400);
+  }
+  if (maxUses !== null && (!Number.isInteger(maxUses) || maxUses <= 0)) {
+    return jsonResponse({ error: "invalid_max_uses" }, 400);
+  }
+
+  try {
+    await env.DB.prepare(
+      "INSERT INTO promo_codes (code, reward, currency, max_uses, uses_count, expires_at) VALUES (?, ?, ?, ?, 0, ?)"
+    ).bind(code, reward, currency, maxUses, expiresAt).run();
+  } catch (e) {
+    return jsonResponse({ error: "code_exists" }, 409);
+  }
+
+  return jsonResponse({ ok: true, code });
+}
+
+// ===================================================================== نقطة /api/admin/ambassador/grant — منح The Ambassador بسرعة يحددها الأدمن. لو لم يستلمها المستخدم بعد (لا صف في user_pets)، تُنشئ/تُحدِّث "منحاً معلّقاً" في ambassador_grants (يُستلَم لاحقاً عبر Claim بالواجهة بهذه السرعة). لو استلمها المستخدم فعلاً بالفعل، هذا الطلب يُعدِّل سرعتها الحالية مباشرة (نفس أسلوب تصفية Storage قبل أي تغيير سرعة المستخدم بكل مكان آخر بالتطبيق). =====================================================================
+async function handleAdminAmbassadorGrant(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "invalid_body" }, 400);
+  }
+
+  const auth = await authenticateAdmin(request, env, body);
+  if (!auth.ok) return auth.response;
+
+  const targetId = parseInt(body.target_id, 10);
+  const speed = parseInt(body.speed, 10);
+  if (!Number.isInteger(targetId)) return jsonResponse({ error: "invalid_target_id" }, 400);
+  if (!Number.isInteger(speed) || speed <= 0) return jsonResponse({ error: "invalid_speed" }, 400);
+
+  const petRow = await env.DB.prepare(
+    `SELECT p.current_speed, u.total_speed, s.capacity_hours, s.last_claim_at
+     FROM user_pets p
+     JOIN users u ON u.telegram_id = p.telegram_id
+     LEFT JOIN user_storage s ON s.telegram_id = p.telegram_id
+     WHERE p.telegram_id = ? AND p.pet_id = 'ambassador'`
+  ).bind(targetId).first();
+
+  if (!petRow) {
+    // لم يُستلَم بعد — فقط أنشئ/حدِّث المنح المعلّق بالسرعة الجديدة
+    const userExists = await env.DB.prepare("SELECT 1 FROM users WHERE telegram_id = ?").bind(targetId).first();
+    if (!userExists) return jsonResponse({ error: "user_not_found" }, 404);
+
+    await env.DB.prepare(
+      "INSERT INTO ambassador_grants (telegram_id, speed, granted_at) VALUES (?, ?, ?) ON CONFLICT(telegram_id) DO UPDATE SET speed = excluded.speed"
+    ).bind(targetId, speed, Date.now()).run();
+
+    return jsonResponse({ ok: true, mode: "pending", speed });
+  }
+
+  // مُستلَمة فعلاً — نُعدِّل سرعتها مباشرة. نُصفّي (checkpoint) ما تراكم في Storage بالسرعة الكلية القديمة أولاً، نفس أسلوب handlePetUpgrade بالضبط.
+  const speedDelta = speed - petRow.current_speed;
+  const capacitySeconds = (petRow.capacity_hours || STORAGE_DEFAULT_CAPACITY_HOURS) * 3600;
+  let preChangeAccrued = 0;
+  if (petRow.last_claim_at) {
+    const elapsedSeconds = Math.max(0, (Date.now() - Date.parse(petRow.last_claim_at)) / 1000);
+    preChangeAccrued = Math.min(elapsedSeconds, capacitySeconds) * ((petRow.total_speed || 0) / 3600);
+  }
+
+  const nowIso = new Date().toISOString();
+  const stmts = [
+    env.DB.prepare("UPDATE user_pets SET current_speed = ? WHERE telegram_id = ? AND pet_id = 'ambassador'").bind(speed, targetId),
+    env.DB.prepare("UPDATE users SET total_speed = total_speed + ?, coins = coins + ? WHERE telegram_id = ?").bind(speedDelta, preChangeAccrued, targetId)
+  ];
+  if (petRow.last_claim_at) {
+    stmts.push(env.DB.prepare("UPDATE user_storage SET last_claim_at = ? WHERE telegram_id = ?").bind(nowIso, targetId));
+  }
+  if (preChangeAccrued > 0) {
+    stmts.push(env.DB.prepare(
+      "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'storage_auto_collect', ?, 'coins')"
+    ).bind(targetId, preChangeAccrued));
+  }
+  await env.DB.batch(stmts);
+
+  return jsonResponse({ ok: true, mode: "updated", speed });
+}
+
+// ===================================================================== نقطة /api/admin/ambassador/revoke — سحب The Ambassador بالكامل. لو كانت منحاً معلّقاً لم يُستلَم بعد، يُحذَف المنح فقط (لا شيء آخر تغيَّر). لو كانت مُستلَمة فعلاً، تُصفَّى Storage بالسرعة القديمة أولاً، ثم تُخصَم سرعتها من total_speed ويُحذَف صفها من user_pets — يمكن منحها للمستخدم مجدداً لاحقاً من الصفر. =====================================================================
+async function handleAdminAmbassadorRevoke(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "invalid_body" }, 400);
+  }
+
+  const auth = await authenticateAdmin(request, env, body);
+  if (!auth.ok) return auth.response;
+
+  const targetId = parseInt(body.target_id, 10);
+  if (!Number.isInteger(targetId)) return jsonResponse({ error: "invalid_target_id" }, 400);
+
+  const pendingGrant = await env.DB.prepare("SELECT 1 FROM ambassador_grants WHERE telegram_id = ?").bind(targetId).first();
+  if (pendingGrant) {
+    await env.DB.prepare("DELETE FROM ambassador_grants WHERE telegram_id = ?").bind(targetId).run();
+    return jsonResponse({ ok: true, mode: "pending_removed" });
+  }
+
+  const petRow = await env.DB.prepare(
+    `SELECT p.current_speed, u.total_speed, s.capacity_hours, s.last_claim_at
+     FROM user_pets p
+     JOIN users u ON u.telegram_id = p.telegram_id
+     LEFT JOIN user_storage s ON s.telegram_id = p.telegram_id
+     WHERE p.telegram_id = ? AND p.pet_id = 'ambassador'`
+  ).bind(targetId).first();
+  if (!petRow) return jsonResponse({ error: "not_found" }, 404);
+
+  const capacitySeconds = (petRow.capacity_hours || STORAGE_DEFAULT_CAPACITY_HOURS) * 3600;
+  let preRevokeAccrued = 0;
+  if (petRow.last_claim_at) {
+    const elapsedSeconds = Math.max(0, (Date.now() - Date.parse(petRow.last_claim_at)) / 1000);
+    preRevokeAccrued = Math.min(elapsedSeconds, capacitySeconds) * ((petRow.total_speed || 0) / 3600);
+  }
+
+  const nowIso = new Date().toISOString();
+  const stmts = [
+    env.DB.prepare("DELETE FROM user_pets WHERE telegram_id = ? AND pet_id = 'ambassador'").bind(targetId),
+    env.DB.prepare("UPDATE users SET total_speed = total_speed - ?, coins = coins + ? WHERE telegram_id = ?").bind(petRow.current_speed, preRevokeAccrued, targetId)
+  ];
+  if (petRow.last_claim_at) {
+    stmts.push(env.DB.prepare("UPDATE user_storage SET last_claim_at = ? WHERE telegram_id = ?").bind(nowIso, targetId));
+  }
+  if (preRevokeAccrued > 0) {
+    stmts.push(env.DB.prepare(
+      "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'storage_auto_collect', ?, 'coins')"
+    ).bind(targetId, preRevokeAccrued));
+  }
+  await env.DB.batch(stmts);
+
+  return jsonResponse({ ok: true, mode: "removed" });
+}
+
 // ===================================================================== نقطة /api/leaderboard — Weekly Leaderboard (By Ads وBy Referrals معاً في استجابة واحدة، لا طلبان منفصلان). كاش عبر Cache API (caches.default — بلا أي حد قراءة/كتابة يومي، بعكس KV) بصلاحية محسوبة حتى 00:00 UTC القادمة. أول طلب فقط بعد انتهاء الصلاحية ينفّذ استعلامي D1 (بالـindex، أعلى 20 فقط بصرف النظر عن عدد المستخدمين الإجمالي)، وكل الطلبات بعده لنفس اليوم تُقرأ من الكاش مباشرة بلا أي لمس لـD1. شرط WHERE > 0 يمنع عرض/منح جوائز لمستخدمين بلا أي نشاط حقيقي هذا الأسبوع. =====================================================================
 async function handleLeaderboard(request, env) {
   const auth = await authenticateRequest(request, env);
@@ -2433,17 +2805,18 @@ async function handleTasksList(request, env) {
   const section = body.section === "special" ? "special" : "partner";
 
   const result = await env.DB.prepare(
-    `SELECT t.id, t.title, t.icon_url, t.reward_coins, t.link, t.channel_id,
+    `SELECT t.id, t.title, t.description, t.icon_url, t.reward_coins, t.link, t.channel_id,
             c.telegram_id AS claimed
      FROM admin_tasks t
      LEFT JOIN admin_task_claims c ON c.task_id = t.id AND c.telegram_id = ?
-     WHERE t.section = ? AND t.is_active = 1
+     WHERE t.section = ? AND t.is_active = 1 AND (t.max_claims IS NULL OR t.claims_count < t.max_claims)
      ORDER BY t.display_order ASC, t.id ASC`
   ).bind(telegramId, section).all();
 
   const tasks = (result.results || []).map((t) => ({
     id: t.id,
     title: t.title,
+    description: t.description || "",
     icon_url: t.icon_url,
     reward: t.reward_coins,
     link: t.link,
@@ -2469,7 +2842,7 @@ async function handleTasksClaim(request, env) {
 
   const taskId = Number(body.task_id);
   const task = await env.DB.prepare(
-    "SELECT id, reward_coins, channel_id FROM admin_tasks WHERE id = ? AND is_active = 1"
+    "SELECT id, reward_coins, channel_id, max_claims, claims_count FROM admin_tasks WHERE id = ? AND is_active = 1"
   ).bind(taskId).first();
   if (!task) {
     return jsonResponse({ error: "invalid_task" }, 400);
@@ -2488,6 +2861,19 @@ async function handleTasksClaim(request, env) {
 
   if (!insertResult.meta || insertResult.meta.changes === 0) {
     return jsonResponse({ error: "already_claimed" }, 409);
+  }
+
+  // شرط "claims_count < max_claims" ذرّي — يمنع تجاوز حد المهمة حتى مع طلبات متزامنة على آخر مقعد متاح. لو استُنفد الحد بين لحظة عرض المهمة للمستخدم واستلامه، نُلغي حجز الاستلام أعلاه (نفس أسلوب handlePromoRedeem بالضبط) ولا يُمنح أي عملة.
+  const counterResult = await env.DB.prepare(
+    `UPDATE admin_tasks SET claims_count = claims_count + 1
+     WHERE id = ? AND (max_claims IS NULL OR claims_count < max_claims)`
+  ).bind(taskId).run();
+
+  if (!counterResult.meta || counterResult.meta.changes === 0) {
+    await env.DB.prepare(
+      "DELETE FROM admin_task_claims WHERE telegram_id = ? AND task_id = ?"
+    ).bind(telegramId, taskId).run();
+    return jsonResponse({ error: "task_full" }, 400);
   }
 
   await env.DB.batch([
