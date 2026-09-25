@@ -1,6 +1,12 @@
 // URL of the deployed Mini App (same Worker serving the static assets)
 const WEBAPP_URL = "https://minerxrealm.zekobusiness0.workers.dev/";
 
+// إعدادات رسالة الترحيب (sendWelcomeMessage) — صورة + أزرار الدعم/السحوبات (رابط القناة نفسه موجود مسبقاً في NEWS_CHANNEL_URL أدناه).
+const WELCOME_PHOTO_URL = "https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/MinerX%20Welcome%20.webp";
+const PAYOUTS_CHANNEL_URL = "https://t.me/MinerXRealmWithdrawals";
+// استبدل هذا باليوزرنيم الحقيقي لحساب الدعم — بمجرد التغيير يعمل زر Support فوراً بلا أي تعديل آخر بالكود.
+const SUPPORT_USERNAME = "REPLACE_WITH_SUPPORT_USERNAME";
+
 // ===================================================================== إعدادات دورة "Start Mining" الأساسية (شخصية Doge — منفصلة تماماً عن حيوانات Realm والتخزين). كل القيم ثابتة هنا ولا تُقرأ أبداً من المتصفح. =====================================================================
 const MINING_CYCLE_SECONDS = 60 * 60; // 60 دقيقة لكل دورة
 const MINING_REWARD_COINS = 80;       // مكافأة كل دورة كاملة
@@ -2893,21 +2899,37 @@ async function sendMessage(env, chatId, payload) {
   return res.json().catch(() => null);
 }
 
+async function sendPhoto(env, chatId, payload) {
+  const res = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/sendPhoto`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: chatId, ...payload })
+  });
+  return res.json().catch(() => null);
+}
+
 // نفس رسالة /start بالضبط — تُستدعى أيضاً من handleGetUser عند إنشاء صف مستخدم جديد،
 // لأن فتح البوت عبر رابط Mini App المباشر (t.me/MinerXRealmBot/app) لا يُرسل /start
 // إطلاقاً (يفتح التطبيق مباشرة متجاوزاً محادثة البوت)، فهذه الطريقة الوحيدة لضمان
 // وصول رسالة الترحيب لأول فتح فعلي. فشل الإرسال هنا لا يجب أن يمنع إنشاء المستخدم أو
 // تحميل التطبيق أبداً — لذلك يُستدعى دائماً داخل try/catch من طرف المستدعي.
 async function sendWelcomeMessage(env, chatId) {
-  await sendMessage(env, chatId, {
-    text: "Welcome to MinerXRealm!\nStart mining now and earn coins for free.",
+  await sendPhoto(env, chatId, {
+    photo: WELCOME_PHOTO_URL,
+    caption: "Welcome to MinerXRealm!\nStart mining now and earn coins for free.",
     reply_markup: {
-      inline_keyboard: [[
-        {
-          text: "Open App",
-          web_app: { url: WEBAPP_URL }
-        }
-      ]]
+      inline_keyboard: [
+        [
+          { text: "Open App", web_app: { url: WEBAPP_URL } }
+        ],
+        [
+          { text: "📺 Channel", url: NEWS_CHANNEL_URL },
+          { text: "🎧 Support", url: `https://t.me/${SUPPORT_USERNAME}` }
+        ],
+        [
+          { text: "💰 Payouts", url: PAYOUTS_CHANNEL_URL }
+        ]
+      ]
     }
   });
 }
