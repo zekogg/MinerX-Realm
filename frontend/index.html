@@ -1131,6 +1131,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   border-radius:16px; padding:8.4px 14px;   /* أعلى/أسفل مصغّرة 40% (كانت 14px)، اليمين/اليسار كما هي */
   backdrop-filter:blur(var(--glass-blur));
   -webkit-backdrop-filter:blur(var(--glass-blur));
+  margin-top:14px;   /* .task-panel عنصر block بلا gap، فبدون هذا الهامش تلتصق البطاقة مباشرة بآخر مهمة حقيقية في الشبكة أعلاها بلا أي مسافة */
 }
 .add-task-card__icon{
   width:26px; height:26px; border-radius:8px; flex-shrink:0;   /* مصغّرة 40% (كانت 44px/14px) */
