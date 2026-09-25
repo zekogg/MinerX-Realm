@@ -1131,8 +1131,10 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   border-radius:16px; padding:8.4px 14px;   /* أعلى/أسفل مصغّرة 40% (كانت 14px)، اليمين/اليسار كما هي */
   backdrop-filter:blur(var(--glass-blur));
   -webkit-backdrop-filter:blur(var(--glass-blur));
-  margin-top:14px;   /* .task-panel عنصر block بلا gap، فبدون هذا الهامش تلتصق البطاقة مباشرة بآخر مهمة حقيقية في الشبكة أعلاها بلا أي مسافة */
 }
+/* .task-panel عنصر block بلا gap — Special: التلميح ثابت أولاً، فيحتاج مسافة أسفله عن المهام الحقيقية بعده. Partner: التلميح يظهر فقط عند الفراغ بعد المهام، فيحتاج مسافة أعلاه بدلاً من ذلك. */
+#special-tasks-empty{ margin-bottom:14px; }
+#partner-tasks-empty{ margin-top:14px; }
 .add-task-card__icon{
   width:26px; height:26px; border-radius:8px; flex-shrink:0;   /* مصغّرة 40% (كانت 44px/14px) */
   display:flex; align-items:center; justify-content:center;
@@ -3687,7 +3689,6 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 
       <!-- /////كود لوحة Special///// -->
       <div class="task-panel" id="task-panel-special">
-        <div class="ad-tasks-grid" id="special-tasks-list"></div>
         <div class="add-task-card" id="special-tasks-empty">
           <span class="add-task-card__icon">+</span>
           <div class="add-task-card__body">
@@ -3696,6 +3697,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
           </div>
           <svg class="add-task-card__link" viewBox="0 0 24 24" fill="none" stroke="#e3a542" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>
         </div>
+        <div class="ad-tasks-grid" id="special-tasks-list"></div>
       </div>
 
       <!-- /////كود لوحة Partner///// -->
