@@ -2893,12 +2893,13 @@ async function handleTasksList(request, env) {
 
   const section = body.section === "special" ? "special" : "partner";
 
+  // LEFT JOIN + شرط "c.telegram_id IS NULL" (Anti-Join) يستبعد أي مهمة استلمها هذا المستخدم بالفعل من النتائج تماماً — لا تظهر له إطلاقاً بعد استلامها (بدل إظهارها بزر "Done" معطَّل كما كان سابقاً).
   const result = await env.DB.prepare(
-    `SELECT t.id, t.title, t.description, t.icon_url, t.reward_coins, t.link, t.channel_id,
-            c.telegram_id AS claimed
+    `SELECT t.id, t.title, t.description, t.icon_url, t.reward_coins, t.link, t.channel_id
      FROM admin_tasks t
      LEFT JOIN admin_task_claims c ON c.task_id = t.id AND c.telegram_id = ?
      WHERE t.section = ? AND t.is_active = 1 AND (t.max_claims IS NULL OR t.claims_count < t.max_claims)
+       AND c.telegram_id IS NULL
      ORDER BY (t.pinned_at IS NULL) ASC, t.pinned_at ASC, t.display_order ASC, t.id ASC`
   ).bind(telegramId, section).all();
 
@@ -2909,8 +2910,7 @@ async function handleTasksList(request, env) {
     icon_url: t.icon_url,
     reward: t.reward_coins,
     link: t.link,
-    requires_membership: !!t.channel_id,
-    claimed: !!t.claimed
+    requires_membership: !!t.channel_id
   }));
 
   return jsonResponse({ tasks });

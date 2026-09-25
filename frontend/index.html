@@ -7973,7 +7973,6 @@ function renderAdminTasks(section){
     var iconHtml = t.icon_url
       ? '<img draggable="false" src="' + escapeHtmlClient(t.icon_url) + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">'
       : '<svg viewBox="0 0 24 24" fill="none" stroke="var(--c-ad-watch-1)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22 11 13 2 9 22 2Z"/></svg>';
-    var claimed = !!t.claimed;
     var descHtml = t.description
       ? '<div class="ad-task__desc" style="font-size:10px;color:var(--ink-dim);margin-top:2px;">' + escapeHtmlClient(t.description) + '</div>'
       : '';
@@ -7986,10 +7985,10 @@ function renderAdminTasks(section){
           '<div class="ad-task__meta">' +
             '<img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">' +
             '<span class="ad-task__reward">+' + Number(t.reward) + '</span>' +
-            '<span class="ad-task__avail">' + (claimed ? 'Claimed' : 'Available') + '</span>' +
+            '<span class="ad-task__avail">Available</span>' +
           '</div>' +
         '</div>' +
-        '<button class="ad-task__watch partner-task__btn' + (claimed ? ' is-claimed' : '') + (adminTasksReady[t.id] ? ' is-ready' : '') + '" ' +
+        '<button class="ad-task__watch partner-task__btn' + (adminTasksReady[t.id] ? ' is-ready' : '') + '" ' +
           'onclick="onAdminTaskClick(' + Number(t.id) + ', \'' + section + '\')">' + adminTaskButtonLabel(t) + '</button>' +
       '</div>'
     );
@@ -8000,7 +7999,6 @@ function renderAdminTasks(section){
 // عنه ولا يمنح المكافأة إلا بعد نجاح /api/tasks/claim الحقيقي بعد انتهائه): Done للمُستلَمة،
 // عدد الثواني المتبقية أثناء العدّاد، Claim بعد انتهائه، وGo قبل أول ضغطة.
 function adminTaskButtonLabel(t){
-  if (t.claimed) return 'Done';
   if (typeof adminTasksCountdown[t.id] === 'number') return String(adminTasksCountdown[t.id]);
   if (adminTasksReady[t.id]) return 'Claim';
   return 'Go';
@@ -8023,7 +8021,7 @@ function startAdminTaskCountdown(taskId, section){
 
 function onAdminTaskClick(taskId, section){
   var task = (adminTasksState[section] || []).find(function(t){ return t.id === taskId; });
-  if (!task || task.claimed || adminTasksBusy[taskId] || typeof adminTasksCountdown[taskId] === 'number') return;
+  if (!task || adminTasksBusy[taskId] || typeof adminTasksCountdown[taskId] === 'number') return;
 
   if (!adminTasksReady[taskId]){
     // أول ضغطة: تفتح الرابط فقط وتبدأ عدّاد 10 ثوانٍ — لا طلب استلام حقيقي إلا بعد الضغطة الثانية.
@@ -8062,7 +8060,12 @@ function onAdminTaskClick(taskId, section){
       }
       return;
     }
-    task.claimed = true;
+    // المهمة تختفي تماماً من قائمة هذا المستخدم فور استلامها (السيرفر نفسه لم يعد يُرجعها إطلاقاً في /api/tasks/list بعد الآن)، بدل إبقائها ظاهرة بزر "Done" معطَّل.
+    var list = adminTasksState[section] || [];
+    var idx = list.indexOf(task);
+    if (idx !== -1) list.splice(idx, 1);
+    delete adminTasksReady[taskId];
+    delete adminTasksCountdown[taskId];
     updateBalanceDisplay({ coins: r.data.coins, gram: CURRENT_GRAM_BALANCE });
     showAppToast({ title: 'Task Reward', icon: PRIZE_ICON_URLS.coins, amount: '+' + r.data.reward + ' Coins' });
     renderAdminTasks(section);
