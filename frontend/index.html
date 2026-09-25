@@ -7917,6 +7917,10 @@ function onCheckinClaimClick(task){
 /* Partner / Special: مهام ديناميكية تُدار من جدول admin_tasks بـD1 (يدوياً الآن، ولاحقاً من لوحة الأدمن) — كل بيانات المهمة (العنوان، المكافأة، الرابط، هل تتطلب تحقق عضوية قناة) تأتي من السيرفر فقط، والاستلام نفسه محمي عبر admin_task_claims (INSERT OR IGNORE كـCAS) في handleTasksClaim. */
 var adminTasksState = { special: [], partner: [] };
 var adminTasksBusy = {};
+var adminTasksReady = {};       // taskId -> جاهزة للاستلام (انتهى العدّاد)
+var adminTasksCountdown = {};   // taskId -> الثواني المتبقية (undefined = لا عدّاد جارٍ)
+var adminTasksCountdownTimers = {};
+var ADMIN_TASK_COUNTDOWN_SECONDS = 10;
 
 function fetchAdminTasks(section){
   var initData = getTelegramInitData();
@@ -7976,24 +7980,54 @@ function renderAdminTasks(section){
             '<span class="ad-task__avail">' + (claimed ? 'Claimed' : 'Available') + '</span>' +
           '</div>' +
         '</div>' +
-        '<button class="ad-task__watch partner-task__btn' + (claimed ? ' is-claimed' : '') + '" ' +
-          'onclick="onAdminTaskClick(' + Number(t.id) + ', \'' + section + '\')">' + (claimed ? 'Done' : 'Go') + '</button>' +
+        '<button class="ad-task__watch partner-task__btn' + (claimed ? ' is-claimed' : '') + (adminTasksReady[t.id] ? ' is-ready' : '') + '" ' +
+          'onclick="onAdminTaskClick(' + Number(t.id) + ', \'' + section + '\')">' + adminTaskButtonLabel(t) + '</button>' +
       '</div>'
     );
   }).join('');
 }
 
+// نص الزر يعتمد على حالة العدّاد المحلي (client-side فقط، تجميلي بحت — السيرفر لا يعرف
+// عنه ولا يمنح المكافأة إلا بعد نجاح /api/tasks/claim الحقيقي بعد انتهائه): Done للمُستلَمة،
+// عدد الثواني المتبقية أثناء العدّاد، Claim بعد انتهائه، وGo قبل أول ضغطة.
+function adminTaskButtonLabel(t){
+  if (t.claimed) return 'Done';
+  if (typeof adminTasksCountdown[t.id] === 'number') return String(adminTasksCountdown[t.id]);
+  if (adminTasksReady[t.id]) return 'Claim';
+  return 'Go';
+}
+
+function startAdminTaskCountdown(taskId, section){
+  clearInterval(adminTasksCountdownTimers[taskId]);
+  adminTasksCountdown[taskId] = ADMIN_TASK_COUNTDOWN_SECONDS;
+  renderAdminTasks(section);
+  adminTasksCountdownTimers[taskId] = setInterval(function(){
+    adminTasksCountdown[taskId]--;
+    if (adminTasksCountdown[taskId] <= 0){
+      clearInterval(adminTasksCountdownTimers[taskId]);
+      delete adminTasksCountdown[taskId];
+      adminTasksReady[taskId] = true;
+    }
+    renderAdminTasks(section);
+  }, 1000);
+}
+
 function onAdminTaskClick(taskId, section){
   var task = (adminTasksState[section] || []).find(function(t){ return t.id === taskId; });
-  if (!task || task.claimed || adminTasksBusy[taskId]) return;
+  if (!task || task.claimed || adminTasksBusy[taskId] || typeof adminTasksCountdown[taskId] === 'number') return;
 
-  var tg = window.Telegram && window.Telegram.WebApp;
-  if (task.link){
-    if (tg && tg.openTelegramLink && task.link.indexOf('t.me') !== -1){
-      tg.openTelegramLink(task.link);
-    } else {
-      window.open(task.link, '_blank');
+  if (!adminTasksReady[taskId]){
+    // أول ضغطة: تفتح الرابط فقط وتبدأ عدّاد 10 ثوانٍ — لا طلب استلام حقيقي إلا بعد الضغطة الثانية.
+    var tg = window.Telegram && window.Telegram.WebApp;
+    if (task.link){
+      if (tg && tg.openTelegramLink && task.link.indexOf('t.me') !== -1){
+        tg.openTelegramLink(task.link);
+      } else {
+        window.open(task.link, '_blank');
+      }
     }
+    startAdminTaskCountdown(taskId, section);
+    return;
   }
 
   var initData = getTelegramInitData();
