@@ -1289,6 +1289,18 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 }
 .friends-empty-note{ text-align:center; font-size:10.5px; color:var(--ink-faint); font-weight:600; margin:6px 0 14px; }
 
+/* -- أسهم التنقل بين صفحات Friends List (10 لكل صفحة) — تصميم زجاجي (Glassmorphism) -- */
+.friends-list-nav{ display:flex; justify-content:center; align-items:center; gap:16px; margin:10px 0; }
+.friends-list-nav__btn{
+  width:34px; height:34px; border-radius:50%; flex-shrink:0;
+  background:rgba(255,255,255,.08);
+  backdrop-filter:blur(var(--glass-blur)); -webkit-backdrop-filter:blur(var(--glass-blur));
+  border:1px solid rgba(255,255,255,.2);
+  color:var(--ink); font-size:16px; font-weight:700;
+  display:flex; align-items:center; justify-content:center; cursor:pointer;
+}
+.friends-list-nav__btn:disabled{ opacity:.3; cursor:default; }
+
 /* /////كود قسم Reward Tiers (صفحة Friends)///// */
 .reward-tiers{ margin:18px 0; }
 .reward-tiers__title{
@@ -3842,6 +3854,10 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
       <div class="friends-list-title">Friends List</div>
 
       <div id="friends-list-container"></div>
+      <div class="friends-list-nav" id="friends-list-nav" style="display:none;">
+        <button class="friends-list-nav__btn" id="friends-list-prev" onclick="friendsListGoPage(-1)" disabled>‹</button>
+        <button class="friends-list-nav__btn" id="friends-list-next" onclick="friendsListGoPage(1)">›</button>
+      </div>
       <button class="friends-show-list-btn" id="btn-show-friends-list" onclick="onShowFriendsListClick()">Show The List</button>
     </section>
 
@@ -8501,7 +8517,9 @@ function adminAmbassadorRevoke(){
 
 /* Friends: كل الأرقام (دعوات، نشطون، أرباح معلّقة، عتبات الإنجازات) تأتي فقط من /api/user — لا حساب أو تخمين من طرف المتصفح. الأرباح المعلّقة (تسجيل +20 + نشاط +130 + عمولة إيداع 5%) لا تُضاف لـCoins إلا بالضغط على Claim (بحد أدنى 5000)، ومكافآت الإنجازات تُضاف مباشرة عند تحقّق الشرط دون المرور عبر الرصيد المعلّق. */
 var friendsState = { invites: 0, active: 0, pendingEarnings: 0, minClaim: 5000, milestones: [], claimBusy: false };
-var friendsListLoaded = false;
+// صفحة واحدة (10) لكل طلب — pages تُخزِّن كل صفحة سبق جلبها فعلاً (بمفتاح رقم الصفحة) حتى لا
+// يُعاد جلبها من السيرفر عند الرجوع للخلف بالسهم. hasMore يأتي من السيرفر نفسه (has_more).
+var friendsListState = { loaded: false, page: 0, pages: {}, hasMore: false, busy: false };
 
 // نفس منطق formatCoinsK لكن بدون فراغ قبل الوحدة (K/M) — مطلوب لعرض أرباح الإحالة بصيغة "1K"/"1.1K" تحديداً.
 function formatFriendsAmount(value){
@@ -8684,27 +8702,73 @@ function onClaimMilestoneClick(tier){
 }
 
 function onShowFriendsListClick(){
-  if (friendsListLoaded) return;
-  var initData = getTelegramInitData();
-  if (!initData) return;
-
+  if (friendsListState.loaded) return;
   var btn = document.getElementById('btn-show-friends-list');
   if (btn) btn.textContent = 'Loading...';
+
+  fetchFriendsListPage(0, function(ok){
+    if (!ok){ if (btn) btn.textContent = 'Show The List'; return; }
+    friendsListState.loaded = true;
+    if (btn) btn.remove();
+  });
+}
+
+// يجلب صفحة واحدة (10 أصدقاء) من السيرفر فقط إن لم تكن مُخزَّنة مسبقاً في friendsListState.pages —
+// الرجوع لصفحة زارها المستخدم من قبل (بالسهم يسار) يُعرَض مباشرة من الذاكرة بلا أي طلب جديد.
+function fetchFriendsListPage(page, callback){
+  if (friendsListState.pages[page]){
+    friendsListState.page = page;
+    renderFriendsList();
+    if (callback) callback(true);
+    return;
+  }
+
+  var initData = getTelegramInitData();
+  if (!initData){ if (callback) callback(false); return; }
+
+  friendsListState.busy = true;
+  updateFriendsListNav();
 
   fetch('/api/friends/list', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData: initData })
+    body: JSON.stringify({ initData: initData, page: page })
   })
   .then(function(res){ return res.json(); })
   .then(function(data){
-    friendsListLoaded = true;
-    renderFriendsList(data.friends || []);
-    if (btn) btn.remove();
+    friendsListState.busy = false;
+    friendsListState.pages[page] = data.friends || [];
+    friendsListState.hasMore = !!data.has_more;
+    friendsListState.page = page;
+    renderFriendsList();
+    if (callback) callback(true);
   })
   .catch(function(){
-    if (btn) btn.textContent = 'Show The List';
+    friendsListState.busy = false;
+    updateFriendsListNav();
+    if (callback) callback(false);
   });
+}
+
+function friendsListGoPage(delta){
+  if (friendsListState.busy) return;
+  var target = friendsListState.page + delta;
+  if (target < 0) return;
+  if (delta > 0 && !friendsListState.hasMore) return;
+  fetchFriendsListPage(target);
+}
+
+function updateFriendsListNav(){
+  var nav = document.getElementById('friends-list-nav');
+  var prevBtn = document.getElementById('friends-list-prev');
+  var nextBtn = document.getElementById('friends-list-next');
+  if (!nav) return;
+
+  // الأسهم لا تظهر إطلاقاً إلا لو تجاوز عدد الأصدقاء 10 (صفحة أولى ممتلئة + وجود صفحة تالية، أو المستخدم تجاوز الصفحة الأولى أصلاً).
+  var show = friendsListState.page > 0 || friendsListState.hasMore;
+  nav.style.display = show ? '' : 'none';
+  if (prevBtn) prevBtn.disabled = friendsListState.busy || friendsListState.page === 0;
+  if (nextBtn) nextBtn.disabled = friendsListState.busy || !friendsListState.hasMore;
 }
 
 // اسم المستخدم (username) قد يحتوي أي نص يختاره المستخدم نفسه — يجب تهريبه قبل إدراجه في innerHTML لمنع حقن HTML/script عبر اسم مزيّف.
@@ -8714,9 +8778,12 @@ function escapeHtmlClient(text){
   return div.innerHTML;
 }
 
-function renderFriendsList(friends){
+function renderFriendsList(){
   var container = document.getElementById('friends-list-container');
   if (!container) return;
+
+  var friends = friendsListState.pages[friendsListState.page] || [];
+  updateFriendsListNav();
 
   if (friends.length === 0){
     container.innerHTML = '<div class="friends-empty-note">No friends invited yet</div>';

@@ -2756,29 +2756,42 @@ async function handleFriendsMilestones(request, env) {
   return jsonResponse({ milestones });
 }
 
-// ===================================================================== نقطة /api/friends/list — تُستدعى فقط عند ضغط المستخدم على "Show The List" (وليس مع كل /api/user) لتفادي أي كلفة إضافية على أكثر نقطة استدعاءً بالتطبيق. LIMIT 100 يحدّ من كلفة القراءة حتى لمُحيل ضخم جداً. =====================================================================
+// ===================================================================== نقطة /api/friends/list — تُستدعى فقط عند ضغط المستخدم على "Show The List" (وليس مع كل /api/user) لتفادي أي كلفة إضافية على أكثر نقطة استدعاءً بالتطبيق. مُقسَّمة لصفحات (10 لكل طلب، body.page) بدل جلب كل الأصدقاء دفعة واحدة — أغلب المستخدمين لن يتصفّحوا أبعد من الصفحة الأولى، فهذا يوفّر rows_read لهم، مقابل طلب Worker إضافي واحد فقط لكل صفحة يطلبها فعلاً من تجاوز 10 أصدقاء. =====================================================================
 async function handleFriendsList(request, env) {
-  const auth = await authenticateRequest(request, env);
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "invalid_body" }, 400);
+  }
+
+  const auth = await authenticateRequest(request, env, body);
   if (!auth.ok) return auth.response;
   const { telegramId } = auth;
+
+  // صفحة واحدة (10 أصدقاء) لكل طلب — لا حاجة لجلب كل الأصدقاء دفعة واحدة لمن لن يتصفّح أبعد من الصفحة الأولى. الأصدقاء النشطون يظهرون أولاً دائماً عبر كل الصفحات (ترتيب واحد مستمر عبر LIMIT/OFFSET، وليس ترتيباً منفصلاً داخل كل صفحة). نجلب 11 بدل 10 فقط لنعرف هل توجد صفحة تالية (has_more) دون إرسال طلب إضافي فارغ عند آخر صفحة.
+  const page = Math.max(0, parseInt(body.page, 10) || 0);
+  const offset = page * 10;
 
   const result = await env.DB.prepare(
     `SELECT u.telegram_id, u.username, u.ads_task_total, r.earned_coins, r.is_active
      FROM referrals r
      JOIN users u ON u.telegram_id = r.referred_id
      WHERE r.referrer_id = ?
-     ORDER BY r.invited_at DESC
-     LIMIT 100`
-  ).bind(telegramId).all();
+     ORDER BY r.is_active DESC, r.invited_at DESC
+     LIMIT 11 OFFSET ?`
+  ).bind(telegramId, offset).all();
 
-  const friends = (result.results || []).map((r) => ({
+  const rows = result.results || [];
+  const hasMore = rows.length > 10;
+  const friends = rows.slice(0, 10).map((r) => ({
     name: r.username || ("User " + r.telegram_id),
     ads_watched: r.ads_task_total || 0,
     earned_coins: r.earned_coins || 0,
     active: !!r.is_active
   }));
 
-  return jsonResponse({ friends });
+  return jsonResponse({ friends, has_more: hasMore });
 }
 
 // يهرّب أي نص قبل إرساله كمعامل URL لطلب Telegram API — يمنع أي حقن أو كسر تنسيق الرابط.
