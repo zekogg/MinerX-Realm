@@ -3778,6 +3778,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         </div>
 
         <div class="milestone-title">Milestone Missions</div>
+        <div id="milestone-missions-list" style="display:none;">
         <div class="milestone-mission">
           <div class="milestone-mission__head">
             <span class="milestone-mission__title">Invite 10 Active Friends</span>
@@ -3834,6 +3835,8 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
             <button class="milestone-mission__claim" id="milestone-claim-100" onclick="onClaimMilestoneClick(100)">Claim</button>
           </div>
         </div>
+        </div>
+        <button class="friends-show-list-btn" id="btn-show-milestones" onclick="onShowMilestonesClick()">Show Missions</button>
       </div>
 
       <div class="friends-list-title">Friends List</div>
@@ -6268,7 +6271,6 @@ fetchUserData();
       var active = btn.getAttribute('data-page') === pageId;
       btn.classList.toggle('is-active', active);
     });
-    if (pageId === 'page-friends' && typeof fetchFriendsMilestones === 'function') fetchFriendsMilestones();
     if (pageId === 'page-realm' && typeof fetchRealmStatus === 'function') fetchRealmStatus();
   }
 
@@ -8512,14 +8514,17 @@ function applyFriendsState(data){
   renderFriendsStats();
 }
 
-// milestone_missions بيانات ثابتة لا تعتمد على المستخدم — تُجلَب فقط عند أول
-// فتح فعلي لصفحة Friends (وليس مع كل /api/user)، مرة واحدة لكل جلسة.
+// milestone_missions بيانات ثابتة لا تعتمد على المستخدم — نفس أسلوب Friends List/Wallet History
+// بالضبط: لا يُرسَل أي طلب ولا يُقرَأ D1 إطلاقاً إلا بعد ضغطة صريحة على "Show Missions" (مرة
+// واحدة فقط لكل جلسة — الزر يُحذَف بعد أول تحميل ناجح).
 var friendsMilestonesFetched = false;
-function fetchFriendsMilestones(){
+function onShowMilestonesClick(){
   if (friendsMilestonesFetched) return;
   var initData = getTelegramInitData();
   if (!initData) return;
-  friendsMilestonesFetched = true;
+
+  var btn = document.getElementById('btn-show-milestones');
+  if (btn) btn.textContent = 'Loading...';
 
   fetch('/api/friends/milestones', {
     method: 'POST',
@@ -8529,12 +8534,16 @@ function fetchFriendsMilestones(){
   .then(function(res){ return res.json(); })
   .then(function(data){
     if (!data.milestones) return;
+    friendsMilestonesFetched = true;
     friendsState.milestones = data.milestones;
     renderMilestones();
+    var list = document.getElementById('milestone-missions-list');
+    if (list) list.style.display = '';
+    if (btn) btn.remove();
   })
   .catch(function(err){
     console.error('fetch friends milestones failed:', err);
-    friendsMilestonesFetched = false; // اسمح بإعادة المحاولة عند فتح الصفحة مجدداً
+    if (btn) btn.textContent = 'Show Missions'; // اسمح بإعادة المحاولة
   });
 }
 
