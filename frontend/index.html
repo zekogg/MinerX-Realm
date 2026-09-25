@@ -4393,6 +4393,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         <label class="ap-label" style="margin-top:10px;">Usage Limit (blank = unlimited)</label>
         <input class="ap-input" id="ap-promo-maxuses" inputmode="numeric" placeholder="e.g. 500">
         <button class="ap-btn" style="width:100%;margin-top:12px;box-sizing:border-box;" onclick="adminCreatePromo()">Create</button>
+        <div id="ap-promo-list" style="margin-top:14px;"></div>
       </div>
 
       <!-- القسم 4: The Ambassador -->
@@ -4406,6 +4407,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
           <button class="ap-btn" style="flex:1;" onclick="adminAmbassadorGrant()">Grant / Update Speed</button>
           <button class="ap-btn-outline" style="flex:1;" onclick="adminAmbassadorRevoke()">Revoke</button>
         </div>
+        <div id="ap-amb-list" style="margin-top:14px;"></div>
       </div>
 
     </div>
@@ -8075,7 +8077,9 @@ var adminPanelState = {
   taskIconDataUrl: null,
   taskFormSection: 'special',
   taskChannelId: null,
-  foundUser: null
+  foundUser: null,
+  promoListFetched: false,
+  ambListFetched: false
 };
 
 function adminApiPost(path, extraBody, onSuccess, onError){
@@ -8101,6 +8105,14 @@ function openAdminPanel(){
   if (!adminPanelState.tasksFetched.special){
     adminPanelState.tasksFetched.special = true;
     adminFetchTasks('special');
+  }
+  if (!adminPanelState.promoListFetched){
+    adminPanelState.promoListFetched = true;
+    adminFetchPromoList();
+  }
+  if (!adminPanelState.ambListFetched){
+    adminPanelState.ambListFetched = true;
+    adminFetchAmbassadorList();
   }
 }
 
@@ -8315,6 +8327,32 @@ function adminSaveTask(){
 }
 
 /* -- القسم 3: Promo Code -- */
+function adminFetchPromoList(){
+  adminApiPost('/api/admin/promo/list', {}, function(data){
+    renderAdminPromoList(data.codes || []);
+  });
+}
+
+function renderAdminPromoList(codes){
+  var list = document.getElementById('ap-promo-list');
+  if (!list) return;
+  if (!codes.length){
+    list.innerHTML = '<div style="font-size:11px;color:var(--ink-dim);text-align:center;padding:10px 0;">No promo codes yet</div>';
+    return;
+  }
+  list.innerHTML = codes.map(function(c){
+    var usesText = c.max_uses ? (c.uses_count + '/' + c.max_uses + ' uses') : (c.uses_count + ' uses');
+    return (
+      '<div class="ap-task-row">' +
+        '<div style="flex:1;min-width:0;">' +
+          '<div style="font-size:12px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtmlClient(c.code) + '</div>' +
+          '<div style="font-size:10px;color:var(--ink-dim);">+' + Number(c.reward) + ' ' + (c.currency === 'gram' ? 'Gram' : 'Coins') + ' · ' + usesText + '</div>' +
+        '</div>' +
+      '</div>'
+    );
+  }).join('');
+}
+
 function adminCreatePromo(){
   var code = document.getElementById('ap-promo-code').value.trim();
   var reward = Number(document.getElementById('ap-promo-reward').value);
@@ -8331,12 +8369,46 @@ function adminCreatePromo(){
     document.getElementById('ap-promo-code').value = '';
     document.getElementById('ap-promo-reward').value = '';
     document.getElementById('ap-promo-maxuses').value = '';
+    adminFetchPromoList();
   }, function(err){
     adminToast(err.error === 'code_exists' ? 'Code already exists' : 'Failed to create code');
   });
 }
 
 /* -- القسم 4: The Ambassador -- */
+function adminFetchAmbassadorList(){
+  adminApiPost('/api/admin/ambassador/list', {}, function(data){
+    renderAdminAmbassadorList(data.ambassadors || []);
+  });
+}
+
+function renderAdminAmbassadorList(ambassadors){
+  var list = document.getElementById('ap-amb-list');
+  if (!list) return;
+  if (!ambassadors.length){
+    list.innerHTML = '<div style="font-size:11px;color:var(--ink-dim);text-align:center;padding:10px 0;">No ambassadors yet</div>';
+    return;
+  }
+  list.innerHTML = ambassadors.map(function(a){
+    var name = a.username ? ('@' + a.username) : ('Player ' + a.telegram_id);
+    var statusText = a.status === 'pending' ? 'Pending claim' : 'Claimed';
+    return (
+      '<div class="ap-task-row" style="cursor:pointer;" onclick="adminFillAmbassadorFields(' + Number(a.telegram_id) + ', ' + Number(a.speed) + ')">' +
+        '<div style="flex:1;min-width:0;">' +
+          '<div style="font-size:12px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtmlClient(name) + '</div>' +
+          '<div style="font-size:10px;color:var(--ink-dim);">ID: ' + Number(a.telegram_id) + ' · +' + Number(a.speed) + ' Coins/hr · ' + statusText + '</div>' +
+        '</div>' +
+      '</div>'
+    );
+  }).join('');
+}
+
+// الضغط على أي صف في القائمة يملأ حقلي Telegram ID/Speed أعلاه مباشرة — تسهيلاً لتحديث السرعة أو السحب بدون كتابة المعرّف يدوياً.
+function adminFillAmbassadorFields(telegramId, speed){
+  document.getElementById('ap-amb-id').value = telegramId;
+  document.getElementById('ap-amb-speed').value = speed;
+}
+
 function adminAmbassadorGrant(){
   var id = parseInt(document.getElementById('ap-amb-id').value, 10);
   var speed = parseInt(document.getElementById('ap-amb-speed').value, 10);
@@ -8344,6 +8416,7 @@ function adminAmbassadorGrant(){
 
   adminApiPost('/api/admin/ambassador/grant', { target_id: id, speed: speed }, function(data){
     adminToast(data.mode === 'pending' ? 'Grant pending — user can claim it now' : 'Ambassador speed updated');
+    adminFetchAmbassadorList();
   }, function(err){
     adminToast(err.error === 'user_not_found' ? 'User not found' : 'Failed to grant');
   });
@@ -8356,6 +8429,7 @@ function adminAmbassadorRevoke(){
 
   adminApiPost('/api/admin/ambassador/revoke', { target_id: id }, function(){
     adminToast('Ambassador revoked');
+    adminFetchAmbassadorList();
   }, function(err){
     adminToast(err.error === 'not_found' ? 'Nothing to revoke for this user' : 'Failed to revoke');
   });
