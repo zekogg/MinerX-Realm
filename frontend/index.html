@@ -3778,6 +3778,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         </div>
 
         <div class="milestone-title">Milestone Missions</div>
+        <div id="milestone-missions-list" style="display:none;">
         <div class="milestone-mission">
           <div class="milestone-mission__head">
             <span class="milestone-mission__title">Invite 10 Active Friends</span>
@@ -3834,6 +3835,8 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
             <button class="milestone-mission__claim" id="milestone-claim-100" onclick="onClaimMilestoneClick(100)">Claim</button>
           </div>
         </div>
+        </div>
+        <button class="friends-show-list-btn" id="btn-show-milestones" onclick="onShowMilestonesClick()">Show Missions</button>
       </div>
 
       <div class="friends-list-title">Friends List</div>
@@ -4363,12 +4366,15 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
       <!-- القسم 2: Tasks (Special / Partner) -->
       <div class="ap-card">
         <h2 class="ap-title">🗂 Tasks — Special / Partner</h2>
-        <div class="ap-row">
-          <div class="ap-tab ap-task-tab is-active" data-section="special" onclick="adminSwitchTaskTab('special')">Special</div>
-          <div class="ap-tab ap-task-tab" data-section="partner" onclick="adminSwitchTaskTab('partner')">Partner</div>
-        </div>
         <button class="ap-btn" style="width:100%;margin-top:12px;box-sizing:border-box;" onclick="adminOpenTaskModal(null)">+ Add A Task</button>
-        <div id="ap-tasks-list" style="margin-top:12px;"></div>
+        <button class="ap-btn-outline" id="ap-tasks-history-btn" style="width:100%;margin-top:8px;box-sizing:border-box;" onclick="adminToggleTasksList()">Show Tasks</button>
+        <div id="ap-tasks-section" style="display:none;margin-top:14px;">
+          <div class="ap-row">
+            <div class="ap-tab ap-task-tab is-active" data-section="special" onclick="adminSwitchTaskTab('special')">Special</div>
+            <div class="ap-tab ap-task-tab" data-section="partner" onclick="adminSwitchTaskTab('partner')">Partner</div>
+          </div>
+          <div id="ap-tasks-list" style="margin-top:12px;"></div>
+        </div>
       </div>
 
       <!-- القسم 3: Promo Code -->
@@ -4850,7 +4856,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 
       <button class="modal-cta" id="withdraw-cta" onclick="submitWithdrawRequest()" disabled>Withdraw</button>
       <div class="modal-footnote">
-        Fee: <b id="withdraw-fee-label">0.02</b> Gram<br>
+        Fee: <b id="withdraw-fee-label">5%</b><br>
         Withdrawals usually take several minutes, but sometimes up to 24 hours.
       </div>
       <div class="modal-notice">
@@ -5089,8 +5095,8 @@ function updateBalanceDisplay(u){
   if (typeof u.withdraw_min_gram === 'number'){
     WITHDRAW_MIN_GRAM = u.withdraw_min_gram;
   }
-  if (typeof u.withdraw_fee_gram === 'number'){
-    WITHDRAW_FLAT_FEE = u.withdraw_fee_gram;
+  if (typeof u.withdraw_fee_rate === 'number'){
+    WITHDRAW_FEE_RATE = u.withdraw_fee_rate;
   }
   if ('next_withdraw_allowed_at' in u){
     NEXT_WITHDRAW_ALLOWED_AT = u.next_withdraw_allowed_at;
@@ -6268,7 +6274,6 @@ fetchUserData();
       var active = btn.getAttribute('data-page') === pageId;
       btn.classList.toggle('is-active', active);
     });
-    if (pageId === 'page-friends' && typeof fetchFriendsMilestones === 'function') fetchFriendsMilestones();
     if (pageId === 'page-realm' && typeof fetchRealmStatus === 'function') fetchRealmStatus();
   }
 
@@ -7968,7 +7973,6 @@ function renderAdminTasks(section){
     var iconHtml = t.icon_url
       ? '<img draggable="false" src="' + escapeHtmlClient(t.icon_url) + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">'
       : '<svg viewBox="0 0 24 24" fill="none" stroke="var(--c-ad-watch-1)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22 11 13 2 9 22 2Z"/></svg>';
-    var claimed = !!t.claimed;
     var descHtml = t.description
       ? '<div class="ad-task__desc" style="font-size:10px;color:var(--ink-dim);margin-top:2px;">' + escapeHtmlClient(t.description) + '</div>'
       : '';
@@ -7981,10 +7985,10 @@ function renderAdminTasks(section){
           '<div class="ad-task__meta">' +
             '<img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">' +
             '<span class="ad-task__reward">+' + Number(t.reward) + '</span>' +
-            '<span class="ad-task__avail">' + (claimed ? 'Claimed' : 'Available') + '</span>' +
+            '<span class="ad-task__avail">Available</span>' +
           '</div>' +
         '</div>' +
-        '<button class="ad-task__watch partner-task__btn' + (claimed ? ' is-claimed' : '') + (adminTasksReady[t.id] ? ' is-ready' : '') + '" ' +
+        '<button class="ad-task__watch partner-task__btn' + (adminTasksReady[t.id] ? ' is-ready' : '') + '" ' +
           'onclick="onAdminTaskClick(' + Number(t.id) + ', \'' + section + '\')">' + adminTaskButtonLabel(t) + '</button>' +
       '</div>'
     );
@@ -7995,7 +7999,6 @@ function renderAdminTasks(section){
 // عنه ولا يمنح المكافأة إلا بعد نجاح /api/tasks/claim الحقيقي بعد انتهائه): Done للمُستلَمة،
 // عدد الثواني المتبقية أثناء العدّاد، Claim بعد انتهائه، وGo قبل أول ضغطة.
 function adminTaskButtonLabel(t){
-  if (t.claimed) return 'Done';
   if (typeof adminTasksCountdown[t.id] === 'number') return String(adminTasksCountdown[t.id]);
   if (adminTasksReady[t.id]) return 'Claim';
   return 'Go';
@@ -8018,7 +8021,7 @@ function startAdminTaskCountdown(taskId, section){
 
 function onAdminTaskClick(taskId, section){
   var task = (adminTasksState[section] || []).find(function(t){ return t.id === taskId; });
-  if (!task || task.claimed || adminTasksBusy[taskId] || typeof adminTasksCountdown[taskId] === 'number') return;
+  if (!task || adminTasksBusy[taskId] || typeof adminTasksCountdown[taskId] === 'number') return;
 
   if (!adminTasksReady[taskId]){
     // أول ضغطة: تفتح الرابط فقط وتبدأ عدّاد 10 ثوانٍ — لا طلب استلام حقيقي إلا بعد الضغطة الثانية.
@@ -8057,7 +8060,12 @@ function onAdminTaskClick(taskId, section){
       }
       return;
     }
-    task.claimed = true;
+    // المهمة تختفي تماماً من قائمة هذا المستخدم فور استلامها (السيرفر نفسه لم يعد يُرجعها إطلاقاً في /api/tasks/list بعد الآن)، بدل إبقائها ظاهرة بزر "Done" معطَّل.
+    var list = adminTasksState[section] || [];
+    var idx = list.indexOf(task);
+    if (idx !== -1) list.splice(idx, 1);
+    delete adminTasksReady[taskId];
+    delete adminTasksCountdown[taskId];
     updateBalanceDisplay({ coins: r.data.coins, gram: CURRENT_GRAM_BALANCE });
     showAppToast({ title: 'Task Reward', icon: PRIZE_ICON_URLS.coins, amount: '+' + r.data.reward + ' Coins' });
     renderAdminTasks(section);
@@ -8073,6 +8081,7 @@ var adminPanelState = {
   currentTaskTab: 'special',
   tasks: { special: [], partner: [] },
   tasksFetched: { special: false, partner: false },
+  tasksListShown: false,
   editingTaskId: null,
   taskIconDataUrl: null,
   taskFormSection: 'special',
@@ -8102,11 +8111,9 @@ function adminToast(message){
 
 function openAdminPanel(){
   openModal('modal-admin');
-  if (!adminPanelState.tasksFetched.special){
-    adminPanelState.tasksFetched.special = true;
-    adminFetchTasks('special');
-  }
-  // قوائم Promo/Ambassador لا تُجلَب تلقائياً عند فتح اللوحة — فقط عند الضغط على "Show History" صراحة (انظر adminTogglePromoHistory/adminToggleAmbassadorHistory)، توفيراً لطلب Worker واستعلام D1 غير ضروريين في كل مرة تُفتح فيها اللوحة.
+  // لا جلب تلقائي لأي قائمة عند فتح اللوحة (Tasks/Promo/Ambassador) — فقط عند الضغط صراحة
+  // على "Show Tasks"/"Show History" (انظر adminToggleTasksList/adminTogglePromoHistory/
+  // adminToggleAmbassadorHistory)، توفيراً لطلب Worker واستعلام D1 غير ضروريين في كل مرة تُفتح فيها اللوحة.
 }
 
 /* -- القسم 1: Find User -- */
@@ -8148,6 +8155,28 @@ function adminSaveBalance(){
 }
 
 /* -- القسم 2: Tasks -- */
+function adminToggleTasksList(){
+  var section = document.getElementById('ap-tasks-section');
+  var btn = document.getElementById('ap-tasks-history-btn');
+  if (!section) return;
+
+  var showing = section.style.display !== 'none';
+  if (showing){
+    section.style.display = 'none';
+    adminPanelState.tasksListShown = false;
+    if (btn) btn.textContent = 'Show Tasks';
+    return;
+  }
+
+  section.style.display = '';
+  adminPanelState.tasksListShown = true;
+  if (btn) btn.textContent = 'Hide Tasks';
+  if (!adminPanelState.tasksFetched[adminPanelState.currentTaskTab]){
+    adminPanelState.tasksFetched[adminPanelState.currentTaskTab] = true;
+    adminFetchTasks(adminPanelState.currentTaskTab);
+  }
+}
+
 function adminSwitchTaskTab(section){
   adminPanelState.currentTaskTab = section;
   document.querySelectorAll('.ap-task-tab').forEach(function(t){
@@ -8312,8 +8341,10 @@ function adminSaveTask(){
     // نُلغي الجلبَين معاً (وليس فقط التبويب الحالي) لأن حفظ التعديل قد يكون نقل المهمة إلى القسم الآخر.
     adminPanelState.tasksFetched.special = false;
     adminPanelState.tasksFetched.partner = false;
-    adminPanelState.tasksFetched[adminPanelState.currentTaskTab] = true;
-    adminFetchTasks(adminPanelState.currentTaskTab);
+    if (adminPanelState.tasksListShown){
+      adminPanelState.tasksFetched[adminPanelState.currentTaskTab] = true;
+      adminFetchTasks(adminPanelState.currentTaskTab);
+    }
   }, function(){
     adminToast('Failed to save task');
   });
@@ -8512,14 +8543,17 @@ function applyFriendsState(data){
   renderFriendsStats();
 }
 
-// milestone_missions بيانات ثابتة لا تعتمد على المستخدم — تُجلَب فقط عند أول
-// فتح فعلي لصفحة Friends (وليس مع كل /api/user)، مرة واحدة لكل جلسة.
+// milestone_missions بيانات ثابتة لا تعتمد على المستخدم — نفس أسلوب Friends List/Wallet History
+// بالضبط: لا يُرسَل أي طلب ولا يُقرَأ D1 إطلاقاً إلا بعد ضغطة صريحة على "Show Missions" (مرة
+// واحدة فقط لكل جلسة — الزر يُحذَف بعد أول تحميل ناجح).
 var friendsMilestonesFetched = false;
-function fetchFriendsMilestones(){
+function onShowMilestonesClick(){
   if (friendsMilestonesFetched) return;
   var initData = getTelegramInitData();
   if (!initData) return;
-  friendsMilestonesFetched = true;
+
+  var btn = document.getElementById('btn-show-milestones');
+  if (btn) btn.textContent = 'Loading...';
 
   fetch('/api/friends/milestones', {
     method: 'POST',
@@ -8529,12 +8563,16 @@ function fetchFriendsMilestones(){
   .then(function(res){ return res.json(); })
   .then(function(data){
     if (!data.milestones) return;
+    friendsMilestonesFetched = true;
     friendsState.milestones = data.milestones;
     renderMilestones();
+    var list = document.getElementById('milestone-missions-list');
+    if (list) list.style.display = '';
+    if (btn) btn.remove();
   })
   .catch(function(err){
     console.error('fetch friends milestones failed:', err);
-    friendsMilestonesFetched = false; // اسمح بإعادة المحاولة عند فتح الصفحة مجدداً
+    if (btn) btn.textContent = 'Show Missions'; // اسمح بإعادة المحاولة
   });
 }
 
@@ -9021,7 +9059,7 @@ function pollDepositStatus(initData){
 }
 
 /* -- Withdraw -- */
-var WITHDRAW_FLAT_FEE = 0.02;
+var WITHDRAW_FEE_RATE = 0.05;
 var WITHDRAW_MIN_GRAM = 0.1;
 var NEXT_WITHDRAW_ALLOWED_AT = null;
 var withdrawCooldownTimer = null;
@@ -9035,14 +9073,14 @@ function openWithdrawModal(){
   document.getElementById('withdraw-amount').value = '';
   document.getElementById('withdraw-address').value = '';
   document.getElementById('withdraw-min-label').textContent = WITHDRAW_MIN_GRAM;
-  document.getElementById('withdraw-fee-label').textContent = WITHDRAW_FLAT_FEE;
+  document.getElementById('withdraw-fee-label').textContent = (WITHDRAW_FEE_RATE * 100) + '%';
   updateWithdraw();
   refreshWithdrawCooldown();
   openModal('modal-withdraw');
 }
 function updateWithdraw(){
   var val = parseFloat(document.getElementById('withdraw-amount').value) || 0;
-  var out = Math.max(0, val - WITHDRAW_FLAT_FEE);
+  var out = Math.max(0, val - (val * WITHDRAW_FEE_RATE));
   document.getElementById('withdraw-output').textContent = out.toFixed(4);
   var cta = document.getElementById('withdraw-cta');
   var onCooldown = NEXT_WITHDRAW_ALLOWED_AT && Date.now() < NEXT_WITHDRAW_ALLOWED_AT;

@@ -41,7 +41,7 @@ const DEPOSIT_CHECK_RETRY_DELAY_MS = 15_000;
 
 // ===================================================================== إعدادات السحب (Withdraw): سحب يدوي بالكامل — المستخدم يطلب، يُخصم المبلغ فوراً من رصيده (حجز)، ويُرسَل منشور للقناة الإدارية بزري Approve/Reject. لا يوجد فحص بلوكتشين آلي هنا (الإرسال يدوي من الأدمن خارج البوت بالكامل). "Amount" الظاهر في الرسائل = المبلغ الصافي (Net) بعد خصم الرسوم — هو الرقم الذي يجب على الأدمن إرساله فعلياً. =====================================================================
 const WITHDRAW_MIN_GRAM = 0.1;
-const WITHDRAW_FEE_GRAM = 0.02;
+const WITHDRAW_FEE_RATE = 0.05; // 5% من مبلغ السحب (وليس رسماً ثابتاً)
 const WITHDRAW_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 ساعة، تبدأ فور الطلب بغض النظر عن النتيجة
 const ADMIN_TELEGRAM_ID = 1018495986;
 const ADMIN_CHANNEL_ID = -1004325013522;
@@ -504,7 +504,7 @@ async function handleGetUser(request, env) {
   view.exchange_rate_coin_to_gram = EXCHANGE_RATE_COIN_TO_GRAM;
   view.exchange_min_coins = EXCHANGE_MIN_COINS;
   view.withdraw_min_gram = WITHDRAW_MIN_GRAM;
-  view.withdraw_fee_gram = WITHDRAW_FEE_GRAM;
+  view.withdraw_fee_rate = WITHDRAW_FEE_RATE;
   view.next_withdraw_allowed_at = user.last_withdraw_request_at
     ? user.last_withdraw_request_at + WITHDRAW_COOLDOWN_MS
     : null;
@@ -1543,7 +1543,8 @@ async function handleWithdrawRequest(request, env) {
 
   const now = Date.now();
   const cooldownCutoff = now - WITHDRAW_COOLDOWN_MS;
-  const netGram = Math.max(0, amountGram - WITHDRAW_FEE_GRAM);
+  const feeGram = amountGram * WITHDRAW_FEE_RATE;
+  const netGram = Math.max(0, amountGram - feeGram);
 
   // شرط CAS واحد يضمن ذرّياً: الرصيد كافٍ + انتهاء فترة الـ24 ساعة معاً — يمنع سباقاً بين طلبين متزامنين من نفس المستخدم يتجاوزان أي من الشرطين.
   const reserveStmt = env.DB.prepare(
@@ -1556,7 +1557,7 @@ async function handleWithdrawRequest(request, env) {
     `INSERT INTO withdrawals
        (telegram_id, raw_username, first_name, amount_gram, fee_gram, net_gram, address, status, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)`
-  ).bind(telegramId, rawUsername, firstName, amountGram, WITHDRAW_FEE_GRAM, netGram, address, now);
+  ).bind(telegramId, rawUsername, firstName, amountGram, feeGram, netGram, address, now);
 
   const txnStmt = env.DB.prepare(
     "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'withdraw_request', ?, 'gram')"
@@ -2893,12 +2894,13 @@ async function handleTasksList(request, env) {
 
   const section = body.section === "special" ? "special" : "partner";
 
+  // LEFT JOIN + شرط "c.telegram_id IS NULL" (Anti-Join) يستبعد أي مهمة استلمها هذا المستخدم بالفعل من النتائج تماماً — لا تظهر له إطلاقاً بعد استلامها (بدل إظهارها بزر "Done" معطَّل كما كان سابقاً).
   const result = await env.DB.prepare(
-    `SELECT t.id, t.title, t.description, t.icon_url, t.reward_coins, t.link, t.channel_id,
-            c.telegram_id AS claimed
+    `SELECT t.id, t.title, t.description, t.icon_url, t.reward_coins, t.link, t.channel_id
      FROM admin_tasks t
      LEFT JOIN admin_task_claims c ON c.task_id = t.id AND c.telegram_id = ?
      WHERE t.section = ? AND t.is_active = 1 AND (t.max_claims IS NULL OR t.claims_count < t.max_claims)
+       AND c.telegram_id IS NULL
      ORDER BY (t.pinned_at IS NULL) ASC, t.pinned_at ASC, t.display_order ASC, t.id ASC`
   ).bind(telegramId, section).all();
 
@@ -2909,8 +2911,7 @@ async function handleTasksList(request, env) {
     icon_url: t.icon_url,
     reward: t.reward_coins,
     link: t.link,
-    requires_membership: !!t.channel_id,
-    claimed: !!t.claimed
+    requires_membership: !!t.channel_id
   }));
 
   return jsonResponse({ tasks });
