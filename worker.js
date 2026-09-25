@@ -406,11 +406,17 @@ async function routeRequest(request, env, url) {
     if (url.pathname === "/api/admin/promo/create" && request.method === "POST") {
       return handleAdminPromoCreate(request, env);
     }
+    if (url.pathname === "/api/admin/promo/list" && request.method === "POST") {
+      return handleAdminPromoList(request, env);
+    }
     if (url.pathname === "/api/admin/ambassador/grant" && request.method === "POST") {
       return handleAdminAmbassadorGrant(request, env);
     }
     if (url.pathname === "/api/admin/ambassador/revoke" && request.method === "POST") {
       return handleAdminAmbassadorRevoke(request, env);
+    }
+    if (url.pathname === "/api/admin/ambassador/list" && request.method === "POST") {
+      return handleAdminAmbassadorList(request, env);
     }
 
     // نقطة منفصلة عن /api/user عمداً — تُستدعى فقط عند فتح نافذة Leaderboard فعلياً، ومحمية بكاش يومي (Cache API) لا يلمس D1 إلا مرة واحدة يومياً.
@@ -2221,6 +2227,25 @@ async function handleAdminPromoCreate(request, env) {
   return jsonResponse({ ok: true, code });
 }
 
+// ===================================================================== نقطة /api/admin/promo/list — كل أكواد promo_codes الموجودة، لعرضها في لوحة الأدمن (الكود، الجائزة، عدد الاستخدامات، الحد الأقصى). =====================================================================
+async function handleAdminPromoList(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "invalid_body" }, 400);
+  }
+
+  const auth = await authenticateAdmin(request, env, body);
+  if (!auth.ok) return auth.response;
+
+  const result = await env.DB.prepare(
+    "SELECT code, reward, currency, max_uses, uses_count, expires_at FROM promo_codes ORDER BY code ASC"
+  ).all();
+
+  return jsonResponse({ codes: result.results || [] });
+}
+
 // ===================================================================== نقطة /api/admin/ambassador/grant — منح The Ambassador بسرعة يحددها الأدمن. لو لم يستلمها المستخدم بعد (لا صف في user_pets)، تُنشئ/تُحدِّث "منحاً معلّقاً" في ambassador_grants (يُستلَم لاحقاً عبر Claim بالواجهة بهذه السرعة). لو استلمها المستخدم فعلاً بالفعل، هذا الطلب يُعدِّل سرعتها الحالية مباشرة (نفس أسلوب تصفية Storage قبل أي تغيير سرعة المستخدم بكل مكان آخر بالتطبيق). =====================================================================
 async function handleAdminAmbassadorGrant(request, env) {
   let body;
@@ -2345,6 +2370,30 @@ async function handleAdminAmbassadorRevoke(request, env) {
   await env.DB.batch(stmts);
 
   return jsonResponse({ ok: true, mode: "removed" });
+}
+
+// ===================================================================== نقطة /api/admin/ambassador/list — كل حاملي The Ambassador حالياً، سواء منح معلّق لم يُستلَم بعد (ambassador_grants) أو مُستلَم فعلاً (user_pets)، مع اسم المستخدم ومعرّفه وسرعته الحالية — استعلام واحد فقط (UNION ALL) بلا أي تكلفة إضافية تُذكر لأن عدد السفراء ضئيل عملياً. =====================================================================
+async function handleAdminAmbassadorList(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "invalid_body" }, 400);
+  }
+
+  const auth = await authenticateAdmin(request, env, body);
+  if (!auth.ok) return auth.response;
+
+  const result = await env.DB.prepare(
+    `SELECT u.telegram_id AS telegram_id, u.username AS username, g.speed AS speed, 'pending' AS status
+     FROM ambassador_grants g JOIN users u ON u.telegram_id = g.telegram_id
+     UNION ALL
+     SELECT u.telegram_id AS telegram_id, u.username AS username, p.current_speed AS speed, 'claimed' AS status
+     FROM user_pets p JOIN users u ON u.telegram_id = p.telegram_id WHERE p.pet_id = 'ambassador'
+     ORDER BY status ASC, telegram_id ASC`
+  ).all();
+
+  return jsonResponse({ ambassadors: result.results || [] });
 }
 
 // ===================================================================== نقطة /api/leaderboard — Weekly Leaderboard (By Ads وBy Referrals معاً في استجابة واحدة، لا طلبان منفصلان). كاش عبر Cache API (caches.default — بلا أي حد قراءة/كتابة يومي، بعكس KV) بصلاحية محسوبة حتى 00:00 UTC القادمة. أول طلب فقط بعد انتهاء الصلاحية ينفّذ استعلامي D1 (بالـindex، أعلى 20 فقط بصرف النظر عن عدد المستخدمين الإجمالي)، وكل الطلبات بعده لنفس اليوم تُقرأ من الكاش مباشرة بلا أي لمس لـD1. شرط WHERE > 0 يمنع عرض/منح جوائز لمستخدمين بلا أي نشاط حقيقي هذا الأسبوع. =====================================================================

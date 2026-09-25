@@ -1131,8 +1131,10 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   border-radius:16px; padding:8.4px 14px;   /* أعلى/أسفل مصغّرة 40% (كانت 14px)، اليمين/اليسار كما هي */
   backdrop-filter:blur(var(--glass-blur));
   -webkit-backdrop-filter:blur(var(--glass-blur));
-  margin-top:14px;   /* .task-panel عنصر block بلا gap، فبدون هذا الهامش تلتصق البطاقة مباشرة بآخر مهمة حقيقية في الشبكة أعلاها بلا أي مسافة */
 }
+/* .task-panel عنصر block بلا gap — Special: التلميح ثابت أولاً، فيحتاج مسافة أسفله عن المهام الحقيقية بعده. Partner: التلميح يظهر فقط عند الفراغ بعد المهام، فيحتاج مسافة أعلاه بدلاً من ذلك. */
+#special-tasks-empty{ margin-bottom:14px; }
+#partner-tasks-empty{ margin-top:14px; }
 .add-task-card__icon{
   width:26px; height:26px; border-radius:8px; flex-shrink:0;   /* مصغّرة 40% (كانت 44px/14px) */
   display:flex; align-items:center; justify-content:center;
@@ -3687,7 +3689,6 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 
       <!-- /////كود لوحة Special///// -->
       <div class="task-panel" id="task-panel-special">
-        <div class="ad-tasks-grid" id="special-tasks-list"></div>
         <div class="add-task-card" id="special-tasks-empty">
           <span class="add-task-card__icon">+</span>
           <div class="add-task-card__body">
@@ -3696,6 +3697,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
           </div>
           <svg class="add-task-card__link" viewBox="0 0 24 24" fill="none" stroke="#e3a542" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>
         </div>
+        <div class="ad-tasks-grid" id="special-tasks-list"></div>
       </div>
 
       <!-- /////كود لوحة Partner///// -->
@@ -3876,9 +3878,8 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 
       <div class="page-title" style="font-size:15px;margin-top:22px;">Transaction history</div>
 
-      <div id="tx-history-list">
-        <div class="tx-empty" id="tx-history-empty">No transactions yet</div>
-      </div>
+      <div id="tx-history-list"></div>
+      <button class="friends-show-list-btn" id="btn-show-tx-history" onclick="onShowTxHistoryClick()">Show History</button>
     </section>
 
     <!-- /////كود صفحة Pets///// -->
@@ -4271,7 +4272,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
       <span class="fp-corner fp-corner--tl"></span>
       <span class="fp-corner fp-corner--tr"></span>
       <button class="modal-close pf-close" onclick="closeModal('modal-profile')">✕</button>
-      <button id="pf-admin-btn" onclick="openAdminPanel()" style="display:none;position:absolute;top:14px;left:14px;width:28px;height:28px;border-radius:10px;background:rgba(0,0,0,.35);border:1px solid rgba(227,165,66,.35);color:#e3a542;font-size:9px;font-weight:700;align-items:center;justify-content:center;cursor:pointer;z-index:2;">Admin</button>
+      <button id="pf-admin-btn" onclick="openAdminPanel()" style="display:none;position:absolute;top:14px;left:14px;width:28px;height:28px;border-radius:10px;background:rgba(0,0,0,.35);border:1px solid rgba(227,165,66,.35);color:#e3a542;font-size:6px;font-weight:700;letter-spacing:-.2px;line-height:1;padding:0;white-space:nowrap;align-items:center;justify-content:center;cursor:pointer;z-index:2;">Admin</button>
 
       <div class="pf-scroll">
         <div class="pf-avatar-wrap">
@@ -4391,6 +4392,8 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         <label class="ap-label" style="margin-top:10px;">Usage Limit (blank = unlimited)</label>
         <input class="ap-input" id="ap-promo-maxuses" inputmode="numeric" placeholder="e.g. 500">
         <button class="ap-btn" style="width:100%;margin-top:12px;box-sizing:border-box;" onclick="adminCreatePromo()">Create</button>
+        <button class="ap-btn-outline" id="ap-promo-history-btn" style="width:100%;margin-top:8px;box-sizing:border-box;" onclick="adminTogglePromoHistory()">Show History</button>
+        <div id="ap-promo-list" style="margin-top:14px;display:none;"></div>
       </div>
 
       <!-- القسم 4: The Ambassador -->
@@ -4404,6 +4407,8 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
           <button class="ap-btn" style="flex:1;" onclick="adminAmbassadorGrant()">Grant / Update Speed</button>
           <button class="ap-btn-outline" style="flex:1;" onclick="adminAmbassadorRevoke()">Revoke</button>
         </div>
+        <button class="ap-btn-outline" id="ap-amb-history-btn" style="width:100%;margin-top:8px;box-sizing:border-box;" onclick="adminToggleAmbassadorHistory()">Show History</button>
+        <div id="ap-amb-list" style="margin-top:14px;display:none;"></div>
       </div>
 
     </div>
@@ -6263,7 +6268,6 @@ fetchUserData();
       var active = btn.getAttribute('data-page') === pageId;
       btn.classList.toggle('is-active', active);
     });
-    if (pageId === 'page-wallet' && typeof loadTxHistory === 'function') loadTxHistory();
     if (pageId === 'page-friends' && typeof fetchFriendsMilestones === 'function') fetchFriendsMilestones();
     if (pageId === 'page-realm' && typeof fetchRealmStatus === 'function') fetchRealmStatus();
   }
@@ -8073,7 +8077,9 @@ var adminPanelState = {
   taskIconDataUrl: null,
   taskFormSection: 'special',
   taskChannelId: null,
-  foundUser: null
+  foundUser: null,
+  promoListFetched: false,
+  ambListFetched: false
 };
 
 function adminApiPost(path, extraBody, onSuccess, onError){
@@ -8100,6 +8106,7 @@ function openAdminPanel(){
     adminPanelState.tasksFetched.special = true;
     adminFetchTasks('special');
   }
+  // قوائم Promo/Ambassador لا تُجلَب تلقائياً عند فتح اللوحة — فقط عند الضغط على "Show History" صراحة (انظر adminTogglePromoHistory/adminToggleAmbassadorHistory)، توفيراً لطلب Worker واستعلام D1 غير ضروريين في كل مرة تُفتح فيها اللوحة.
 }
 
 /* -- القسم 1: Find User -- */
@@ -8313,6 +8320,52 @@ function adminSaveTask(){
 }
 
 /* -- القسم 3: Promo Code -- */
+function adminTogglePromoHistory(){
+  var list = document.getElementById('ap-promo-list');
+  var btn = document.getElementById('ap-promo-history-btn');
+  if (!list) return;
+
+  var showing = list.style.display !== 'none';
+  if (showing){
+    list.style.display = 'none';
+    if (btn) btn.textContent = 'Show History';
+    return;
+  }
+
+  list.style.display = '';
+  if (btn) btn.textContent = 'Hide History';
+  if (!adminPanelState.promoListFetched){
+    adminPanelState.promoListFetched = true;
+    adminFetchPromoList();
+  }
+}
+
+function adminFetchPromoList(){
+  adminApiPost('/api/admin/promo/list', {}, function(data){
+    renderAdminPromoList(data.codes || []);
+  });
+}
+
+function renderAdminPromoList(codes){
+  var list = document.getElementById('ap-promo-list');
+  if (!list) return;
+  if (!codes.length){
+    list.innerHTML = '<div style="font-size:11px;color:var(--ink-dim);text-align:center;padding:10px 0;">No promo codes yet</div>';
+    return;
+  }
+  list.innerHTML = codes.map(function(c){
+    var usesText = c.max_uses ? (c.uses_count + '/' + c.max_uses + ' uses') : (c.uses_count + ' uses');
+    return (
+      '<div class="ap-task-row">' +
+        '<div style="flex:1;min-width:0;">' +
+          '<div style="font-size:12px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtmlClient(c.code) + '</div>' +
+          '<div style="font-size:10px;color:var(--ink-dim);">+' + Number(c.reward) + ' ' + (c.currency === 'gram' ? 'Gram' : 'Coins') + ' · ' + usesText + '</div>' +
+        '</div>' +
+      '</div>'
+    );
+  }).join('');
+}
+
 function adminCreatePromo(){
   var code = document.getElementById('ap-promo-code').value.trim();
   var reward = Number(document.getElementById('ap-promo-reward').value);
@@ -8329,12 +8382,66 @@ function adminCreatePromo(){
     document.getElementById('ap-promo-code').value = '';
     document.getElementById('ap-promo-reward').value = '';
     document.getElementById('ap-promo-maxuses').value = '';
+    if (adminPanelState.promoListFetched) adminFetchPromoList();
   }, function(err){
     adminToast(err.error === 'code_exists' ? 'Code already exists' : 'Failed to create code');
   });
 }
 
 /* -- القسم 4: The Ambassador -- */
+function adminToggleAmbassadorHistory(){
+  var list = document.getElementById('ap-amb-list');
+  var btn = document.getElementById('ap-amb-history-btn');
+  if (!list) return;
+
+  var showing = list.style.display !== 'none';
+  if (showing){
+    list.style.display = 'none';
+    if (btn) btn.textContent = 'Show History';
+    return;
+  }
+
+  list.style.display = '';
+  if (btn) btn.textContent = 'Hide History';
+  if (!adminPanelState.ambListFetched){
+    adminPanelState.ambListFetched = true;
+    adminFetchAmbassadorList();
+  }
+}
+
+function adminFetchAmbassadorList(){
+  adminApiPost('/api/admin/ambassador/list', {}, function(data){
+    renderAdminAmbassadorList(data.ambassadors || []);
+  });
+}
+
+function renderAdminAmbassadorList(ambassadors){
+  var list = document.getElementById('ap-amb-list');
+  if (!list) return;
+  if (!ambassadors.length){
+    list.innerHTML = '<div style="font-size:11px;color:var(--ink-dim);text-align:center;padding:10px 0;">No ambassadors yet</div>';
+    return;
+  }
+  list.innerHTML = ambassadors.map(function(a){
+    var name = a.username ? ('@' + a.username) : ('Player ' + a.telegram_id);
+    var statusText = a.status === 'pending' ? 'Pending claim' : 'Claimed';
+    return (
+      '<div class="ap-task-row" style="cursor:pointer;" onclick="adminFillAmbassadorFields(' + Number(a.telegram_id) + ', ' + Number(a.speed) + ')">' +
+        '<div style="flex:1;min-width:0;">' +
+          '<div style="font-size:12px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtmlClient(name) + '</div>' +
+          '<div style="font-size:10px;color:var(--ink-dim);">ID: ' + Number(a.telegram_id) + ' · +' + Number(a.speed) + ' Coins/hr · ' + statusText + '</div>' +
+        '</div>' +
+      '</div>'
+    );
+  }).join('');
+}
+
+// الضغط على أي صف في القائمة يملأ حقلي Telegram ID/Speed أعلاه مباشرة — تسهيلاً لتحديث السرعة أو السحب بدون كتابة المعرّف يدوياً.
+function adminFillAmbassadorFields(telegramId, speed){
+  document.getElementById('ap-amb-id').value = telegramId;
+  document.getElementById('ap-amb-speed').value = speed;
+}
+
 function adminAmbassadorGrant(){
   var id = parseInt(document.getElementById('ap-amb-id').value, 10);
   var speed = parseInt(document.getElementById('ap-amb-speed').value, 10);
@@ -8342,6 +8449,7 @@ function adminAmbassadorGrant(){
 
   adminApiPost('/api/admin/ambassador/grant', { target_id: id, speed: speed }, function(data){
     adminToast(data.mode === 'pending' ? 'Grant pending — user can claim it now' : 'Ambassador speed updated');
+    if (adminPanelState.ambListFetched) adminFetchAmbassadorList();
   }, function(err){
     adminToast(err.error === 'user_not_found' ? 'User not found' : 'Failed to grant');
   });
@@ -8354,6 +8462,7 @@ function adminAmbassadorRevoke(){
 
   adminApiPost('/api/admin/ambassador/revoke', { target_id: id }, function(){
     adminToast('Ambassador revoked');
+    if (adminPanelState.ambListFetched) adminFetchAmbassadorList();
   }, function(err){
     adminToast(err.error === 'not_found' ? 'Nothing to revoke for this user' : 'Failed to revoke');
   });
@@ -9045,9 +9154,16 @@ var TX_ICON_DEPOSIT =
 var TX_ICON_WITHDRAW =
   '<svg viewBox="0 0 24 24" fill="none" stroke="#d98a86" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M19 12l-7 7-7-7"/></svg>';
 
-function loadTxHistory(){
+// نفس أسلوب Friends List بالضبط: لا يُرسَل أي طلب ولا يُقرَأ D1 إطلاقاً إلا بعد ضغطة صريحة على الزر (مرة واحدة فقط لكل جلسة — الزر يُحذَف بعد أول تحميل ناجح).
+var txHistoryLoaded = false;
+function onShowTxHistoryClick(){
+  if (txHistoryLoaded) return;
   var initData = getTelegramInitData();
   if (!initData) return;
+
+  var btn = document.getElementById('btn-show-tx-history');
+  if (btn) btn.textContent = 'Loading...';
+
   fetch('/api/wallet/history', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -9055,10 +9171,14 @@ function loadTxHistory(){
   })
   .then(function(res){ return res.json(); })
   .then(function(data){
-    if (data.error || !data.items) return;
-    renderTxHistory(data.items);
+    txHistoryLoaded = true;
+    renderTxHistory((data && data.items) || []);
+    if (btn) btn.remove();
   })
-  .catch(function(err){ console.error('wallet history request failed:', err); });
+  .catch(function(err){
+    console.error('wallet history request failed:', err);
+    if (btn) btn.textContent = 'Show History';
+  });
 }
 
 function renderTxHistory(items){
