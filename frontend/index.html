@@ -4366,12 +4366,15 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
       <!-- القسم 2: Tasks (Special / Partner) -->
       <div class="ap-card">
         <h2 class="ap-title">🗂 Tasks — Special / Partner</h2>
-        <div class="ap-row">
-          <div class="ap-tab ap-task-tab is-active" data-section="special" onclick="adminSwitchTaskTab('special')">Special</div>
-          <div class="ap-tab ap-task-tab" data-section="partner" onclick="adminSwitchTaskTab('partner')">Partner</div>
-        </div>
         <button class="ap-btn" style="width:100%;margin-top:12px;box-sizing:border-box;" onclick="adminOpenTaskModal(null)">+ Add A Task</button>
-        <div id="ap-tasks-list" style="margin-top:12px;"></div>
+        <button class="ap-btn-outline" id="ap-tasks-history-btn" style="width:100%;margin-top:8px;box-sizing:border-box;" onclick="adminToggleTasksList()">Show Tasks</button>
+        <div id="ap-tasks-section" style="display:none;margin-top:14px;">
+          <div class="ap-row">
+            <div class="ap-tab ap-task-tab is-active" data-section="special" onclick="adminSwitchTaskTab('special')">Special</div>
+            <div class="ap-tab ap-task-tab" data-section="partner" onclick="adminSwitchTaskTab('partner')">Partner</div>
+          </div>
+          <div id="ap-tasks-list" style="margin-top:12px;"></div>
+        </div>
       </div>
 
       <!-- القسم 3: Promo Code -->
@@ -8075,6 +8078,7 @@ var adminPanelState = {
   currentTaskTab: 'special',
   tasks: { special: [], partner: [] },
   tasksFetched: { special: false, partner: false },
+  tasksListShown: false,
   editingTaskId: null,
   taskIconDataUrl: null,
   taskFormSection: 'special',
@@ -8104,11 +8108,9 @@ function adminToast(message){
 
 function openAdminPanel(){
   openModal('modal-admin');
-  if (!adminPanelState.tasksFetched.special){
-    adminPanelState.tasksFetched.special = true;
-    adminFetchTasks('special');
-  }
-  // قوائم Promo/Ambassador لا تُجلَب تلقائياً عند فتح اللوحة — فقط عند الضغط على "Show History" صراحة (انظر adminTogglePromoHistory/adminToggleAmbassadorHistory)، توفيراً لطلب Worker واستعلام D1 غير ضروريين في كل مرة تُفتح فيها اللوحة.
+  // لا جلب تلقائي لأي قائمة عند فتح اللوحة (Tasks/Promo/Ambassador) — فقط عند الضغط صراحة
+  // على "Show Tasks"/"Show History" (انظر adminToggleTasksList/adminTogglePromoHistory/
+  // adminToggleAmbassadorHistory)، توفيراً لطلب Worker واستعلام D1 غير ضروريين في كل مرة تُفتح فيها اللوحة.
 }
 
 /* -- القسم 1: Find User -- */
@@ -8150,6 +8152,28 @@ function adminSaveBalance(){
 }
 
 /* -- القسم 2: Tasks -- */
+function adminToggleTasksList(){
+  var section = document.getElementById('ap-tasks-section');
+  var btn = document.getElementById('ap-tasks-history-btn');
+  if (!section) return;
+
+  var showing = section.style.display !== 'none';
+  if (showing){
+    section.style.display = 'none';
+    adminPanelState.tasksListShown = false;
+    if (btn) btn.textContent = 'Show Tasks';
+    return;
+  }
+
+  section.style.display = '';
+  adminPanelState.tasksListShown = true;
+  if (btn) btn.textContent = 'Hide Tasks';
+  if (!adminPanelState.tasksFetched[adminPanelState.currentTaskTab]){
+    adminPanelState.tasksFetched[adminPanelState.currentTaskTab] = true;
+    adminFetchTasks(adminPanelState.currentTaskTab);
+  }
+}
+
 function adminSwitchTaskTab(section){
   adminPanelState.currentTaskTab = section;
   document.querySelectorAll('.ap-task-tab').forEach(function(t){
@@ -8314,8 +8338,10 @@ function adminSaveTask(){
     // نُلغي الجلبَين معاً (وليس فقط التبويب الحالي) لأن حفظ التعديل قد يكون نقل المهمة إلى القسم الآخر.
     adminPanelState.tasksFetched.special = false;
     adminPanelState.tasksFetched.partner = false;
-    adminPanelState.tasksFetched[adminPanelState.currentTaskTab] = true;
-    adminFetchTasks(adminPanelState.currentTaskTab);
+    if (adminPanelState.tasksListShown){
+      adminPanelState.tasksFetched[adminPanelState.currentTaskTab] = true;
+      adminFetchTasks(adminPanelState.currentTaskTab);
+    }
   }, function(){
     adminToast('Failed to save task');
   });
