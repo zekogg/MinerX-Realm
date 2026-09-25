@@ -2135,7 +2135,7 @@ async function handleAdminTasksSave(request, env) {
   return jsonResponse({ ok: true, id: insertResult.meta.last_row_id });
 }
 
-// ===================================================================== نقطة /api/admin/tasks/delete — حذف ناعم (is_active = 0) وليس DELETE حقيقي، لتفادي ترك صفوف admin_task_claims يتيمة (تشير لمهمة محذوفة) — نفس ما يفعله is_active مسبقاً لإخفاء أي مهمة عن handleTasksList/handleAdminTasksList دون حذف تاريخها. =====================================================================
+// ===================================================================== نقطة /api/admin/tasks/delete — حذف حقيقي للمهمة وكل سجلات استلامها معاً (admin_task_claims). لا خطر من إعادة استخدام نفس id لاحقاً (AUTOINCREMENT لا يُعيد معرّفات محذوفة أبداً)، والمكافأة المالية التي استلمها كل مستخدم تبقى محفوظة بشكل مستقل تماماً في جدول transactions (type='admin_task') بصرف النظر عن حذف هذين الصفين. =====================================================================
 async function handleAdminTasksDelete(request, env) {
   let body;
   try {
@@ -2150,8 +2150,11 @@ async function handleAdminTasksDelete(request, env) {
   const id = parseInt(body.id, 10);
   if (!Number.isInteger(id)) return jsonResponse({ error: "invalid_id" }, 400);
 
-  const result = await env.DB.prepare("UPDATE admin_tasks SET is_active = 0 WHERE id = ?").bind(id).run();
-  if (!result.meta || result.meta.changes === 0) return jsonResponse({ error: "task_not_found" }, 404);
+  const [deleteResult] = await env.DB.batch([
+    env.DB.prepare("DELETE FROM admin_tasks WHERE id = ?").bind(id),
+    env.DB.prepare("DELETE FROM admin_task_claims WHERE task_id = ?").bind(id)
+  ]);
+  if (!deleteResult.meta || deleteResult.meta.changes === 0) return jsonResponse({ error: "task_not_found" }, 404);
 
   return jsonResponse({ ok: true });
 }
