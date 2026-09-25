@@ -4393,7 +4393,8 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         <label class="ap-label" style="margin-top:10px;">Usage Limit (blank = unlimited)</label>
         <input class="ap-input" id="ap-promo-maxuses" inputmode="numeric" placeholder="e.g. 500">
         <button class="ap-btn" style="width:100%;margin-top:12px;box-sizing:border-box;" onclick="adminCreatePromo()">Create</button>
-        <div id="ap-promo-list" style="margin-top:14px;"></div>
+        <button class="ap-btn-outline" id="ap-promo-history-btn" style="width:100%;margin-top:8px;box-sizing:border-box;" onclick="adminTogglePromoHistory()">Show History</button>
+        <div id="ap-promo-list" style="margin-top:14px;display:none;"></div>
       </div>
 
       <!-- القسم 4: The Ambassador -->
@@ -4407,7 +4408,8 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
           <button class="ap-btn" style="flex:1;" onclick="adminAmbassadorGrant()">Grant / Update Speed</button>
           <button class="ap-btn-outline" style="flex:1;" onclick="adminAmbassadorRevoke()">Revoke</button>
         </div>
-        <div id="ap-amb-list" style="margin-top:14px;"></div>
+        <button class="ap-btn-outline" id="ap-amb-history-btn" style="width:100%;margin-top:8px;box-sizing:border-box;" onclick="adminToggleAmbassadorHistory()">Show History</button>
+        <div id="ap-amb-list" style="margin-top:14px;display:none;"></div>
       </div>
 
     </div>
@@ -8106,14 +8108,7 @@ function openAdminPanel(){
     adminPanelState.tasksFetched.special = true;
     adminFetchTasks('special');
   }
-  if (!adminPanelState.promoListFetched){
-    adminPanelState.promoListFetched = true;
-    adminFetchPromoList();
-  }
-  if (!adminPanelState.ambListFetched){
-    adminPanelState.ambListFetched = true;
-    adminFetchAmbassadorList();
-  }
+  // قوائم Promo/Ambassador لا تُجلَب تلقائياً عند فتح اللوحة — فقط عند الضغط على "Show History" صراحة (انظر adminTogglePromoHistory/adminToggleAmbassadorHistory)، توفيراً لطلب Worker واستعلام D1 غير ضروريين في كل مرة تُفتح فيها اللوحة.
 }
 
 /* -- القسم 1: Find User -- */
@@ -8327,6 +8322,26 @@ function adminSaveTask(){
 }
 
 /* -- القسم 3: Promo Code -- */
+function adminTogglePromoHistory(){
+  var list = document.getElementById('ap-promo-list');
+  var btn = document.getElementById('ap-promo-history-btn');
+  if (!list) return;
+
+  var showing = list.style.display !== 'none';
+  if (showing){
+    list.style.display = 'none';
+    if (btn) btn.textContent = 'Show History';
+    return;
+  }
+
+  list.style.display = '';
+  if (btn) btn.textContent = 'Hide History';
+  if (!adminPanelState.promoListFetched){
+    adminPanelState.promoListFetched = true;
+    adminFetchPromoList();
+  }
+}
+
 function adminFetchPromoList(){
   adminApiPost('/api/admin/promo/list', {}, function(data){
     renderAdminPromoList(data.codes || []);
@@ -8369,13 +8384,33 @@ function adminCreatePromo(){
     document.getElementById('ap-promo-code').value = '';
     document.getElementById('ap-promo-reward').value = '';
     document.getElementById('ap-promo-maxuses').value = '';
-    adminFetchPromoList();
+    if (adminPanelState.promoListFetched) adminFetchPromoList();
   }, function(err){
     adminToast(err.error === 'code_exists' ? 'Code already exists' : 'Failed to create code');
   });
 }
 
 /* -- القسم 4: The Ambassador -- */
+function adminToggleAmbassadorHistory(){
+  var list = document.getElementById('ap-amb-list');
+  var btn = document.getElementById('ap-amb-history-btn');
+  if (!list) return;
+
+  var showing = list.style.display !== 'none';
+  if (showing){
+    list.style.display = 'none';
+    if (btn) btn.textContent = 'Show History';
+    return;
+  }
+
+  list.style.display = '';
+  if (btn) btn.textContent = 'Hide History';
+  if (!adminPanelState.ambListFetched){
+    adminPanelState.ambListFetched = true;
+    adminFetchAmbassadorList();
+  }
+}
+
 function adminFetchAmbassadorList(){
   adminApiPost('/api/admin/ambassador/list', {}, function(data){
     renderAdminAmbassadorList(data.ambassadors || []);
@@ -8416,7 +8451,7 @@ function adminAmbassadorGrant(){
 
   adminApiPost('/api/admin/ambassador/grant', { target_id: id, speed: speed }, function(data){
     adminToast(data.mode === 'pending' ? 'Grant pending — user can claim it now' : 'Ambassador speed updated');
-    adminFetchAmbassadorList();
+    if (adminPanelState.ambListFetched) adminFetchAmbassadorList();
   }, function(err){
     adminToast(err.error === 'user_not_found' ? 'User not found' : 'Failed to grant');
   });
@@ -8429,7 +8464,7 @@ function adminAmbassadorRevoke(){
 
   adminApiPost('/api/admin/ambassador/revoke', { target_id: id }, function(){
     adminToast('Ambassador revoked');
-    adminFetchAmbassadorList();
+    if (adminPanelState.ambListFetched) adminFetchAmbassadorList();
   }, function(err){
     adminToast(err.error === 'not_found' ? 'Nothing to revoke for this user' : 'Failed to revoke');
   });
