@@ -357,6 +357,31 @@ img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
 .ad-loading-overlay__text{ font-family:var(--font-display); font-weight:800; font-size:14px; color:#ffffff; }
 .ad-loading-overlay__via{ font-size:11px; color:rgba(255,255,255,.55); }
 
+/* -- دائرة تحميل عامة داخل أي زر مشغول (setButtonBusy) — تستخدم currentColor فتتلوّن تلقائياً بنفس لون نص كل زر بلا أي إعداد إضافي -- */
+.btn-spinner{
+  display:inline-block; width:14px; height:14px;
+  border:2px solid currentColor; border-right-color:transparent;
+  border-radius:50%; opacity:.85;
+  animation:spin .6s linear infinite;
+  vertical-align:middle;
+}
+
+/* -- Skeleton Loading عام: أشكال رمادية بلمعان متحرك، تُستخدَم كبديل مؤقت لمحتوى القوائم (Wallet History، Tasks، Friends List، Leaderboard) أثناء انتظار أول جلب حقيقي فقط (Cache Hit يعرض المحتوى الحقيقي فوراً بلا Skeleton إطلاقاً) -- */
+.skeleton-row, .skeleton-avatar{
+  background:linear-gradient(90deg, rgba(255,255,255,.05) 25%, rgba(255,255,255,.12) 50%, rgba(255,255,255,.05) 75%);
+  background-size:200% 100%;
+  animation:skeleton-shimmer 1.4s ease-in-out infinite;
+  border-radius:10px;
+}
+@keyframes skeleton-shimmer{
+  0%{ background-position:200% 0; }
+  100%{ background-position:-200% 0; }
+}
+.skeleton-row{ height:52px; margin-bottom:8px; }
+.skeleton-list-item{ display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+.skeleton-avatar{ width:36px; height:36px; border-radius:50%; flex-shrink:0; }
+.skeleton-list-item .skeleton-row{ flex:1; height:14px; margin-bottom:0; }
+
 /* -- طبقة الكونفيتي المشتركة: canvas ثابت فوق كل شيء، بدون أي تفاعل -- */
 #confetti-canvas{
   position:fixed; inset:0; z-index:10000;
@@ -3136,7 +3161,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   <div class="ad-loading-overlay" id="ad-loading-overlay">
     <div class="ad-loading-overlay__box">
       <div class="ad-loading-overlay__spinner"></div>
-      <div class="ad-loading-overlay__text">Loading Ad...</div>
+      <div class="ad-loading-overlay__text" id="ad-loading-overlay-text">Loading Ad...</div>
       <div class="ad-loading-overlay__via" id="ad-loading-overlay-via">via Monetix</div>
     </div>
   </div>
@@ -4999,24 +5024,27 @@ var MAINTENANCE_ADMIN_ID = 1018495986;   // معرّف تيليجرام (Telegra
   };
 })();
 
-/* /////كود شاشة التحميل الوهمية: 4 ثوانٍ ثابتة عند كل فتح للتطبيق، لا علاقة لها بجلب البيانات الحقيقية (fetchUserData يعمل بالتوازي في الخلفية)///// */
-(function(){
-  var LOADING_SCREEN_DURATION_MS = 2000;
+/* ===================================================================== شاشة التحميل: مربوطة الآن بوصول رد /api/user الحقيقي فعلاً (عبر hideSplashScreen() المُستدعاة من fetchUserData) بدل مؤقّت وهمي ثابت. الشريط يمتلئ بصرياً على مدى SPLASH_MAX_WAIT_MS (نفس مدة الحد الأقصى)، لكن الشاشة تختفي فور وصول الرد الحقيقي (نجاحاً أو فشلاً) قبل انتهاء هذه المدة عادةً. SPLASH_MAX_WAIT_MS حد أقصى احتياطي فقط — يمنع بقاء المستخدم عالقاً أمام شاشة تحميل بلا نهاية عند سوء الاتصال أو تعطّل الطلب. ===================================================================== */
+var SPLASH_MAX_WAIT_MS = 8000;
+var splashHidden = false;
+function hideSplashScreen(){
+  if (splashHidden) return;
+  splashHidden = true;
   var screen = document.getElementById('loading-screen');
-  var fill = document.getElementById('loading-screen-fill');
   if (!screen) return;
-
+  screen.classList.add('is-hidden');
+  setTimeout(function(){ screen.style.display = 'none'; }, 400);
+}
+(function(){
+  var fill = document.getElementById('loading-screen-fill');
   if (fill){
     requestAnimationFrame(function(){
-      fill.style.transition = 'width ' + LOADING_SCREEN_DURATION_MS + 'ms linear';
+      fill.style.transition = 'width ' + SPLASH_MAX_WAIT_MS + 'ms linear';
       fill.style.width = '100%';
     });
   }
-
-  setTimeout(function(){
-    screen.classList.add('is-hidden');
-    setTimeout(function(){ screen.style.display = 'none'; }, 400);
-  }, LOADING_SCREEN_DURATION_MS);
+  // حد أقصى احتياطي فقط — التخفي الطبيعي يحدث عبر hideSplashScreen() من fetchUserData قبل هذا بكثير عادةً.
+  setTimeout(hideSplashScreen, SPLASH_MAX_WAIT_MS);
 })();
 
 /* /////كود توسيط لوغو الشريط العلوي في الفراغ الحقيقي بين البروفايل وعمود Coins/Gram/اللغة — يُحسَب من العرض الفعلي المُقاس لكل عمود (وليس نسبة % أو left px ثابت)، لأن عمود topbar-right متغيّر العرض حسب الشاشة، فمنتصف الشريط الكامل لا يساوي منتصف الفراغ الفعلي بينهما///// */
@@ -5149,7 +5177,8 @@ function updateBalanceDisplay(u){
 function fetchUserData(){
   var initData = getTelegramInitData();
   if (!initData){
-    return; // تشغيل خارج تيليجرام — يبقى على الأرقام الافتراضية بالواجهة
+    hideSplashScreen(); // تشغيل خارج تيليجرام — يبقى على الأرقام الافتراضية بالواجهة، لا داعي لانتظار الحد الأقصى
+    return;
   }
 
   fetch('/api/user', {
@@ -5218,9 +5247,11 @@ function fetchUserData(){
       pending_earnings: data.user.friends_pending_earnings,
       min_claim: data.user.friends_min_claim
     });
+    hideSplashScreen();
   })
   .catch(function(err){
     console.error('fetchUserData failed:', err);
+    hideSplashScreen();
   });
 }
 
@@ -5379,6 +5410,7 @@ function runMiningRequest(isReadyToClaim){
   })
   .finally(function(){
     miningBusy = false;
+    hideAdLoadingOverlay(); // لا يفعل شيئاً لو كانت الدورة "Claim" بلا إعلان أصلاً (النافذة أصلاً غير ظاهرة)
   });
 }
 
@@ -5491,6 +5523,7 @@ function runStreakClaimRequest(initData){
   })
   .finally(function(){
     streakBusy = false;
+    hideAdLoadingOverlay();
   });
 }
 
@@ -5727,6 +5760,7 @@ function runSpinClaimRequest(initData, btn){
   })
   .finally(function(){
     spinBusy = false;
+    hideAdLoadingOverlay();
   });
 }
 
@@ -5803,6 +5837,7 @@ function runChestClaimRequest(initData){
   })
   .finally(function(){
     chestBusy = false;
+    hideAdLoadingOverlay();
   });
 }
 
@@ -5891,6 +5926,7 @@ function runGiftClaimRequest(initData, selectedBox){
   })
   .finally(function(){
     giftPickBusy = false;
+    hideAdLoadingOverlay();
   });
 }
 
@@ -6066,6 +6102,7 @@ function onPetBuyClick(petId, btn){
   }
 
   petBuyBusy[petId] = true;
+  setButtonBusy(btn, true);
   fetch('/api/pet/' + petId + '/buy', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -6075,6 +6112,7 @@ function onPetBuyClick(petId, btn){
   .then(function(result){
     var data = result.data;
     if (data.error){
+      setButtonBusy(btn, false);
       if (data.error === 'insufficient_funds'){
         showBuyErrorToast('Not enough Coins');
       } else if (data.error === 'already_owned'){
@@ -6085,6 +6123,8 @@ function onPetBuyClick(petId, btn){
       return;
     }
 
+    // لا نستدعي setButtonBusy(btn, false) هنا عمداً — showBuySuccessGeneric تكتب مباشرة أيقونة الصح
+    // الدائمة داخل الزر، فاستعادة النص الأصلي بعدها ستمحو تلك الأيقونة بالخطأ.
     petStates[petId] = { level: data.level, speed: data.speed };
     renderPetCard(def);
     updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE });
@@ -6101,6 +6141,7 @@ function onPetBuyClick(petId, btn){
   })
   .catch(function(err){
     console.error('pet buy request failed:', err);
+    setButtonBusy(btn, false);
   })
   .finally(function(){
     petBuyBusy[petId] = false;
@@ -6119,6 +6160,8 @@ function onPetUpgradeConfirm(){
   }
 
   petUpgradeBusy = true;
+  var petUpgradeBtn = document.getElementById('pet-upgrade-confirm-btn');
+  setButtonBusy(petUpgradeBtn, true);
   fetch('/api/pet/' + petId + '/upgrade', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -6158,6 +6201,7 @@ function onPetUpgradeConfirm(){
   })
   .finally(function(){
     petUpgradeBusy = false;
+    setButtonBusy(petUpgradeBtn, false);
   });
 }
 
@@ -6293,6 +6337,7 @@ function onStorageClaimClick(){
   }
 
   storageClaimBusy = true;
+  setButtonBusy(domCache.storageClaimBtn, true);
   fetch('/api/storage/claim', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -6326,6 +6371,7 @@ function onStorageClaimClick(){
   })
   .finally(function(){
     storageClaimBusy = false;
+    setButtonBusy(domCache.storageClaimBtn, false);
   });
 }
 
@@ -6563,6 +6609,11 @@ function openLeaderboardModal(){
   var initData = getTelegramInitData();
   if (!initData) return;
 
+  ['ads', 'referrals'].forEach(function(type){
+    var listEl = document.getElementById('lb-list-' + type);
+    if (listEl) listEl.innerHTML = skeletonRowsHtml(3, true);
+  });
+
   fetch('/api/leaderboard', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -6647,6 +6698,32 @@ function localCacheSet(name, data){
 
 function localCacheClear(name){
   try{ localStorage.removeItem(localCacheKey(name)); }catch(e){}
+}
+
+/* ===================================================================== دالة عامة لتحويل أي زر إلى حالة "مشغول" (معطَّل + دائرة تحميل تدور بدل نصه) بدل النص الثابت "..." المُستخدَم سابقاً في أماكن متفرقة — تُستخدَم الآن في كل زر ينتظر رد سيرفر حقيقياً بلا استثناء، ليكون شكل الانتظار متطابقاً بكل التطبيق. تحفظ محتوى الزر الأصلي في dataset.origHtml لاستعادته عند انتهاء الانتظار؛ setButtonBusy(btn, false) لا تُغيّر disabled بنفسها (تترك ذلك لكود العرض الخاص بكل زر بعد وصول الرد، لأن حالة "معطَّل" النهائية قد تعتمد على شروط أخرى غير الانتظار نفسه). ===================================================================== */
+function setButtonBusy(btn, busy){
+  if (!btn) return;
+  if (busy){
+    if (btn.dataset.origHtml === undefined) btn.dataset.origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="btn-spinner"></span>';
+  } else if (btn.dataset.origHtml !== undefined){
+    btn.innerHTML = btn.dataset.origHtml;
+    delete btn.dataset.origHtml;
+  }
+}
+
+// يُنتج نص HTML لصفوف Skeleton بسيطة (أشرطة رمادية لامعة) — تُستخدَم فقط عند Cache Miss الحقيقي
+// (قبل أول جلب فعلي)، أبداً عند Cache Hit لأن المحتوى الحقيقي يظهر فوراً دون انتظار. count = عدد
+// الصفوف الوهمية، withAvatar = true يضيف دائرة صغيرة يسار كل شريط (لعناصر بها صورة/أيقونة كالأصدقاء).
+function skeletonRowsHtml(count, withAvatar){
+  var rows = [];
+  for (var i = 0; i < count; i++){
+    rows.push(withAvatar
+      ? '<div class="skeleton-list-item"><div class="skeleton-avatar"></div><div class="skeleton-row"></div></div>'
+      : '<div class="skeleton-row"></div>');
+  }
+  return rows.join('');
 }
 
 // نافذة Profile كانت النقطة الوحيدة بالتطبيق بلا أي تخزين مؤقت إطلاقاً (تُعاد جلبها بالكامل مع 3 استعلامات D1 في كل ضغطة، إحداها SUM بلا حد أقصى على كامل تاريخ الإيداعات/السحوبات). يُبطَل فوراً عند تأكيد إيداع حقيقي (pollDepositStatus) لأنه الحدث الوحيد الذي يُغيّر أرقامها بشكل نعرفه من طرف العميل مباشرة.
@@ -6772,6 +6849,8 @@ function onStorageUpgradeConfirm(){
   }
 
   storageUpgradeBusy = true;
+  var storageUpgradeBtn = document.getElementById('storage-upgrade-confirm-btn');
+  setButtonBusy(storageUpgradeBtn, true);
   fetch('/api/storage/upgrade', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -6808,6 +6887,7 @@ function onStorageUpgradeConfirm(){
   })
   .finally(function(){
     storageUpgradeBusy = false;
+    setButtonBusy(storageUpgradeBtn, false);
   });
 }
 
@@ -6827,17 +6907,21 @@ function renderHappyDogUI(){
   [cardBtn, modalBtn].forEach(function(btn){
     if (!btn) return;
     if (happyDogState.claimed){
+      setButtonBusy(btn, false);
       btn.textContent = '✓';
       btn.disabled = true;
       btn.classList.add('is-claimed');
       btn.classList.remove('is-ready');
+    } else if (happyDogState.busy){
+      setButtonBusy(btn, true);
     } else {
-      btn.textContent = happyDogState.busy ? '...' : 'Claim';
-      btn.disabled = happyDogState.busy || happyDogState.activeFriends < happyDogState.threshold;
+      setButtonBusy(btn, false);
+      btn.textContent = 'Claim';
+      btn.disabled = happyDogState.activeFriends < happyDogState.threshold;
       btn.classList.remove('is-claimed');
       // زر Free Pet المنبثق (fp-claim-btn) يبقى بلونه الذهبي المعتاد — هذا التلوين الأخضر خاص فقط بزر البطاقة داخل صفحة Realm.
       if (btn === cardBtn){
-        btn.classList.toggle('is-ready', !happyDogState.busy && happyDogState.activeFriends >= happyDogState.threshold);
+        btn.classList.toggle('is-ready', !btn.disabled);
       }
     }
   });
@@ -6911,15 +6995,19 @@ function renderGuardianUI(){
   var cardBtn = document.getElementById('tg-claim-btn');
   if (cardBtn){
     if (guardianState.claimed){
+      setButtonBusy(cardBtn, false);
       cardBtn.textContent = '✓';
       cardBtn.disabled = true;
       cardBtn.classList.add('is-claimed');
       cardBtn.classList.remove('is-ready');
+    } else if (guardianState.busy){
+      setButtonBusy(cardBtn, true);
     } else {
-      cardBtn.textContent = guardianState.busy ? '...' : 'Claim';
-      cardBtn.disabled = guardianState.busy || guardianState.adsWatched < guardianState.threshold;
+      setButtonBusy(cardBtn, false);
+      cardBtn.textContent = 'Claim';
+      cardBtn.disabled = guardianState.adsWatched < guardianState.threshold;
       cardBtn.classList.remove('is-claimed');
-      cardBtn.classList.toggle('is-ready', !guardianState.busy && guardianState.adsWatched >= guardianState.threshold);
+      cardBtn.classList.toggle('is-ready', !cardBtn.disabled);
     }
   }
 
@@ -7000,6 +7088,7 @@ function renderAmbassadorUI(){
   if (!btn) return;
 
   if (ambassadorState.claimed){
+    setButtonBusy(btn, false);
     if (speedEl) speedEl.textContent = (ambassadorState.speed || 0) + '/hr';
     btn.textContent = '✓';
     btn.disabled = true;
@@ -7010,9 +7099,14 @@ function renderAmbassadorUI(){
 
   if (speedEl) speedEl.textContent = '???/hr';
   btn.classList.remove('is-claimed');
-  btn.textContent = ambassadorState.busy ? '...' : 'Claim';
-  btn.disabled = ambassadorState.busy || !ambassadorState.available;
-  btn.classList.toggle('is-ready', !ambassadorState.busy && ambassadorState.available);
+  if (ambassadorState.busy){
+    setButtonBusy(btn, true);
+  } else {
+    setButtonBusy(btn, false);
+    btn.textContent = 'Claim';
+    btn.disabled = !ambassadorState.available;
+    btn.classList.toggle('is-ready', ambassadorState.available);
+  }
 }
 
 function applyAmbassadorState(data){
@@ -7695,6 +7789,10 @@ var GIGAPUB_GATE_PLACEMENT = 'gate';
 function showAdLoadingOverlay(){
   var el = document.getElementById('ad-loading-overlay');
   if (el) el.classList.add('is-visible');
+  var textEl = document.getElementById('ad-loading-overlay-text');
+  if (textEl) textEl.textContent = 'Loading Ad...';
+  var viaEl = document.getElementById('ad-loading-overlay-via');
+  if (viaEl) viaEl.style.display = '';
 }
 
 function hideAdLoadingOverlay(){
@@ -7702,19 +7800,33 @@ function hideAdLoadingOverlay(){
   if (el) el.classList.remove('is-visible');
 }
 
+// يُستدعى بعد نجاح مشاهدة الإعلان وقبل بدء الطلب الحقيقي للسيرفر — تبقى النافذة ظاهرة (نفس الدائرة
+// الدوّارة) لكن يتغيّر نصها من "Loading Ad..." إلى "Verifying..." بدل اختفائها فوراً وترك الزر بلا أي
+// مؤشر انتظار حتى وصول رد السيرفر. onSuccess في كل من الأفعال الستة (Mining/Streak/Spin/Chest/
+// GiftPick/PromoRedeem) هو من يستدعي hideAdLoadingOverlay() بنفسه عند وصول الرد الحقيقي (نجاحاً أو فشلاً).
+function setAdLoadingOverlayVerifying(){
+  var textEl = document.getElementById('ad-loading-overlay-text');
+  if (textEl) textEl.textContent = 'Verifying...';
+  var viaEl = document.getElementById('ad-loading-overlay-via');
+  if (viaEl) viaEl.style.display = 'none';
+}
+
 function setAdLoadingOverlayVia(providerName){
   var el = document.getElementById('ad-loading-overlay-via');
   if (el) el.textContent = 'via ' + providerName;
 }
 
-// onSuccess يُستدعى فقط بعد نجاح مشاهدة الإعلان بالكامل (من أي مزوّد)؛ onFail (اختياري) يُستدعى عند فشل/عدم توفر الإعلان من الاثنين معاً، ليتيح لكل زر إعادة تعيين حالته (busy=false، تفعيل الزر...).
+// onSuccess يُستدعى فقط بعد نجاح مشاهدة الإعلان بالكامل (من أي مزوّد)، وهو المسؤول عن استدعاء
+// hideAdLoadingOverlay() بنفسه بعد اكتمال طلبه الحقيقي للسيرفر (انظر setAdLoadingOverlayVerifying أعلاه)؛
+// onFail (اختياري) يُستدعى عند فشل/عدم توفر الإعلان من الاثنين معاً، ليتيح لكل زر إعادة تعيين حالته
+// (busy=false، تفعيل الزر...) — مسارات onFail تُخفي النافذة بنفسها فوراً لأنه لا طلب حقيقي يليها.
 function runAdGate(onSuccess, onFail){
   showAdLoadingOverlay();
   setAdLoadingOverlayVia('GigaPub');
 
   if (gigapubReady && typeof window.showGiga === 'function'){
     window.showGiga({ showTag: GIGAPUB_GATE_PLACEMENT }).then(function(){
-      hideAdLoadingOverlay();
+      setAdLoadingOverlayVerifying();
       triggerConfetti();
       onSuccess();
     }).catch(function(){
@@ -7750,12 +7862,13 @@ function runAdGateMonetixFallback(onSuccess, onFail){
     if (settled) return;
     settled = true;
     clearTimeout(noAdTimeout);
-    hideAdLoadingOverlay();
     if (res && (res.status === 'completed' || res.status === 'closed')){
+      setAdLoadingOverlayVerifying();
       reportGateAdWatched();
       triggerConfetti();
       onSuccess();
     } else {
+      hideAdLoadingOverlay();
       showBuyErrorToast('Ad was not completed', { title: 'Ad Required' });
       if (onFail) onFail();
     }
@@ -8096,6 +8209,9 @@ function fetchAdminTasks(section){
 
   var initData = getTelegramInitData();
   if (!initData) return;
+
+  var tasksListEl = document.getElementById(section + '-tasks-list');
+  if (tasksListEl) tasksListEl.innerHTML = skeletonRowsHtml(2, false);
 
   fetch('/api/tasks/list', {
     method: 'POST',
@@ -8769,8 +8885,13 @@ function renderFriendsStats(){
 
   var claimBtn = document.getElementById('friends-claim-btn');
   if (claimBtn){
-    var eligible = friendsState.pendingEarnings >= friendsState.minClaim && !friendsState.claimBusy;
-    claimBtn.classList.toggle('is-claimed', !eligible);
+    if (friendsState.claimBusy){
+      setButtonBusy(claimBtn, true);
+    } else {
+      setButtonBusy(claimBtn, false);
+      claimBtn.textContent = 'Claim';
+      claimBtn.classList.toggle('is-claimed', friendsState.pendingEarnings < friendsState.minClaim);
+    }
   }
 }
 
@@ -8902,6 +9023,8 @@ function fetchFriendsListPage(page, callback){
 
   friendsListState.busy = true;
   updateFriendsListNav();
+  var friendsContainer = document.getElementById('friends-list-container');
+  if (friendsContainer) friendsContainer.innerHTML = skeletonRowsHtml(4, true);
 
   fetch('/api/friends/list', {
     method: 'POST',
@@ -9068,6 +9191,8 @@ function onExchangeConfirm(){
   }
 
   exchangeBusy = true;
+  var exchangeBtn = document.getElementById('exchange-cta');
+  setButtonBusy(exchangeBtn, true);
   fetch('/api/exchange', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -9100,6 +9225,8 @@ function onExchangeConfirm(){
   })
   .finally(function(){
     exchangeBusy = false;
+    setButtonBusy(exchangeBtn, false);
+    updateExchange();
   });
 }
 
@@ -9156,6 +9283,7 @@ function runPromoRedeemRequest(initData, code, input){
   })
   .finally(function(){
     promoRedeemBusy = false;
+    hideAdLoadingOverlay();
   });
 }
 
@@ -9217,18 +9345,13 @@ function goDepositStep2(){
   document.getElementById('deposit-step2').style.display = 'block';
 }
 
-function setDepositCheckBtnState(text, disabled){
-  var btn = document.getElementById('deposit-check-btn');
-  if (!btn) return;
-  btn.textContent = text;
-  btn.disabled = disabled;
-}
-
 function stopDepositPolling(){
   clearTimeout(depositPollTimer);
   depositPollTimer = null;
   depositCheckBusy = false;
-  setDepositCheckBtnState("I've Sent - Check", false);
+  var btn = document.getElementById('deposit-check-btn');
+  setButtonBusy(btn, false);
+  if (btn) btn.disabled = false;
 }
 
 function checkDepositStatus(){
@@ -9240,7 +9363,7 @@ function checkDepositStatus(){
   }
 
   depositCheckBusy = true;
-  setDepositCheckBtnState('Checking...', true);
+  setButtonBusy(document.getElementById('deposit-check-btn'), true);
 
   fetch('/api/deposit/check', {
     method: 'POST',
@@ -9389,6 +9512,8 @@ function submitWithdrawRequest(){
   }
 
   withdrawBusy = true;
+  var withdrawBtn = document.getElementById('withdraw-cta');
+  setButtonBusy(withdrawBtn, true);
   fetch('/api/withdraw/request', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -9433,6 +9558,8 @@ function submitWithdrawRequest(){
   })
   .finally(function(){
     withdrawBusy = false;
+    setButtonBusy(withdrawBtn, false);
+    updateWithdraw(); // يعيد ضبط النص/disabled الصحيحين حسب حالة الحقول الحالية (setButtonBusy لا تلمس disabled بنفسها)
   });
 }
 
@@ -9461,6 +9588,8 @@ function onShowTxHistoryClick(){
   if (!initData) return;
 
   if (btn) btn.textContent = 'Loading...';
+  var txList = document.getElementById('tx-history-list');
+  if (txList) txList.innerHTML = skeletonRowsHtml(4, false);
 
   fetch('/api/wallet/history', {
     method: 'POST',
