@@ -384,7 +384,7 @@ img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
 .skeleton-row--thin{ height:14px; margin-bottom:14px; }
 
 /* -- غطاء Skeleton عام موحّد (واحد فقط لكل قسم كامل، بدل تصميم مطابق لكل حقل) — يُستخدَم لـProfile/Realm/Milestones: يغطي القسم بأكمله بأشرطة رمادية عامة بينما يُخفى المحتوى الحقيقي خلفه (visibility:hidden يحافظ على المساحة فلا يتغيّر الارتفاع عند الكشف) -- */
-.section-skeleton-overlay{ position:absolute; inset:0; z-index:5; padding-top:2px; }
+.section-skeleton-overlay{ position:absolute; inset:0; z-index:5; }
 .pf-stats{ position:relative; }
 .pf-stats.is-loading > .pf-stat-row{ visibility:hidden; }
 #page-realm.is-loading > *:not(.section-skeleton-overlay){ visibility:hidden; }
@@ -6086,7 +6086,7 @@ function fetchRealmStatus(){
   var realmPage = document.getElementById('page-realm');
   var realmSkeleton = document.getElementById('realm-skeleton');
   if (realmPage) realmPage.classList.add('is-loading');
-  if (realmSkeleton){ realmSkeleton.innerHTML = sectionSkeletonRowsHtml(8); realmSkeleton.style.display = ''; }
+  if (realmSkeleton){ realmSkeleton.innerHTML = skeletonRowsHtml(8, 'thin'); realmSkeleton.style.display = ''; }
 
   fetch('/api/realm/status', {
     method: 'POST',
@@ -6262,6 +6262,7 @@ function onPetUpgradeConfirm(){
   .finally(function(){
     petUpgradeBusy = false;
     setButtonBusy(petUpgradeBtn, false);
+    if (petUpgradeBtn) petUpgradeBtn.disabled = false;
   });
 }
 
@@ -6671,7 +6672,7 @@ function openLeaderboardModal(){
 
   ['ads', 'referrals'].forEach(function(type){
     var listEl = document.getElementById('lb-list-' + type);
-    if (listEl) listEl.innerHTML = skeletonRowsHtml(3, true);
+    if (listEl) listEl.innerHTML = skeletonRowsHtml(3, 'avatar');
   });
 
   fetch('/api/leaderboard', {
@@ -6775,22 +6776,14 @@ function setButtonBusy(btn, busy){
 
 // يُنتج نص HTML لصفوف Skeleton بسيطة (أشرطة رمادية لامعة) — تُستخدَم فقط عند Cache Miss الحقيقي
 // (قبل أول جلب فعلي)، أبداً عند Cache Hit لأن المحتوى الحقيقي يظهر فوراً دون انتظار. count = عدد
-// الصفوف الوهمية، withAvatar = true يضيف دائرة صغيرة يسار كل شريط (لعناصر بها صورة/أيقونة كالأصدقاء).
-function skeletonRowsHtml(count, withAvatar){
+// الصفوف الوهمية. variant: 'avatar' يضيف دائرة صغيرة يسار كل شريط (Friends/Leaderboard)، 'thin'
+// أشرطة رفيعة لغطاء قسم كامل (Profile/Realm/Milestones)، وبلا variant = شريط كامل (Wallet/Tasks).
+function skeletonRowsHtml(count, variant){
+  var rowHtml = variant === 'avatar'
+    ? '<div class="skeleton-list-item"><div class="skeleton-avatar"></div><div class="skeleton-row"></div></div>'
+    : (variant === 'thin' ? '<div class="skeleton-row skeleton-row--thin"></div>' : '<div class="skeleton-row"></div>');
   var rows = [];
-  for (var i = 0; i < count; i++){
-    rows.push(withAvatar
-      ? '<div class="skeleton-list-item"><div class="skeleton-avatar"></div><div class="skeleton-row"></div></div>'
-      : '<div class="skeleton-row"></div>');
-  }
-  return rows.join('');
-}
-
-// نفس الفكرة لكن أشرطة رفيعة — تُستخدَم فقط داخل section-skeleton-overlay (غطاء عام واحد لكل
-// قسم بالكامل، بدل غطاء مطابق لكل حقل على حدة) في Profile/Realm/Milestones.
-function sectionSkeletonRowsHtml(count){
-  var rows = [];
-  for (var i = 0; i < count; i++) rows.push('<div class="skeleton-row skeleton-row--thin"></div>');
+  for (var i = 0; i < count; i++) rows.push(rowHtml);
   return rows.join('');
 }
 
@@ -6807,7 +6800,7 @@ function openProfileModal(){
   var pfStats = document.getElementById('pf-stats');
   var pfSkeleton = document.getElementById('pf-stats-skeleton');
   if (pfStats) pfStats.classList.add('is-loading');
-  if (pfSkeleton){ pfSkeleton.innerHTML = sectionSkeletonRowsHtml(10); pfSkeleton.style.display = ''; }
+  if (pfSkeleton){ pfSkeleton.innerHTML = skeletonRowsHtml(10, 'thin'); pfSkeleton.style.display = ''; }
 
   fetch('/api/profile', {
     method: 'POST',
@@ -6966,6 +6959,7 @@ function onStorageUpgradeConfirm(){
   .finally(function(){
     storageUpgradeBusy = false;
     setButtonBusy(storageUpgradeBtn, false);
+    if (storageUpgradeBtn) storageUpgradeBtn.disabled = false;
   });
 }
 
@@ -7470,6 +7464,7 @@ function renderAdsTaskButton(){
       setButtonBusy(btn, true);
     } else {
       setButtonBusy(btn, false);
+      btn.disabled = false;
       btn.textContent = inCooldown ? String(cooldownRemaining) : 'Watch';
       btn.classList.toggle('is-claimed', adsTaskState.watchedToday >= adsTaskState.dailyLimit || inCooldown);
     }
@@ -7612,9 +7607,15 @@ function renderBonusAdButton(){
   var remainingMs = bonusAdState.nextAvailableAt - Date.now();
   var inCooldown = !dailyDone && remainingMs > 0;
   if (btn){
-    var minutesLeft = Math.max(1, Math.ceil(remainingMs / 60000));
-    btn.textContent = inCooldown ? String(minutesLeft) : 'Watch';
-    btn.classList.toggle('is-claimed', dailyDone || bonusAdState.busy || inCooldown);
+    if (bonusAdState.busy){
+      setButtonBusy(btn, true);
+    } else {
+      setButtonBusy(btn, false);
+      btn.disabled = false;
+      var minutesLeft = Math.max(1, Math.ceil(remainingMs / 60000));
+      btn.textContent = inCooldown ? String(minutesLeft) : 'Watch';
+      btn.classList.toggle('is-claimed', dailyDone || inCooldown);
+    }
   }
 }
 
@@ -7773,6 +7774,7 @@ function renderGigapubButton(){
       setButtonBusy(btn, true);
     } else {
       setButtonBusy(btn, false);
+      btn.disabled = false; // setButtonBusy(false) لا تلمس disabled؛ هذا الزر لم يكن يستخدم disabled أصلاً قبل إضافة setButtonBusy، فيجب إعادة ضبطه صراحة هنا وإلا يبقى معطَّلاً للأبد بعد أول استخدام
       btn.textContent = inCooldown ? String(cooldownRemaining) : 'Watch';
       btn.classList.toggle('is-claimed', dailyDone || inCooldown);
     }
@@ -8005,6 +8007,7 @@ function renderMonetixButton(){
       setButtonBusy(btn, true);
     } else {
       setButtonBusy(btn, false);
+      btn.disabled = false;
       btn.textContent = inCooldown ? String(cooldownRemaining) : 'Watch';
       btn.classList.toggle('is-claimed', dailyDone || inCooldown);
     }
@@ -8313,7 +8316,7 @@ function fetchAdminTasks(section){
   if (!initData) return;
 
   var tasksListEl = document.getElementById(section + '-tasks-list');
-  if (tasksListEl) tasksListEl.innerHTML = skeletonRowsHtml(2, false);
+  if (tasksListEl) tasksListEl.innerHTML = skeletonRowsHtml(2);
 
   fetch('/api/tasks/list', {
     method: 'POST',
@@ -8953,7 +8956,7 @@ function onShowMilestonesClick(){
 
   setButtonBusy(btn, true);
   var msSkeleton = document.getElementById('milestone-missions-skeleton');
-  if (msSkeleton){ msSkeleton.innerHTML = sectionSkeletonRowsHtml(4); msSkeleton.style.display = ''; }
+  if (msSkeleton){ msSkeleton.innerHTML = skeletonRowsHtml(4, 'thin'); msSkeleton.style.display = ''; }
 
   fetch('/api/friends/milestones', {
     method: 'POST',
@@ -8975,7 +8978,8 @@ function onShowMilestonesClick(){
   .catch(function(err){
     console.error('fetch friends milestones failed:', err);
     if (msSkeleton) msSkeleton.style.display = 'none';
-    setButtonBusy(btn, false); // اسمح بإعادة المحاولة
+    setButtonBusy(btn, false);
+    if (btn) btn.disabled = false; // اسمح بإعادة المحاولة
   });
 }
 
@@ -8995,6 +8999,7 @@ function renderFriendsStats(){
       setButtonBusy(claimBtn, true);
     } else {
       setButtonBusy(claimBtn, false);
+      claimBtn.disabled = false;
       claimBtn.textContent = 'Claim';
       claimBtn.classList.toggle('is-claimed', friendsState.pendingEarnings < friendsState.minClaim);
     }
@@ -9098,7 +9103,7 @@ function onShowFriendsListClick(){
   setButtonBusy(btn, true);
 
   fetchFriendsListPage(0, function(ok){
-    if (!ok){ setButtonBusy(btn, false); return; }
+    if (!ok){ setButtonBusy(btn, false); if (btn) btn.disabled = false; return; }
     friendsListState.loaded = true;
     if (btn) btn.remove();
   });
@@ -9130,7 +9135,7 @@ function fetchFriendsListPage(page, callback){
   friendsListState.busy = true;
   updateFriendsListNav();
   var friendsContainer = document.getElementById('friends-list-container');
-  if (friendsContainer) friendsContainer.innerHTML = skeletonRowsHtml(4, true);
+  if (friendsContainer) friendsContainer.innerHTML = skeletonRowsHtml(4, 'avatar');
 
   fetch('/api/friends/list', {
     method: 'POST',
@@ -9704,7 +9709,7 @@ function onShowTxHistoryClick(){
 
   setButtonBusy(btn, true);
   var txList = document.getElementById('tx-history-list');
-  if (txList) txList.innerHTML = skeletonRowsHtml(4, false);
+  if (txList) txList.innerHTML = skeletonRowsHtml(4);
 
   fetch('/api/wallet/history', {
     method: 'POST',
@@ -9722,6 +9727,7 @@ function onShowTxHistoryClick(){
   .catch(function(err){
     console.error('wallet history request failed:', err);
     setButtonBusy(btn, false);
+    if (btn) btn.disabled = false;
   });
 }
 
