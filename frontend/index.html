@@ -5954,9 +5954,18 @@ function showBuySuccessGeneric(btn){
 // بيانات الحيوانات المملوكة + Happy Dog/Guardian/Ambassador + Storage — تُجلَب
 // فقط عند أول فتح فعلي لصفحة Realm أو نافذتي Free Pet/Quick Free Pet (وليس
 // مع كل /api/user)، لأنها لا تظهر في أي واجهة أخرى بالتطبيق. مرة واحدة لكل جلسة.
+// كاش محلي 5 دقائق بالإضافة لعلم الجلسة realmStatusFetched — يبقى بعد إغلاق/إعادة فتح البوت خلال هذه المدة بدل إعادة جلب 3 استعلامات (JOIN + كل الحيوانات + Ambassador) في كل مرة. يُبطَل فوراً عند شراء/ترقية أي حيوان، استلام/ترقية/سحب Storage، أو استلام Happy Dog/Guardian/Ambassador (انظر localCacheClear('realm') في كل هذه الدوال).
 var realmStatusFetched = false;
 function fetchRealmStatus(){
   if (realmStatusFetched) return;
+
+  var cached = localCacheGet('realm');
+  if (cached){
+    realmStatusFetched = true;
+    applyRealmStatusData(cached);
+    return;
+  }
+
   var initData = getTelegramInitData();
   if (!initData) return;
   realmStatusFetched = true;
@@ -5969,34 +5978,45 @@ function fetchRealmStatus(){
   .then(function(res){ return res.json(); })
   .then(function(data){
     if (data.error) return;
-    applyPetsState(data.pets);
-    applyStorageState({
-      storage_has_pet: data.storage_has_pet,
-      total_speed: data.total_speed,
-      storage_level: data.storage_level,
-      storage_capacity_seconds: data.storage_capacity_seconds,
-      storage_remaining_seconds: data.storage_remaining_seconds
-    });
-    applyHappyDogState({
-      active_friends: friendsState.active,
-      threshold: data.happy_dog_friends_threshold,
-      claimed: data.happy_dog_claimed
-    });
-    applyGuardianState({
-      ads_watched: data.lifetime_ads_watched,
-      threshold: data.guardian_ads_threshold,
-      claimed: data.guardian_claimed
-    });
-    applyAmbassadorState({
-      available: data.ambassador_available,
-      claimed: data.ambassador_claimed,
-      speed: data.pets && data.pets.ambassador ? data.pets.ambassador.speed : 0
-    });
+    localCacheSet('realm', data);
+    applyRealmStatusData(data);
   })
   .catch(function(err){
     console.error('fetch realm status failed:', err);
     realmStatusFetched = false; // اسمح بإعادة المحاولة عند فتح Realm/النوافذ مجدداً
   });
+}
+
+function applyRealmStatusData(data){
+  applyPetsState(data.pets);
+  applyStorageState({
+    storage_has_pet: data.storage_has_pet,
+    total_speed: data.total_speed,
+    storage_level: data.storage_level,
+    storage_capacity_seconds: data.storage_capacity_seconds,
+    storage_remaining_seconds: data.storage_remaining_seconds
+  });
+  applyHappyDogState({
+    active_friends: friendsState.active,
+    threshold: data.happy_dog_friends_threshold,
+    claimed: data.happy_dog_claimed
+  });
+  applyGuardianState({
+    ads_watched: data.lifetime_ads_watched,
+    threshold: data.guardian_ads_threshold,
+    claimed: data.guardian_claimed
+  });
+  applyAmbassadorState({
+    available: data.ambassador_available,
+    claimed: data.ambassador_claimed,
+    speed: data.pets && data.pets.ambassador ? data.pets.ambassador.speed : 0
+  });
+}
+
+// يُستدعى بعد أي فعل يغيّر بيانات Realm فعلياً (شراء/ترقية حيوان، Storage، Happy Dog/Guardian/Ambassador) — يُبطل الكاش ويسمح بإعادة الجلب عند العودة لصفحة Realm.
+function invalidateRealmCache(){
+  localCacheClear('realm');
+  realmStatusFetched = false;
 }
 
 function applyPetsState(petsData){
@@ -6050,6 +6070,7 @@ function onPetBuyClick(petId, btn){
     });
     showBuySuccessGeneric(btn);
     showPurchaseToast(def.name, 'Lv.1');
+    invalidateRealmCache();
   })
   .catch(function(err){
     console.error('pet buy request failed:', err);
@@ -6103,6 +6124,7 @@ function onPetUpgradeConfirm(){
       storage_remaining_seconds: storageState.capacitySeconds
     });
     showUpgradeToast(def.name, 'Lv.' + data.level);
+    invalidateRealmCache();
   })
   .catch(function(err){
     console.error('pet upgrade request failed:', err);
@@ -6237,6 +6259,7 @@ function onStorageClaimClick(){
     updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE });
     showPrizeToast('coins', Math.round(data.claimed_amount * 100) / 100, 'You Got');
     triggerConfetti();
+    invalidateRealmCache();
     applyStorageState({
       storage_has_pet: true,
       total_speed: storageState.totalSpeed,
@@ -6519,8 +6542,46 @@ function openSupportChat(){
   }
 }
 
+/* ===================================================================== كاش محلي عام (localStorage) بمدة صلاحية 5 دقائق — يُستخدم فقط للأقسام شبه الثابتة (Profile، Realm، Tasks، Milestones، Friends List) التي لا تتغيّر كل ثانية، لتقليل الطلبات المتكررة عند إغلاق/إعادة فتح البوت خلال فترة قصيرة (سيناريو شائع جداً في Telegram Mini Apps — إعادة الفتح تُصفِّر أي متغيّر بذاكرة الصفحة، لكن localStorage يبقى محفوظاً). يُبطَل فوراً (localCacheClear) عند أي فعل حقيقي يغيّر البيانات المخزَّنة تحديداً، بدل انتظار انتهاء الصلاحية. لا علاقة له إطلاقاً بـ/api/user (يبقى حياً دائماً بلا أي كاش) ولا بكاش Leaderboard اليومي المنفصل تماماً (مفاتيح مختلفة كلياً). المفتاح يتضمن معرّف تيليجرام لمنع أي تداخل نظري بين حسابات مختلفة تشارك نفس تخزين المتصفح. ===================================================================== */
+var LOCAL_CACHE_TTL_MS = 5 * 60 * 1000;
+
+function localCacheKey(name){
+  var uid = 0;
+  try{
+    if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user){
+      uid = window.Telegram.WebApp.initDataUnsafe.user.id;
+    }
+  }catch(e){}
+  return 'mx_cache_' + name + '_' + uid;
+}
+
+function localCacheGet(name){
+  try{
+    var raw = localStorage.getItem(localCacheKey(name));
+    if (!raw) return null;
+    var parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed.t !== 'number') return null;
+    if (Date.now() - parsed.t > LOCAL_CACHE_TTL_MS) return null;
+    return parsed.d;
+  }catch(e){ return null; }
+}
+
+function localCacheSet(name, data){
+  try{
+    localStorage.setItem(localCacheKey(name), JSON.stringify({ t: Date.now(), d: data }));
+  }catch(e){ /* وضع خاص بالمتصفح أو تخزين ممتلئ — نتجاهل بصمت، التطبيق يعمل بلا كاش فقط بلا أي خطأ ظاهر للمستخدم */ }
+}
+
+function localCacheClear(name){
+  try{ localStorage.removeItem(localCacheKey(name)); }catch(e){}
+}
+
+// نافذة Profile كانت النقطة الوحيدة بالتطبيق بلا أي تخزين مؤقت إطلاقاً (تُعاد جلبها بالكامل مع 3 استعلامات D1 في كل ضغطة، إحداها SUM بلا حد أقصى على كامل تاريخ الإيداعات/السحوبات). يُبطَل فوراً عند تأكيد إيداع حقيقي (pollDepositStatus) لأنه الحدث الوحيد الذي يُغيّر أرقامها بشكل نعرفه من طرف العميل مباشرة.
 function openProfileModal(){
   openModal('modal-profile');
+
+  var cached = localCacheGet('profile');
+  if (cached){ applyProfileData(cached); return; }
 
   var initData = getTelegramInitData();
   if (!initData) return;
@@ -6533,46 +6594,50 @@ function openProfileModal(){
   .then(function(res){ return res.json(); })
   .then(function(data){
     if (data.error) return;
-
-    var nameEl = document.getElementById('pf-name');
-    if (nameEl) nameEl.textContent = data.display_name;
-
-    var usernameEl = document.getElementById('pf-username');
-    if (usernameEl) usernameEl.textContent = data.username ? ('@' + data.username) : 'No username';
-
-    var idEl = document.getElementById('pf-stat-id');
-    if (idEl) idEl.textContent = data.telegram_id;
-
-    var registeredEl = document.getElementById('pf-stat-registered');
-    if (registeredEl) registeredEl.textContent = data.registered_date;
-
-    var referralsEl = document.getElementById('pf-stat-referrals');
-    if (referralsEl) referralsEl.textContent = data.invites;
-
-    var activeReferralsEl = document.getElementById('pf-stat-active-referrals');
-    if (activeReferralsEl) activeReferralsEl.textContent = data.active_invites;
-
-    var referralCommissionEl = document.getElementById('pf-stat-referral-commission');
-    if (referralCommissionEl) referralCommissionEl.textContent = Number(data.referral_commission_total).toLocaleString('en-US', { maximumFractionDigits: 0 });
-
-    var coinsEl = document.getElementById('pf-stat-coins');
-    if (coinsEl) coinsEl.textContent = Number(data.coins).toLocaleString('en-US', { maximumFractionDigits: 0 });
-
-    var gramEl = document.getElementById('pf-stat-gram');
-    if (gramEl) gramEl.textContent = Number(data.gram).toFixed(3);
-
-    var speedEl = document.getElementById('pf-stat-speed');
-    if (speedEl) speedEl.textContent = '+' + Number(data.total_speed).toLocaleString('en-US', { maximumFractionDigits: 0 }) + ' Coins/hr';
-
-    var depositEl = document.getElementById('pf-stat-deposit');
-    if (depositEl) depositEl.textContent = Number(data.total_deposit_gram).toFixed(3) + ' Gram';
-
-    var withdrawEl = document.getElementById('pf-stat-withdraw');
-    if (withdrawEl) withdrawEl.textContent = Number(data.total_withdraw_gram).toFixed(3) + ' Gram';
+    localCacheSet('profile', data);
+    applyProfileData(data);
   })
   .catch(function(err){
     console.error('fetch profile failed:', err);
   });
+}
+
+function applyProfileData(data){
+  var nameEl = document.getElementById('pf-name');
+  if (nameEl) nameEl.textContent = data.display_name;
+
+  var usernameEl = document.getElementById('pf-username');
+  if (usernameEl) usernameEl.textContent = data.username ? ('@' + data.username) : 'No username';
+
+  var idEl = document.getElementById('pf-stat-id');
+  if (idEl) idEl.textContent = data.telegram_id;
+
+  var registeredEl = document.getElementById('pf-stat-registered');
+  if (registeredEl) registeredEl.textContent = data.registered_date;
+
+  var referralsEl = document.getElementById('pf-stat-referrals');
+  if (referralsEl) referralsEl.textContent = data.invites;
+
+  var activeReferralsEl = document.getElementById('pf-stat-active-referrals');
+  if (activeReferralsEl) activeReferralsEl.textContent = data.active_invites;
+
+  var referralCommissionEl = document.getElementById('pf-stat-referral-commission');
+  if (referralCommissionEl) referralCommissionEl.textContent = Number(data.referral_commission_total).toLocaleString('en-US', { maximumFractionDigits: 0 });
+
+  var coinsEl = document.getElementById('pf-stat-coins');
+  if (coinsEl) coinsEl.textContent = Number(data.coins).toLocaleString('en-US', { maximumFractionDigits: 0 });
+
+  var gramEl = document.getElementById('pf-stat-gram');
+  if (gramEl) gramEl.textContent = Number(data.gram).toFixed(3);
+
+  var speedEl = document.getElementById('pf-stat-speed');
+  if (speedEl) speedEl.textContent = '+' + Number(data.total_speed).toLocaleString('en-US', { maximumFractionDigits: 0 }) + ' Coins/hr';
+
+  var depositEl = document.getElementById('pf-stat-deposit');
+  if (depositEl) depositEl.textContent = Number(data.total_deposit_gram).toFixed(3) + ' Gram';
+
+  var withdrawEl = document.getElementById('pf-stat-withdraw');
+  if (withdrawEl) withdrawEl.textContent = Number(data.total_withdraw_gram).toFixed(3) + ' Gram';
 }
 
 function openWithdrawReqModal(){
@@ -6663,6 +6728,7 @@ function onStorageUpgradeConfirm(){
       storage_remaining_seconds: data.capacity_seconds
     });
     showStorageUpgradeToast(data.level, STORAGE_LEVEL_HOURS[data.level - 1]);
+    invalidateRealmCache();
   })
   .catch(function(err){
     console.error('storage upgrade request failed:', err);
@@ -6748,6 +6814,7 @@ function onClaimHappyDogClick(){
     if (typeof data.total_speed === 'number') applyClaimedPetSpeed(data.total_speed);
     renderHappyDogUI();
     showAppToast({ title: 'Happy Dog', amount: 'Pet unlocked for free!' });
+    invalidateRealmCache();
   })
   .catch(function(err){
     console.error('claim happy dog failed:', err);
@@ -6835,6 +6902,7 @@ function onClaimGuardianClick(){
     if (typeof data.total_speed === 'number') applyClaimedPetSpeed(data.total_speed);
     renderGuardianUI();
     showAppToast({ title: 'The Guardian', amount: 'Pet unlocked for free!' });
+    invalidateRealmCache();
   })
   .catch(function(err){
     console.error('claim guardian failed:', err);
@@ -6905,6 +6973,7 @@ function onClaimAmbassadorClick(){
     renderAmbassadorUI();
     showAppToast({ title: 'The Ambassador', amount: 'Pet unlocked!' });
     triggerConfetti();
+    invalidateRealmCache();
   })
   .catch(function(err){
     console.error('claim ambassador failed:', err);
@@ -7938,6 +8007,13 @@ var adminTasksCountdownTimers = {};
 var ADMIN_TASK_COUNTDOWN_SECONDS = 10;
 
 function fetchAdminTasks(section){
+  var cached = localCacheGet('tasks_' + section);
+  if (cached){
+    adminTasksState[section] = cached;
+    renderAdminTasks(section);
+    return;
+  }
+
   var initData = getTelegramInitData();
   if (!initData) return;
 
@@ -7949,6 +8025,7 @@ function fetchAdminTasks(section){
   .then(function(res){ return res.json(); })
   .then(function(data){
     adminTasksState[section] = data.tasks || [];
+    localCacheSet('tasks_' + section, adminTasksState[section]);
     renderAdminTasks(section);
   })
   .catch(function(err){
@@ -8070,6 +8147,7 @@ function onAdminTaskClick(taskId, section){
     var list = adminTasksState[section] || [];
     var idx = list.indexOf(task);
     if (idx !== -1) list.splice(idx, 1);
+    localCacheSet('tasks_' + section, list);
     delete adminTasksReady[taskId];
     delete adminTasksCountdown[taskId];
     updateBalanceDisplay({ coins: r.data.coins, gram: CURRENT_GRAM_BALANCE });
@@ -8558,10 +8636,23 @@ function applyFriendsState(data){
 var friendsMilestonesFetched = false;
 function onShowMilestonesClick(){
   if (friendsMilestonesFetched) return;
+
+  var btn = document.getElementById('btn-show-milestones');
+
+  var cached = localCacheGet('milestones');
+  if (cached){
+    friendsMilestonesFetched = true;
+    friendsState.milestones = cached;
+    renderMilestones();
+    var cachedList = document.getElementById('milestone-missions-list');
+    if (cachedList) cachedList.style.display = '';
+    if (btn) btn.remove();
+    return;
+  }
+
   var initData = getTelegramInitData();
   if (!initData) return;
 
-  var btn = document.getElementById('btn-show-milestones');
   if (btn) btn.textContent = 'Loading...';
 
   fetch('/api/friends/milestones', {
@@ -8574,6 +8665,7 @@ function onShowMilestonesClick(){
     if (!data.milestones) return;
     friendsMilestonesFetched = true;
     friendsState.milestones = data.milestones;
+    localCacheSet('milestones', friendsState.milestones);
     renderMilestones();
     var list = document.getElementById('milestone-missions-list');
     if (list) list.style.display = '';
@@ -8684,6 +8776,7 @@ function onClaimMilestoneClick(tier){
     updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE });
     var m = friendsState.milestones.find(function(x){ return x.count === tier; });
     if (m) m.claimed = true;
+    localCacheSet('milestones', friendsState.milestones);
     renderMilestones();
     showAppToast({ title: 'Milestone Claimed', icon: PRIZE_ICON_URLS.coins, amount: '+' + formatFriendsAmount(data.reward) + ' Coins' });
   })
@@ -8714,6 +8807,16 @@ function fetchFriendsListPage(page, callback){
     return;
   }
 
+  var cached = localCacheGet('friends_list_p' + page);
+  if (cached){
+    friendsListState.pages[page] = cached.friends || [];
+    friendsListState.hasMore = !!cached.has_more;
+    friendsListState.page = page;
+    renderFriendsList();
+    if (callback) callback(true);
+    return;
+  }
+
   var initData = getTelegramInitData();
   if (!initData){ if (callback) callback(false); return; }
 
@@ -8731,6 +8834,7 @@ function fetchFriendsListPage(page, callback){
     friendsListState.pages[page] = data.friends || [];
     friendsListState.hasMore = !!data.has_more;
     friendsListState.page = page;
+    localCacheSet('friends_list_p' + page, { friends: friendsListState.pages[page], has_more: friendsListState.hasMore });
     renderFriendsList();
     if (callback) callback(true);
   })
@@ -9094,6 +9198,9 @@ function pollDepositStatus(initData){
     if (data.status === 'found' || data.status === 'already_processed'){
       stopDepositPolling();
       updateBalanceDisplay({ coins: data.coins, gram: data.gram });
+      // إيداع حقيقي يغيّر total_deposit_gram (Profile) وسجل المعاملات (Wallet History) — إبطال فوري بدل انتظار انتهاء الـ5 دقائق.
+      localCacheClear('profile');
+      localCacheClear('wallet_history');
       closeModal('modal-deposit');
       showAppToast({
         title: data.status === 'found' ? 'Deposit Confirmed!' : 'Deposit Already Processed',
@@ -9229,6 +9336,8 @@ function submitWithdrawRequest(){
 
     updateBalanceDisplay({ gram: data.gram });
     NEXT_WITHDRAW_ALLOWED_AT = data.next_allowed_at;
+    // طلب سحب جديد يظهر فوراً بحالة "Pending" في Wallet History — إبطال بدل انتظار الـ5 دقائق (لا حاجة لإبطال Profile: مجموعه يحسب السحوبات المعتمدة فقط، ولن يتغيّر بمجرد تقديم الطلب).
+    localCacheClear('wallet_history');
     closeModal('modal-withdraw');
     showAppToast({
       title: 'Withdrawal Requested',
@@ -9253,14 +9362,24 @@ var TX_ICON_DEPOSIT =
 var TX_ICON_WITHDRAW =
   '<svg viewBox="0 0 24 24" fill="none" stroke="#d98a86" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M19 12l-7 7-7-7"/></svg>';
 
-// نفس أسلوب Friends List بالضبط: لا يُرسَل أي طلب ولا يُقرَأ D1 إطلاقاً إلا بعد ضغطة صريحة على الزر (مرة واحدة فقط لكل جلسة — الزر يُحذَف بعد أول تحميل ناجح).
+// لا يُرسَل أي طلب ولا يُقرَأ D1 إلا بعد ضغطة صريحة على الزر، ثم كاش محلي 5 دقائق بعدها (بدل جلسة بحتة) — يُبطَل فوراً عند إيداع مؤكَّد أو طلب سحب جديد (انظر localCacheClear('wallet_history') في pollDepositStatus/submitWithdrawRequest). الزر يُحذَف بعد أول تحميل ناجح؛ لا حاجة لإعادة إظهاره لاحقاً لأن renderTxHistory يمكن استدعاؤه مباشرة عند إعادة الفتح لو كانت البيانات محفوظة بالكاش.
 var txHistoryLoaded = false;
 function onShowTxHistoryClick(){
   if (txHistoryLoaded) return;
+
+  var btn = document.getElementById('btn-show-tx-history');
+
+  var cached = localCacheGet('wallet_history');
+  if (cached){
+    txHistoryLoaded = true;
+    renderTxHistory(cached);
+    if (btn) btn.remove();
+    return;
+  }
+
   var initData = getTelegramInitData();
   if (!initData) return;
 
-  var btn = document.getElementById('btn-show-tx-history');
   if (btn) btn.textContent = 'Loading...';
 
   fetch('/api/wallet/history', {
@@ -9270,8 +9389,10 @@ function onShowTxHistoryClick(){
   })
   .then(function(res){ return res.json(); })
   .then(function(data){
+    var items = (data && data.items) || [];
     txHistoryLoaded = true;
-    renderTxHistory((data && data.items) || []);
+    localCacheSet('wallet_history', items);
+    renderTxHistory(items);
     if (btn) btn.remove();
   })
   .catch(function(err){
