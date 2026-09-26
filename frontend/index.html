@@ -5712,6 +5712,7 @@ function renderSpinButton(){
   if (!btn) return;
   btn.textContent = spinState.claimedToday ? 'Spin (0)' : 'Spin (1)';
   btn.classList.toggle('is-claimed', spinState.claimedToday);
+  btn.disabled = spinState.claimedToday; // بدون هذا يبقى disabled=true عالقاً من طلب الاستلام السابق حتى لو انتهى اليوم فعلياً (لا يُلاحَظ إلا لو بقيت الجلسة مفتوحة عبر منتصف الليل UTC)
 }
 
 function applySpinState(data){
@@ -5809,6 +5810,7 @@ function renderChestButton(){
   if (!btn) return;
   btn.innerHTML = chestState.claimedToday ? 'Open Chest&nbsp;&nbsp;(0)' : 'Open Chest&nbsp;&nbsp;(1)';
   btn.classList.toggle('is-claimed', chestState.claimedToday);
+  btn.disabled = chestState.claimedToday;
 }
 
 function applyChestState(data){
@@ -5893,6 +5895,7 @@ function renderGiftOpenButton(){
   if (!btn) return;
   btn.innerHTML = giftPickState.claimedToday ? 'Open&nbsp;&nbsp;(0)' : 'Open&nbsp;&nbsp;(1)';
   btn.classList.toggle('is-claimed', giftPickState.claimedToday);
+  btn.disabled = giftPickState.claimedToday;
 }
 
 function applyGiftPickState(data){
