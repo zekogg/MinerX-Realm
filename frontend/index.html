@@ -1697,6 +1697,12 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   color:#eafdec;
   border-color:rgba(234,253,236,.4);
 }
+/* -- جاهز للاستلام فعلاً (تحقق الشرط): نفس أخضر زر Deposit -- */
+.hd-claim-btn.is-ready{
+  background:linear-gradient(135deg, var(--c-btn-deposit-1), var(--c-btn-deposit-2));
+  color:var(--c-btn-deposit-text);
+  border-color:rgba(234,253,236,.4);
+}
 
 /* -- بطاقة The Guardian — بدون توهج/Buy/Upgrade/Lv، بحد أحمر يناسب شال الشخصية -- */
 .tg-exclusive::before{
@@ -1753,6 +1759,12 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   color:#eafdec;
   border-color:rgba(234,253,236,.4);
 }
+/* -- جاهز للاستلام فعلاً (تحقق الشرط): نفس أخضر زر Deposit -- */
+.tg-claim-btn.is-ready{
+  background:linear-gradient(135deg, var(--c-btn-deposit-1), var(--c-btn-deposit-2));
+  color:var(--c-btn-deposit-text);
+  border-color:rgba(234,253,236,.4);
+}
 
 /* -- بطاقة The Ambassador — بدون سعر شراء/Buy/Upgrade، بحد بنفسجي-ذهبي يناسب زي الشخصية بالصورة -- */
 .amb-exclusive::before{
@@ -1806,16 +1818,11 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   color:#eafdec;
   border-color:rgba(234,253,236,.4);
 }
-/* -- حالة "منح معلّق من الأدمن، جاهز للاستلام": توهج بنفسجي-ذهبي نابض -- */
+/* -- حالة "منح معلّق من الأدمن، جاهز للاستلام": نفس أخضر زر Deposit -- */
 .amb-claim-btn.is-ready{
-  background:linear-gradient(135deg, #b794f6, #e3a542);
-  color:#2a1533;
-  border-color:rgba(183,148,246,.6);
-  animation:amb-claim-glow 1.6s ease-in-out infinite;
-}
-@keyframes amb-claim-glow{
-  0%, 100%{ box-shadow:0 0 6px -1px rgba(183,148,246,.7); }
-  50%{ box-shadow:0 0 14px 2px rgba(227,165,66,.85); }
+  background:linear-gradient(135deg, var(--c-btn-deposit-1), var(--c-btn-deposit-2));
+  color:var(--c-btn-deposit-text);
+  border-color:rgba(234,253,236,.4);
 }
 
 .pet-exclusive-grid{ display:flex; flex-direction:column; gap:12px; }
@@ -2227,12 +2234,8 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 }
 .pod::after{
   content:""; position:absolute; inset:4px; border-radius:50%;
-  background:var(--pod-c1); filter:blur(11px); opacity:.7;
-  animation:pod-pulse 2.6s ease-in-out infinite;
-}
-@keyframes pod-pulse{
-  0%,100%{ opacity:.55; transform:scale(.95); }
-  50%{ opacity:.9; transform:scale(1.1); }
+  background:var(--pod-c1); filter:blur(11px);
+  opacity:.9; transform:scale(1.1);
 }
 .pod__inner{
   position:relative; z-index:1; width:100%; height:100%; border-radius:50%;
@@ -2945,8 +2948,12 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   background:linear-gradient(135deg, #6fbf73, #2f7d3f);
   color:#eafdec; box-shadow:none;
 }
-.hd-claim-btn:disabled, .tg-claim-btn:disabled, .fp-claim-btn:disabled{
+.fp-claim-btn:disabled{
   opacity:.55; cursor:not-allowed;
+}
+/* -- hd-claim-btn/tg-claim-btn غير الجاهزين: بلا تعتيم، نفس مظهر زر Claim لـThe Ambassador قبل تحقق الشرط (رمادي محايد كامل الوضوح) -- */
+.hd-claim-btn:disabled:not(.is-claimed), .tg-claim-btn:disabled:not(.is-claimed){
+  cursor:not-allowed;
 }
 
 /* -- نافذة Free Pet Tasks (من Quick Actions) — تصميم مصغّر يتماشى مع باقي النوافذ -- */
@@ -6197,6 +6204,21 @@ function applyStorageState(data){
   }
 }
 
+// إيقاف/استئناف عدّاد Storage عند مغادرة/العودة لصفحة Realm فقط (وليس عند إغلاق التطبيق —
+// ذلك يوقف كل شيء تلقائياً بلا حاجة لأي كود). لا داعي لتشغيله 5 مرات بالثانية وهو غير ظاهر
+// أصلاً لأي مستخدم بصفحة أخرى (Earn/Tasks/Friends/Wallet). storageState.syncedAtMs لا يتأثر
+// بالإيقاف/الاستئناف لأن storageTick يحسب الوقت المنقضي من الساعة الحقيقية في كل مرة يُستدعى،
+// فلا يحدث أي انحراف بالرقم المعروض بعد الاستئناف.
+function pauseStorageTick(){
+  clearInterval(storageTickTimer);
+  storageTickTimer = null;
+}
+function resumeStorageTick(){
+  if (storageTickTimer || !storageState.hasPet) return;
+  storageTick();
+  storageTickTimer = setInterval(storageTick, 200);
+}
+
 // أرقام Storage < 1000: تُعرض كاملة بـ3 خانات عشرية (240.452). أرقام >= 1000: تُختصَر لصيغة
 // "1.2K,345" — الجزء "1.2K" هو الآلاف مقطوعاً (بلا تقريب لأعلى) وثابت لا يتغيّر إلا كل 1000 وحدة
 // كاملة، والجزء "345" هو باقي القسمة على 1000 (آخر 3 أرقام) وهو الذي يستمر بالتزايد بصرياً كل
@@ -6318,7 +6340,12 @@ fetchUserData();
       var active = btn.getAttribute('data-page') === pageId;
       btn.classList.toggle('is-active', active);
     });
-    if (pageId === 'page-realm' && typeof fetchRealmStatus === 'function') fetchRealmStatus();
+    if (pageId === 'page-realm'){
+      if (typeof fetchRealmStatus === 'function') fetchRealmStatus();
+      if (typeof resumeStorageTick === 'function') resumeStorageTick();
+    } else if (typeof pauseStorageTick === 'function'){
+      pauseStorageTick();
+    }
   }
 
   navButtons.forEach(function(btn){
@@ -6788,10 +6815,15 @@ function renderHappyDogUI(){
       btn.textContent = '✓';
       btn.disabled = true;
       btn.classList.add('is-claimed');
+      btn.classList.remove('is-ready');
     } else {
       btn.textContent = happyDogState.busy ? '...' : 'Claim';
       btn.disabled = happyDogState.busy || happyDogState.activeFriends < happyDogState.threshold;
       btn.classList.remove('is-claimed');
+      // زر Free Pet المنبثق (fp-claim-btn) يبقى بلونه الذهبي المعتاد — هذا التلوين الأخضر خاص فقط بزر البطاقة داخل صفحة Realm.
+      if (btn === cardBtn){
+        btn.classList.toggle('is-ready', !happyDogState.busy && happyDogState.activeFriends >= happyDogState.threshold);
+      }
     }
   });
 
@@ -6867,10 +6899,12 @@ function renderGuardianUI(){
       cardBtn.textContent = '✓';
       cardBtn.disabled = true;
       cardBtn.classList.add('is-claimed');
+      cardBtn.classList.remove('is-ready');
     } else {
       cardBtn.textContent = guardianState.busy ? '...' : 'Claim';
       cardBtn.disabled = guardianState.busy || guardianState.adsWatched < guardianState.threshold;
       cardBtn.classList.remove('is-claimed');
+      cardBtn.classList.toggle('is-ready', !guardianState.busy && guardianState.adsWatched >= guardianState.threshold);
     }
   }
 
