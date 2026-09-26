@@ -114,6 +114,68 @@ function petUpgradeCost(petId) {
   return Math.round(PETS[petId].price * PET_UPGRADE_COST_RATIO);
 }
 
+// ===================================================================== زيادة يومية تلقائية حصرية لـDancing Bear وThe Cat: نسبة ثابتة من basespeed (وليس من current_speed المُرقّى يدوياً) تُضاف كل يوم عند 00:00 UTC حتى سقف إجمالي 10%، ثم تتوقف نهائياً — مستقلة تماماً عن نظام الترقية اليدوية بالمستويات (PET_SPEED_INCREMENT_RATIO)، تُضافان معاً بلا أي تداخل. maxDays مضبوط بحيث dailyPct × maxDays = 10 بالضبط (لا حاجة لتقريب/بقية جزئية عند آخر يوم). =====================================================================
+const DAILY_PET_BOOST = {
+  dancing_bear: { dailyPct: 0.5, maxDays: 20 },
+  the_cat: { dailyPct: 1.0, maxDays: 10 }
+};
+
+// تُستدعى فقط من scheduled() عند 00:00 UTC. لكل شخصية من الاثنتين: تجلب فقط من يملكها ولم
+// يصل بعد لسقف الأيام، ولكل مستخدم مؤهّل تُصفَّى (checkpoint) ما تراكم في Storage بالسرعة
+// القديمة أولاً وتُدفَع مباشرة كعملات — نفس أسلوب handlePetBuy/handlePetUpgrade بالضبط — قبل
+// زيادة current_speed/total_speed وإعادة ضبط last_claim_at، لمنع احتساب الوقت الماضي بالسرعة
+// الجديدة الأعلى بالخطأ.
+async function applyDailyPetBoost(env) {
+  for (const [petId, cfg] of Object.entries(DAILY_PET_BOOST)) {
+    const basespeed = PETS[petId].basespeed;
+    const deltaSpeed = basespeed * (cfg.dailyPct / 100);
+
+    const rows = await env.DB.prepare(
+      `SELECT p.telegram_id, u.total_speed, s.capacity_hours, s.last_claim_at
+       FROM user_pets p
+       JOIN users u ON u.telegram_id = p.telegram_id
+       LEFT JOIN user_storage s ON s.telegram_id = p.telegram_id
+       WHERE p.pet_id = ? AND p.daily_boost_days < ?`
+    ).bind(petId, cfg.maxDays).all();
+
+    const eligible = rows.results || [];
+    if (!eligible.length) continue;
+
+    const nowIso = new Date().toISOString();
+    const stmts = [];
+
+    for (const row of eligible) {
+      const capacitySeconds = (row.capacity_hours || STORAGE_DEFAULT_CAPACITY_HOURS) * 3600;
+      let preBoostAccrued = 0;
+      if (row.last_claim_at) {
+        const elapsedSeconds = Math.max(0, (Date.now() - Date.parse(row.last_claim_at)) / 1000);
+        preBoostAccrued = Math.min(elapsedSeconds, capacitySeconds) * ((row.total_speed || 0) / 3600);
+      }
+
+      stmts.push(
+        env.DB.prepare(
+          "UPDATE users SET coins = coins + ?, total_speed = total_speed + ? WHERE telegram_id = ?"
+        ).bind(preBoostAccrued, deltaSpeed, row.telegram_id),
+        env.DB.prepare(
+          "UPDATE user_pets SET current_speed = current_speed + ?, daily_boost_days = daily_boost_days + 1 WHERE telegram_id = ? AND pet_id = ?"
+        ).bind(deltaSpeed, row.telegram_id, petId),
+        env.DB.prepare("UPDATE user_storage SET last_claim_at = ? WHERE telegram_id = ?").bind(nowIso, row.telegram_id)
+      );
+      if (preBoostAccrued > 0) {
+        stmts.push(env.DB.prepare(
+          "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'storage_auto_collect', ?, 'coins')"
+        ).bind(row.telegram_id, preBoostAccrued));
+      }
+    }
+
+    try {
+      await env.DB.batch(stmts);
+    } catch (e) {
+      console.error("daily pet boost failed for " + petId + ":", e?.message || e);
+    }
+  }
+}
+
 // مستويات مدة التخزين (Storage) بالساعات — الفهرس 0 = Lv.1 (الافتراضي عند أول شراء لأي شخصية). كل ترقية تكلّف نفس المبلغ الثابت (300,000، مطابق لسعر شراء The Duck)، وتُشتق قيمة المستوى الحالي مباشرة من capacity_hours المخزّنة بدون الحاجة لعمود منفصل.
 const STORAGE_LEVELS = [6, 8, 12, 16, 24];
 const STORAGE_MAX_LEVEL = STORAGE_LEVELS.length;
@@ -130,6 +192,8 @@ export default {
     if (event.cron === "0 0 * * *") {
       // يومياً 00:00 UTC: يختار تركيبة Daily Combo الجديدة ويرسلها للأدمن فقط.
       ctx.waitUntil(generateDailyCombo(env));
+      // يومياً 00:00 UTC أيضاً: زيادة السرعة التلقائية لـDancing Bear/The Cat (انظر applyDailyPetBoost).
+      ctx.waitUntil(applyDailyPetBoost(env));
     } else if (event.cron === "30 0 * * 5") {
       // أسبوعياً الجمعة 00:30 UTC فقط: توزيع جوائز Weekly Leaderboard.
       ctx.waitUntil(handleLeaderboardPayout(env));
@@ -562,7 +626,7 @@ async function handleRealmStatus(request, env) {
        WHERE u.telegram_id = ?`
     ).bind(telegramId).first(),
     env.DB.prepare(
-      "SELECT pet_id, level, current_speed FROM user_pets WHERE telegram_id = ?"
+      "SELECT pet_id, level, current_speed, daily_boost_days FROM user_pets WHERE telegram_id = ?"
     ).bind(telegramId).all(),
     env.DB.prepare(
       "SELECT 1 FROM ambassador_grants WHERE telegram_id = ?"
@@ -573,7 +637,7 @@ async function handleRealmStatus(request, env) {
 
   const pets = {};
   for (const r of (petsResult.results || [])) {
-    pets[r.pet_id] = { level: r.level, speed: r.current_speed };
+    pets[r.pet_id] = { level: r.level, speed: r.current_speed, daily_boost_days: r.daily_boost_days || 0 };
   }
 
   const storageView = withStorageView({

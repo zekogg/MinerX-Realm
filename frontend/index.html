@@ -4057,14 +4057,14 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
       <div class="pet-exclusive-grid">
         <div class="pet-card-wrap" style="position:relative; margin-top:14px;">
           <span class="realm-label realm-label--shine"><span>Dancing Bear</span></span>
-          <span class="price-tooltip db-growth-tooltip" id="growth-tooltip-db">Extra Growth</span>
+          <span class="price-tooltip db-growth-tooltip" id="growth-tooltip-db">Extra Boost</span>
           <div class="pet-slot pet-slot--wide pet-slot--exclusive">
             <div class="db-badges-left">
               <span class="db-animated-badge">Animated</span>
               <span class="db-rarity-mythic">Mythic</span>
             </div>
             <span class="db-growth-badge" onclick="toggleGrowthTooltip()">
-              <span>+0.5%/Day</span>
+              <span id="dancing_bear-growth-text">+0.5%/Day</span>
             </span>
             <span class="db-lv-badge" id="dancing_bear-lv-badge">Lv.0</span>
             <button class="db-action-btn db-action-btn--upgrade" id="dancing_bear-upgrade-btn" onclick="openUpgradePetModal('dancing_bear')" disabled>
@@ -4089,14 +4089,14 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         </div>
         <div class="pet-card-wrap" style="position:relative; margin-top:14px;">
           <span class="realm-label realm-label--shine"><span>The Cat</span></span>
-          <span class="price-tooltip tc-growth-tooltip" id="growth-tooltip-tc">Extra Growth</span>
+          <span class="price-tooltip tc-growth-tooltip" id="growth-tooltip-tc">Extra Boost</span>
           <div class="pet-slot pet-slot--wide pet-slot--exclusive tc-exclusive">
             <div class="tc-badges-left">
               <span class="tc-animated-badge">Animated</span>
               <span class="tc-rarity-mythic">Mythic</span>
             </div>
             <span class="tc-growth-badge" onclick="toggleGrowthTooltipTC()">
-              <span>+1%/Day</span>
+              <span id="the_cat-growth-text">+1%/Day</span>
             </span>
             <span class="tc-lv-badge" id="the_cat-lv-badge">Lv.0</span>
             <button class="tc-action-btn tc-action-btn--upgrade" id="the_cat-upgrade-btn" onclick="openUpgradePetModal('the_cat')" disabled>
@@ -4715,8 +4715,8 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
             <span class="pg-section__icon">✨</span>
             <span class="pg-section__title">Exclusive Card Details</span>
           </div>
-          <div class="pg-section__body"><b>Dancing Bear</b> gains an extra <b>+0.5%</b> of its base Speed automatically every day at <b>00:00 UTC</b> — completely free, no action needed.</div>
-          <div class="pg-section__body"><b>The Cat</b> gains an extra <b>+1%</b> of its base Speed automatically every day at <b>00:00 UTC</b> — completely free, no action needed.</div>
+          <div class="pg-section__body"><b>Dancing Bear</b> gains an extra <b>+0.5%</b> of its base Speed automatically every day at <b>00:00 UTC</b>, up to a maximum of <b>+10%</b> total (20 days) — completely free, no action needed.</div>
+          <div class="pg-section__body"><b>The Cat</b> gains an extra <b>+1%</b> of its base Speed automatically every day at <b>00:00 UTC</b>, up to a maximum of <b>+10%</b> total (10 days) — completely free, no action needed.</div>
           <div class="pg-section__body">How to unlock the free exclusive pets:</div>
           <div class="pg-section__body">• <b>Happy Dog</b> — invite 100 active friends.</div>
           <div class="pg-section__body">• <span class="is-purple">The Guardian</span> — watch 4,000 ads in total (any ad watched anywhere in the bot counts toward this).</div>
@@ -5903,8 +5903,8 @@ var PET_DEFS = [
   { id: 'polar_bear',   basespeed: 191,   price: 500000,   name: 'The Polar Bear', lvId: 'bear-lv-badge',         rateId: 'bear-rate-text',         buyBtnId: 'bear-buy-btn',         upgradeBtnId: 'bear-upgrade-btn' },
   { id: 'scorpion',     basespeed: 379,   price: 1000000,  name: 'The Scorpion',   lvId: 'scorpion-lv-badge',     rateId: 'scorpion-rate-text',     buyBtnId: 'scorpion-buy-btn',     upgradeBtnId: 'scorpion-upgrade-btn' },
   { id: 'penguin',      basespeed: 1894,  price: 5000000,  name: 'The Penguin',    lvId: 'penguin-lv-badge',      rateId: 'penguin-rate-text',      buyBtnId: 'penguin-buy-btn',      upgradeBtnId: 'penguin-upgrade-btn' },
-  { id: 'dancing_bear', basespeed: 3788,  price: 10000000, name: 'Dancing Bear',   lvId: 'dancing_bear-lv-badge', rateId: 'dancing_bear-rate-text', buyBtnId: 'dancing_bear-buy-btn', upgradeBtnId: 'dancing_bear-upgrade-btn' },
-  { id: 'the_cat',      basespeed: 18940, price: 50000000, name: 'The Cat',        lvId: 'the_cat-lv-badge',      rateId: 'the_cat-rate-text',      buyBtnId: 'the_cat-buy-btn',      upgradeBtnId: 'the_cat-upgrade-btn' }
+  { id: 'dancing_bear', basespeed: 3788,  price: 10000000, name: 'Dancing Bear',   lvId: 'dancing_bear-lv-badge', rateId: 'dancing_bear-rate-text', buyBtnId: 'dancing_bear-buy-btn', upgradeBtnId: 'dancing_bear-upgrade-btn', growthTextId: 'dancing_bear-growth-text', dailyBoostPct: 0.5, dailyBoostMaxDays: 20 },
+  { id: 'the_cat',      basespeed: 18940, price: 50000000, name: 'The Cat',        lvId: 'the_cat-lv-badge',      rateId: 'the_cat-rate-text',      buyBtnId: 'the_cat-buy-btn',      upgradeBtnId: 'the_cat-upgrade-btn',      growthTextId: 'the_cat-growth-text',      dailyBoostPct: 1.0, dailyBoostMaxDays: 10 }
 ];
 var PET_DEFS_BY_ID = {};
 PET_DEFS.forEach(function(def){ PET_DEFS_BY_ID[def.id] = def; });
@@ -5933,6 +5933,21 @@ function renderPetCard(def){
   // قبل الشراء نعرض السرعة الأساسية المتوقعة (Lv.1) بدل 0 الفعلية غير المملوكة بعد
   var displaySpeed = state.level > 0 ? state.speed : def.basespeed;
   if (rateText) rateText.textContent = '+' + Math.round(displaySpeed) + '/hr';
+
+  // شارة Extra Boost (Dancing Bear/The Cat فقط): قبل الامتلاك تبقى نصاً ثابتاً "+X%/Day"، وبعد
+  // الامتلاك تتحوّل لعرض التقدّم الفعلي المتراكم حتى الآن من أصل السقف (10% دائماً)، من
+  // daily_boost_days القادم من السيرفر — لا حساب أو تخمين من طرف المتصفح.
+  if (def.growthTextId){
+    var growthText = document.getElementById(def.growthTextId);
+    if (growthText){
+      if (state.level > 0){
+        var earnedPct = (state.dailyBoostDays || 0) * def.dailyBoostPct;
+        growthText.textContent = earnedPct.toFixed(1) + '%/10%';
+      } else {
+        growthText.textContent = '+' + def.dailyBoostPct + '%/Day';
+      }
+    }
+  }
 
   var upgradeBtn = document.getElementById(def.upgradeBtnId);
   if (upgradeBtn) upgradeBtn.disabled = state.level <= 0 || state.level >= PET_MAX_LEVEL;
@@ -6034,7 +6049,7 @@ function invalidateRealmCache(){
 function applyPetsState(petsData){
   PET_DEFS.forEach(function(def){
     var p = (petsData && petsData[def.id]) || {};
-    petStates[def.id] = { level: p.level || 0, speed: p.speed || 0 };
+    petStates[def.id] = { level: p.level || 0, speed: p.speed || 0, dailyBoostDays: p.daily_boost_days || 0 };
     renderPetCard(def);
   });
 }
