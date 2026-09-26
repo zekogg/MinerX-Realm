@@ -6204,6 +6204,21 @@ function applyStorageState(data){
   }
 }
 
+// إيقاف/استئناف عدّاد Storage عند مغادرة/العودة لصفحة Realm فقط (وليس عند إغلاق التطبيق —
+// ذلك يوقف كل شيء تلقائياً بلا حاجة لأي كود). لا داعي لتشغيله 5 مرات بالثانية وهو غير ظاهر
+// أصلاً لأي مستخدم بصفحة أخرى (Earn/Tasks/Friends/Wallet). storageState.syncedAtMs لا يتأثر
+// بالإيقاف/الاستئناف لأن storageTick يحسب الوقت المنقضي من الساعة الحقيقية في كل مرة يُستدعى،
+// فلا يحدث أي انحراف بالرقم المعروض بعد الاستئناف.
+function pauseStorageTick(){
+  clearInterval(storageTickTimer);
+  storageTickTimer = null;
+}
+function resumeStorageTick(){
+  if (storageTickTimer || !storageState.hasPet) return;
+  storageTick();
+  storageTickTimer = setInterval(storageTick, 200);
+}
+
 // أرقام Storage < 1000: تُعرض كاملة بـ3 خانات عشرية (240.452). أرقام >= 1000: تُختصَر لصيغة
 // "1.2K,345" — الجزء "1.2K" هو الآلاف مقطوعاً (بلا تقريب لأعلى) وثابت لا يتغيّر إلا كل 1000 وحدة
 // كاملة، والجزء "345" هو باقي القسمة على 1000 (آخر 3 أرقام) وهو الذي يستمر بالتزايد بصرياً كل
@@ -6325,7 +6340,12 @@ fetchUserData();
       var active = btn.getAttribute('data-page') === pageId;
       btn.classList.toggle('is-active', active);
     });
-    if (pageId === 'page-realm' && typeof fetchRealmStatus === 'function') fetchRealmStatus();
+    if (pageId === 'page-realm'){
+      if (typeof fetchRealmStatus === 'function') fetchRealmStatus();
+      if (typeof resumeStorageTick === 'function') resumeStorageTick();
+    } else if (typeof pauseStorageTick === 'function'){
+      pauseStorageTick();
+    }
   }
 
   navButtons.forEach(function(btn){
