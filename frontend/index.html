@@ -381,6 +381,13 @@ img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
 .skeleton-list-item{ display:flex; align-items:center; gap:10px; margin-bottom:12px; }
 .skeleton-avatar{ width:36px; height:36px; border-radius:50%; flex-shrink:0; }
 .skeleton-list-item .skeleton-row{ flex:1; height:14px; margin-bottom:0; }
+.skeleton-row--thin{ height:14px; margin-bottom:14px; }
+
+/* -- غطاء Skeleton عام موحّد (واحد فقط لكل قسم كامل، بدل تصميم مطابق لكل حقل) — يُستخدَم لـProfile/Realm/Milestones: يغطي القسم بأكمله بأشرطة رمادية عامة بينما يُخفى المحتوى الحقيقي خلفه (visibility:hidden يحافظ على المساحة فلا يتغيّر الارتفاع عند الكشف) -- */
+.section-skeleton-overlay{ position:absolute; inset:0; z-index:5; padding-top:2px; }
+.pf-stats{ position:relative; }
+.pf-stats.is-loading > .pf-stat-row{ visibility:hidden; }
+#page-realm.is-loading > *:not(.section-skeleton-overlay){ visibility:hidden; }
 
 /* -- طبقة الكونفيتي المشتركة: canvas ثابت فوق كل شيء، بدون أي تفاعل -- */
 #confetti-canvas{
@@ -3811,6 +3818,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         </div>
 
         <div class="milestone-title">Milestone Missions</div>
+        <div id="milestone-missions-skeleton" style="display:none;"></div>
         <div id="milestone-missions-list" style="display:none;">
         <div class="milestone-mission">
           <div class="milestone-mission__head">
@@ -3924,6 +3932,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 
     <!-- /////كود صفحة Pets///// -->
     <section class="page" id="page-realm">
+      <div class="section-skeleton-overlay" id="realm-skeleton" style="display:none;"></div>
       <div class="page-title page-title--with-help">
         <span>Pet Cards</span>
         <span class="help-badge help-badge--md" style="cursor:pointer;" onclick="openModal('modal-pets-guide')">?</span>
@@ -4341,7 +4350,8 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
           </button>
         </div>
 
-        <div class="pf-stats">
+        <div class="pf-stats" id="pf-stats">
+          <div class="section-skeleton-overlay" id="pf-stats-skeleton" style="display:none;"></div>
           <div class="pf-stat-row"><span class="pf-stat-label">ID</span><span class="pf-stat-val" id="pf-stat-id">000000</span></div>
           <div class="pf-stat-row"><span class="pf-stat-label">Registered Date</span><span class="pf-stat-val" id="pf-stat-registered">01-01-2026</span></div>
           <div class="pf-stat-row"><span class="pf-stat-label">Referrals</span><span class="pf-stat-val" id="pf-stat-referrals">0</span></div>
@@ -5372,6 +5382,7 @@ function onMiningButtonClick(){
 
 function runMiningRequest(isReadyToClaim){
   miningBusy = true;
+  setButtonBusy(domCache.miningBtn, true);
   var request = isReadyToClaim ? callMiningApi('/api/mine/claim') : callMiningApi('/api/mine/start');
 
   request.then(function(result){
@@ -5407,6 +5418,8 @@ function runMiningRequest(isReadyToClaim){
   })
   .catch(function(err){
     if (err.message !== 'no_init_data') console.error('mining request failed:', err);
+    // فشل الشبكة فقط: لا فرع آخر في .then() يستدعي setMiningButton هنا، فنستعيد النص يدوياً لمنع بقاء الدائرة عالقة للأبد.
+    setButtonBusy(domCache.miningBtn, false);
   })
   .finally(function(){
     miningBusy = false;
@@ -6033,6 +6046,11 @@ function fetchRealmStatus(){
   if (!initData) return;
   realmStatusFetched = true;
 
+  var realmPage = document.getElementById('page-realm');
+  var realmSkeleton = document.getElementById('realm-skeleton');
+  if (realmPage) realmPage.classList.add('is-loading');
+  if (realmSkeleton){ realmSkeleton.innerHTML = sectionSkeletonRowsHtml(8); realmSkeleton.style.display = ''; }
+
   fetch('/api/realm/status', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -6051,6 +6069,11 @@ function fetchRealmStatus(){
 }
 
 function applyRealmStatusData(data){
+  var realmPage = document.getElementById('page-realm');
+  var realmSkeleton = document.getElementById('realm-skeleton');
+  if (realmPage) realmPage.classList.remove('is-loading');
+  if (realmSkeleton) realmSkeleton.style.display = 'none';
+
   applyPetsState(data.pets);
   applyStorageState({
     storage_has_pet: data.storage_has_pet,
@@ -6726,6 +6749,14 @@ function skeletonRowsHtml(count, withAvatar){
   return rows.join('');
 }
 
+// نفس الفكرة لكن أشرطة رفيعة — تُستخدَم فقط داخل section-skeleton-overlay (غطاء عام واحد لكل
+// قسم بالكامل، بدل غطاء مطابق لكل حقل على حدة) في Profile/Realm/Milestones.
+function sectionSkeletonRowsHtml(count){
+  var rows = [];
+  for (var i = 0; i < count; i++) rows.push('<div class="skeleton-row skeleton-row--thin"></div>');
+  return rows.join('');
+}
+
 // نافذة Profile كانت النقطة الوحيدة بالتطبيق بلا أي تخزين مؤقت إطلاقاً (تُعاد جلبها بالكامل مع 3 استعلامات D1 في كل ضغطة، إحداها SUM بلا حد أقصى على كامل تاريخ الإيداعات/السحوبات). يُبطَل فوراً عند تأكيد إيداع حقيقي (pollDepositStatus) لأنه الحدث الوحيد الذي يُغيّر أرقامها بشكل نعرفه من طرف العميل مباشرة.
 function openProfileModal(){
   openModal('modal-profile');
@@ -6735,6 +6766,11 @@ function openProfileModal(){
 
   var initData = getTelegramInitData();
   if (!initData) return;
+
+  var pfStats = document.getElementById('pf-stats');
+  var pfSkeleton = document.getElementById('pf-stats-skeleton');
+  if (pfStats) pfStats.classList.add('is-loading');
+  if (pfSkeleton){ pfSkeleton.innerHTML = sectionSkeletonRowsHtml(10); pfSkeleton.style.display = ''; }
 
   fetch('/api/profile', {
     method: 'POST',
@@ -6753,6 +6789,11 @@ function openProfileModal(){
 }
 
 function applyProfileData(data){
+  var pfStats = document.getElementById('pf-stats');
+  var pfSkeleton = document.getElementById('pf-stats-skeleton');
+  if (pfStats) pfStats.classList.remove('is-loading');
+  if (pfSkeleton) pfSkeleton.style.display = 'none';
+
   var nameEl = document.getElementById('pf-name');
   if (nameEl) nameEl.textContent = data.display_name;
 
@@ -8874,6 +8915,8 @@ function onShowMilestonesClick(){
   if (!initData) return;
 
   if (btn) btn.textContent = 'Loading...';
+  var msSkeleton = document.getElementById('milestone-missions-skeleton');
+  if (msSkeleton){ msSkeleton.innerHTML = sectionSkeletonRowsHtml(4); msSkeleton.style.display = ''; }
 
   fetch('/api/friends/milestones', {
     method: 'POST',
@@ -8887,12 +8930,14 @@ function onShowMilestonesClick(){
     friendsState.milestones = data.milestones;
     localCacheSet('milestones', friendsState.milestones);
     renderMilestones();
+    if (msSkeleton) msSkeleton.style.display = 'none';
     var list = document.getElementById('milestone-missions-list');
     if (list) list.style.display = '';
     if (btn) btn.remove();
   })
   .catch(function(err){
     console.error('fetch friends milestones failed:', err);
+    if (msSkeleton) msSkeleton.style.display = 'none';
     if (btn) btn.textContent = 'Show Missions'; // اسمح بإعادة المحاولة
   });
 }
