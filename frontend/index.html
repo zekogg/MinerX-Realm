@@ -5959,10 +5959,15 @@ var realmStatusFetched = false;
 function fetchRealmStatus(){
   if (realmStatusFetched) return;
 
-  var cached = localCacheGet('realm');
-  if (cached){
+  var cachedMeta = localCacheGetMeta('realm');
+  if (cachedMeta){
     realmStatusFetched = true;
-    applyRealmStatusData(cached);
+    // storage_remaining_seconds المخزَّن هو قيمته لحظة الحفظ وليس الآن — نطرح عمر الكاش منه
+    // (بالثواني) وإلا سيظهر نفس الرقم "مجمَّداً" عند كل إعادة فتح للبوت خلال صلاحية الكاش.
+    if (typeof cachedMeta.d.storage_remaining_seconds === 'number'){
+      cachedMeta.d.storage_remaining_seconds = Math.max(0, cachedMeta.d.storage_remaining_seconds - Math.floor(cachedMeta.ageMs / 1000));
+    }
+    applyRealmStatusData(cachedMeta.d);
     return;
   }
 
@@ -6563,6 +6568,21 @@ function localCacheGet(name){
     if (!parsed || typeof parsed.t !== 'number') return null;
     if (Date.now() - parsed.t > LOCAL_CACHE_TTL_MS) return null;
     return parsed.d;
+  }catch(e){ return null; }
+}
+
+// نفس localCacheGet لكن يُرجع أيضاً عمر الكاش بالمللي ثانية (منذ لحظة localCacheSet) — يلزم فقط
+// للبيانات التي تحتوي عدّاداً زمنياً حياً (مثل storage_remaining_seconds) والتي لا يصح عرضها
+// كما حُفظت بالضبط بعد إعادة فتح البوت، بل يجب طرح الوقت الذي مضى منذ الحفظ منها أولاً.
+function localCacheGetMeta(name){
+  try{
+    var raw = localStorage.getItem(localCacheKey(name));
+    if (!raw) return null;
+    var parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed.t !== 'number') return null;
+    var ageMs = Date.now() - parsed.t;
+    if (ageMs > LOCAL_CACHE_TTL_MS) return null;
+    return { d: parsed.d, ageMs: ageMs };
   }catch(e){ return null; }
 }
 
