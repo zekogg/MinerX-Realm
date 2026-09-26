@@ -7388,8 +7388,13 @@ function renderAdsTaskButton(){
   var cooldownRemaining = Math.ceil((adsTaskState.cooldownUntil - Date.now()) / 1000);
   var inCooldown = cooldownRemaining > 0;
   if (btn){
-    btn.textContent = inCooldown ? String(cooldownRemaining) : 'Watch';
-    btn.classList.toggle('is-claimed', adsTaskState.watchedToday >= adsTaskState.dailyLimit || adsTaskState.busy || inCooldown);
+    if (adsTaskState.busy){
+      setButtonBusy(btn, true);
+    } else {
+      setButtonBusy(btn, false);
+      btn.textContent = inCooldown ? String(cooldownRemaining) : 'Watch';
+      btn.classList.toggle('is-claimed', adsTaskState.watchedToday >= adsTaskState.dailyLimit || inCooldown);
+    }
   }
 }
 
@@ -7686,8 +7691,13 @@ function renderGigapubButton(){
   var cooldownRemaining = Math.ceil((gigapubState.cooldownUntil - Date.now()) / 1000);
   var inCooldown = cooldownRemaining > 0;
   if (btn){
-    btn.textContent = inCooldown ? String(cooldownRemaining) : 'Watch';
-    btn.classList.toggle('is-claimed', dailyDone || gigapubState.busy || inCooldown);
+    if (gigapubState.busy){
+      setButtonBusy(btn, true);
+    } else {
+      setButtonBusy(btn, false);
+      btn.textContent = inCooldown ? String(cooldownRemaining) : 'Watch';
+      btn.classList.toggle('is-claimed', dailyDone || inCooldown);
+    }
   }
 }
 
@@ -7726,7 +7736,7 @@ function onWatchGigapubClick(){
   setAdLoadingOverlayVia('GigaPub');
 
   window.showGiga('main').then(function(){
-    hideAdLoadingOverlay();
+    setAdLoadingOverlayVerifying();
     pollGigapubRewardConfirmation(baselineWatched, 0);
   }).catch(function(){
     hideAdLoadingOverlay();
@@ -7742,6 +7752,7 @@ function pollGigapubRewardConfirmation(baselineWatched, attempt){
   if (!initData){
     gigapubState.busy = false;
     renderGigapubButton();
+    hideAdLoadingOverlay();
     return;
   }
 
@@ -7765,6 +7776,7 @@ function pollGigapubRewardConfirmation(baselineWatched, attempt){
       triggerConfetti();
       gigapubState.busy = false;
       startGigapubTaskCooldown();
+      hideAdLoadingOverlay();
       return;
     }
 
@@ -7773,6 +7785,7 @@ function pollGigapubRewardConfirmation(baselineWatched, attempt){
     } else {
       gigapubState.busy = false;
       renderGigapubButton();
+      hideAdLoadingOverlay();
       showBuyErrorToast('Reward is taking longer than usual, check back shortly', { title: 'Watch gigapub ads' });
     }
   })
@@ -7780,6 +7793,7 @@ function pollGigapubRewardConfirmation(baselineWatched, attempt){
     console.error('gigapub reward poll failed:', err);
     gigapubState.busy = false;
     renderGigapubButton();
+    hideAdLoadingOverlay();
   });
 }
 
@@ -7909,8 +7923,13 @@ function renderMonetixButton(){
   var cooldownRemaining = Math.ceil((monetixState.cooldownUntil - Date.now()) / 1000);
   var inCooldown = cooldownRemaining > 0;
   if (btn){
-    btn.textContent = inCooldown ? String(cooldownRemaining) : 'Watch';
-    btn.classList.toggle('is-claimed', dailyDone || monetixState.busy || inCooldown);
+    if (monetixState.busy){
+      setButtonBusy(btn, true);
+    } else {
+      setButtonBusy(btn, false);
+      btn.textContent = inCooldown ? String(cooldownRemaining) : 'Watch';
+      btn.classList.toggle('is-claimed', dailyDone || inCooldown);
+    }
   }
 }
 
@@ -7958,11 +7977,12 @@ function onWatchMonetixClick(){
     if (settled) return;
     settled = true;
     clearTimeout(noAdTimeout);
-    hideAdLoadingOverlay();
 
     if (res && (res.status === 'completed' || res.status === 'closed')){
+      setAdLoadingOverlayVerifying();
       creditMonetixReward();
     } else {
+      hideAdLoadingOverlay();
       monetixState.busy = false;
       renderMonetixButton();
       showBuyErrorToast('Ad was not completed', { title: 'Watch MonetixAds' });
@@ -7975,6 +7995,7 @@ function creditMonetixReward(){
   if (!initData){
     monetixState.busy = false;
     renderMonetixButton();
+    hideAdLoadingOverlay();
     return;
   }
 
@@ -7991,6 +8012,7 @@ function creditMonetixReward(){
       }
       monetixState.busy = false;
       renderMonetixButton();
+      hideAdLoadingOverlay();
       return;
     }
 
@@ -8000,11 +8022,13 @@ function creditMonetixReward(){
     triggerConfetti();
     monetixState.busy = false;
     startMonetixTaskCooldown();
+    hideAdLoadingOverlay();
   })
   .catch(function(err){
     console.error('monetix reward request failed:', err);
     monetixState.busy = false;
     renderMonetixButton();
+    hideAdLoadingOverlay();
   });
 }
 
