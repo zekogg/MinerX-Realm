@@ -3904,7 +3904,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         </div>
         <div class="storage-card__info">
           <div class="storage-card__label">Storage</div>
-          <div class="storage-card__val" id="display-storage-val">0.00000</div>
+          <div class="storage-card__val" id="display-storage-val">0.000</div>
           <div class="storage-card__timer" id="storage-timer" style="display:none;">Full in 06:00:00</div>
         </div>
         <button class="storage-card__boost" id="storage-boost-btn" aria-label="Boost" onclick="openStorageUpgradeModal()" disabled>
@@ -6172,7 +6172,7 @@ function applyClaimedPetSpeed(newTotalSpeed){
     if (boostBtn) boostBtn.disabled = false;
     clearInterval(storageTickTimer);
     storageTick();
-    storageTickTimer = setInterval(storageTick, 1000);
+    storageTickTimer = setInterval(storageTick, 200);
   }
 }
 
@@ -6193,8 +6193,19 @@ function applyStorageState(data){
   clearInterval(storageTickTimer);
   storageTick();
   if (storageState.hasPet){
-    storageTickTimer = setInterval(storageTick, 1000);
+    storageTickTimer = setInterval(storageTick, 200);
   }
+}
+
+// أرقام Storage < 1000: تُعرض كاملة بـ3 خانات عشرية (240.452). أرقام >= 1000: تُختصَر لصيغة
+// "1.2K,345" — الجزء "1.2K" هو الآلاف مقطوعاً (بلا تقريب لأعلى) وثابت لا يتغيّر إلا كل 1000 وحدة
+// كاملة، والجزء "345" هو باقي القسمة على 1000 (آخر 3 أرقام) وهو الذي يستمر بالتزايد بصرياً كل
+// جزء من الثانية — يمنع تمدد الرقم بلا حدود مع ارتفاع السرعة/الترقيات ويبقيه بعيداً عن زر Boost.
+function formatStorageValue(n){
+  if (n < 1000) return n.toFixed(3);
+  var thousands = Math.floor(n / 100) / 10; // قطع (وليس تقريب) لخانة عشرية واحدة من الآلاف
+  var remainder = Math.floor(n) % 1000;
+  return thousands.toFixed(1) + 'K,' + String(remainder).padStart(3, '0');
 }
 
 function storageTick(){
@@ -6205,7 +6216,7 @@ function storageTick(){
 
   if (!storageState.hasPet){
     timerEl.style.display = 'none';
-    valEl.textContent = '0.00000';
+    valEl.textContent = '0.000';
     claimBtn.classList.remove('is-charging');
     claimBtn.classList.add('is-inactive');
     claimBtn.disabled = true;
@@ -6218,7 +6229,7 @@ function storageTick(){
   var elapsedNow = Math.min(storageState.capacitySeconds, storageState.elapsedAtSync + elapsedSinceSync);
   var perSecondRate = storageState.totalSpeed / 3600;
   var accruedNow = elapsedNow * perSecondRate;
-  valEl.textContent = accruedNow.toFixed(5);
+  valEl.textContent = formatStorageValue(accruedNow);
 
   var remainingSeconds = storageState.capacitySeconds - elapsedNow;
   if (remainingSeconds <= 0){
