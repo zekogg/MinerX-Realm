@@ -8914,7 +8914,7 @@ function onShowMilestonesClick(){
   var initData = getTelegramInitData();
   if (!initData) return;
 
-  if (btn) btn.textContent = 'Loading...';
+  setButtonBusy(btn, true);
   var msSkeleton = document.getElementById('milestone-missions-skeleton');
   if (msSkeleton){ msSkeleton.innerHTML = sectionSkeletonRowsHtml(4); msSkeleton.style.display = ''; }
 
@@ -8938,7 +8938,7 @@ function onShowMilestonesClick(){
   .catch(function(err){
     console.error('fetch friends milestones failed:', err);
     if (msSkeleton) msSkeleton.style.display = 'none';
-    if (btn) btn.textContent = 'Show Missions'; // اسمح بإعادة المحاولة
+    setButtonBusy(btn, false); // اسمح بإعادة المحاولة
   });
 }
 
@@ -9058,10 +9058,10 @@ function onClaimMilestoneClick(tier){
 function onShowFriendsListClick(){
   if (friendsListState.loaded) return;
   var btn = document.getElementById('btn-show-friends-list');
-  if (btn) btn.textContent = 'Loading...';
+  setButtonBusy(btn, true);
 
   fetchFriendsListPage(0, function(ok){
-    if (!ok){ if (btn) btn.textContent = 'Show The List'; return; }
+    if (!ok){ setButtonBusy(btn, false); return; }
     friendsListState.loaded = true;
     if (btn) btn.remove();
   });
@@ -9656,7 +9656,7 @@ function onShowTxHistoryClick(){
   var initData = getTelegramInitData();
   if (!initData) return;
 
-  if (btn) btn.textContent = 'Loading...';
+  setButtonBusy(btn, true);
   var txList = document.getElementById('tx-history-list');
   if (txList) txList.innerHTML = skeletonRowsHtml(4, false);
 
@@ -9675,7 +9675,7 @@ function onShowTxHistoryClick(){
   })
   .catch(function(err){
     console.error('wallet history request failed:', err);
-    if (btn) btn.textContent = 'Show History';
+    setButtonBusy(btn, false);
   });
 }
 
