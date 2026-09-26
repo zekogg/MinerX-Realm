@@ -381,6 +381,13 @@ img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
 .skeleton-list-item{ display:flex; align-items:center; gap:10px; margin-bottom:12px; }
 .skeleton-avatar{ width:36px; height:36px; border-radius:50%; flex-shrink:0; }
 .skeleton-list-item .skeleton-row{ flex:1; height:14px; margin-bottom:0; }
+.skeleton-row--thin{ height:14px; margin-bottom:14px; }
+
+/* -- غطاء Skeleton عام موحّد (واحد فقط لكل قسم كامل، بدل تصميم مطابق لكل حقل) — يُستخدَم لـProfile/Realm/Milestones: يغطي القسم بأكمله بأشرطة رمادية عامة بينما يُخفى المحتوى الحقيقي خلفه (visibility:hidden يحافظ على المساحة فلا يتغيّر الارتفاع عند الكشف) -- */
+.section-skeleton-overlay{ position:absolute; inset:0; z-index:5; }
+.pf-stats{ position:relative; }
+.pf-stats.is-loading > .pf-stat-row{ visibility:hidden; }
+#page-realm.is-loading > *:not(.section-skeleton-overlay){ visibility:hidden; }
 
 /* -- طبقة الكونفيتي المشتركة: canvas ثابت فوق كل شيء، بدون أي تفاعل -- */
 #confetti-canvas{
@@ -3811,6 +3818,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         </div>
 
         <div class="milestone-title">Milestone Missions</div>
+        <div id="milestone-missions-skeleton" style="display:none;"></div>
         <div id="milestone-missions-list" style="display:none;">
         <div class="milestone-mission">
           <div class="milestone-mission__head">
@@ -3924,6 +3932,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 
     <!-- /////كود صفحة Pets///// -->
     <section class="page" id="page-realm">
+      <div class="section-skeleton-overlay" id="realm-skeleton" style="display:none;"></div>
       <div class="page-title page-title--with-help">
         <span>Pet Cards</span>
         <span class="help-badge help-badge--md" style="cursor:pointer;" onclick="openModal('modal-pets-guide')">?</span>
@@ -4341,7 +4350,8 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
           </button>
         </div>
 
-        <div class="pf-stats">
+        <div class="pf-stats" id="pf-stats">
+          <div class="section-skeleton-overlay" id="pf-stats-skeleton" style="display:none;"></div>
           <div class="pf-stat-row"><span class="pf-stat-label">ID</span><span class="pf-stat-val" id="pf-stat-id">000000</span></div>
           <div class="pf-stat-row"><span class="pf-stat-label">Registered Date</span><span class="pf-stat-val" id="pf-stat-registered">01-01-2026</span></div>
           <div class="pf-stat-row"><span class="pf-stat-label">Referrals</span><span class="pf-stat-val" id="pf-stat-referrals">0</span></div>
@@ -5366,12 +5376,18 @@ function onMiningButtonClick(){
     runMiningRequest(true);
   } else {
     miningBusy = true;
-    runAdGate(function(){ runMiningRequest(false); }, function(){ miningBusy = false; });
+    setButtonBusy(domCache.miningBtn, true);
+    runAdGate(function(){ runMiningRequest(false); }, function(){
+      miningBusy = false;
+      setButtonBusy(domCache.miningBtn, false);
+      if (domCache.miningBtn) domCache.miningBtn.disabled = false;
+    });
   }
 }
 
 function runMiningRequest(isReadyToClaim){
   miningBusy = true;
+  setButtonBusy(domCache.miningBtn, true);
   var request = isReadyToClaim ? callMiningApi('/api/mine/claim') : callMiningApi('/api/mine/start');
 
   request.then(function(result){
@@ -5407,6 +5423,9 @@ function runMiningRequest(isReadyToClaim){
   })
   .catch(function(err){
     if (err.message !== 'no_init_data') console.error('mining request failed:', err);
+    // فشل الشبكة فقط: لا فرع آخر في .then() يستدعي setMiningButton هنا، فنستعيد النص والتفعيل يدوياً لمنع بقاء الدائرة/التعطيل عالقين للأبد.
+    setButtonBusy(domCache.miningBtn, false);
+    if (domCache.miningBtn) domCache.miningBtn.disabled = false;
   })
   .finally(function(){
     miningBusy = false;
@@ -5492,7 +5511,13 @@ function onStreakClaimClick(){
   }
 
   streakBusy = true;
-  runAdGate(function(){ runStreakClaimRequest(initData); }, function(){ streakBusy = false; });
+  setButtonBusy(document.getElementById('streak-claim-btn'), true);
+  runAdGate(function(){ runStreakClaimRequest(initData); }, function(){
+    streakBusy = false;
+    var streakBtn = document.getElementById('streak-claim-btn');
+    setButtonBusy(streakBtn, false);
+    if (streakBtn) streakBtn.disabled = false;
+  });
 }
 
 function runStreakClaimRequest(initData){
@@ -5509,6 +5534,9 @@ function runStreakClaimRequest(initData){
         applyStreakState({ display_day: data.claimed_day, claimed_today: true, next_reset_utc: data.next_reset_utc });
       } else {
         console.error('streak claim error:', data.error);
+        var streakBtnErr = document.getElementById('streak-claim-btn');
+        setButtonBusy(streakBtnErr, false);
+        if (streakBtnErr) streakBtnErr.disabled = false;
       }
       return;
     }
@@ -5520,6 +5548,9 @@ function runStreakClaimRequest(initData){
   })
   .catch(function(err){
     console.error('streak claim request failed:', err);
+    var streakBtnCatch = document.getElementById('streak-claim-btn');
+    setButtonBusy(streakBtnCatch, false);
+    if (streakBtnCatch) streakBtnCatch.disabled = false;
   })
   .finally(function(){
     streakBusy = false;
@@ -5681,6 +5712,7 @@ function renderSpinButton(){
   if (!btn) return;
   btn.textContent = spinState.claimedToday ? 'Spin (0)' : 'Spin (1)';
   btn.classList.toggle('is-claimed', spinState.claimedToday);
+  btn.disabled = spinState.claimedToday; // بدون هذا يبقى disabled=true عالقاً من طلب الاستلام السابق حتى لو انتهى اليوم فعلياً (لا يُلاحَظ إلا لو بقيت الجلسة مفتوحة عبر منتصف الليل UTC)
 }
 
 function applySpinState(data){
@@ -5722,13 +5754,16 @@ function onSpinButtonClick(){
 
   var btn = document.getElementById('btn-spin');
   spinBusy = true;
+  setButtonBusy(btn, true);
 
-  runAdGate(function(){ runSpinClaimRequest(initData, btn); }, function(){ spinBusy = false; });
+  runAdGate(function(){ runSpinClaimRequest(initData, btn); }, function(){
+    spinBusy = false;
+    setButtonBusy(btn, false);
+    if (btn) btn.disabled = false;
+  });
 }
 
 function runSpinClaimRequest(initData, btn){
-  if (btn) btn.disabled = true;
-
   fetch('/api/spin/claim', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -5742,6 +5777,7 @@ function runSpinClaimRequest(initData, btn){
         applySpinState({ claimed_today: true, next_reset_utc: data.next_reset_utc });
       } else {
         console.error('spin claim error:', data.error);
+        setButtonBusy(btn, false);
         if (btn) btn.disabled = false;
       }
       return;
@@ -5752,10 +5788,11 @@ function runSpinClaimRequest(initData, btn){
       updateBalanceDisplay({ coins: data.coins, gram: data.gram });
       applySpinState({ claimed_today: true, next_reset_utc: data.next_reset_utc });
       showPrizeToast(data.prize_type, data.prize_amount);
-    }, 4000); // نفس مدة أنيميشن الدوران — الرصيد يتحدث بعد توقف العجلة تماماً
+    }, 4000); // نفس مدة أنيميشن الدوران — الرصيد يتحدث بعد توقف العجلة تماماً (renderSpinButton يمسح الدائرة عندها)
   })
   .catch(function(err){
     console.error('spin request failed:', err);
+    setButtonBusy(btn, false);
     if (btn) btn.disabled = false;
   })
   .finally(function(){
@@ -5773,6 +5810,7 @@ function renderChestButton(){
   if (!btn) return;
   btn.innerHTML = chestState.claimedToday ? 'Open Chest&nbsp;&nbsp;(0)' : 'Open Chest&nbsp;&nbsp;(1)';
   btn.classList.toggle('is-claimed', chestState.claimedToday);
+  btn.disabled = chestState.claimedToday;
 }
 
 function applyChestState(data){
@@ -5795,12 +5833,17 @@ function onChestOpenClick(){
   }
 
   chestBusy = true;
-  runAdGate(function(){ runChestClaimRequest(initData); }, function(){ chestBusy = false; });
+  setButtonBusy(document.getElementById('btn-open-chest'), true);
+  runAdGate(function(){ runChestClaimRequest(initData); }, function(){
+    chestBusy = false;
+    var chestBtn = document.getElementById('btn-open-chest');
+    setButtonBusy(chestBtn, false);
+    if (chestBtn) chestBtn.disabled = false;
+  });
 }
 
 function runChestClaimRequest(initData){
   var btn = document.getElementById('btn-open-chest');
-  if (btn) btn.disabled = true;
 
   var iconWrap = document.getElementById('chest-icon-wrap');
   if (iconWrap) iconWrap.classList.add('is-opening');
@@ -5820,6 +5863,7 @@ function runChestClaimRequest(initData){
         applyChestState({ claimed_today: true, next_reset_utc: data.next_reset_utc });
       } else {
         console.error('chest claim error:', data.error);
+        setButtonBusy(btn, false);
         if (btn) btn.disabled = false;
       }
       return;
@@ -5829,10 +5873,11 @@ function runChestClaimRequest(initData){
       updateBalanceDisplay({ coins: data.coins, gram: data.gram });
       applyChestState({ claimed_today: true, next_reset_utc: data.next_reset_utc });
       showPrizeToast(data.prize_type, data.prize_amount);
-    }, 650); // بعد انتهاء الاهتزاز والومضة تماماً
+    }, 650); // بعد انتهاء الاهتزاز والومضة تماماً (renderChestButton يمسح الدائرة عندها)
   })
   .catch(function(err){
     console.error('chest request failed:', err);
+    setButtonBusy(btn, false);
     if (btn) btn.disabled = false;
   })
   .finally(function(){
@@ -5850,6 +5895,7 @@ function renderGiftOpenButton(){
   if (!btn) return;
   btn.innerHTML = giftPickState.claimedToday ? 'Open&nbsp;&nbsp;(0)' : 'Open&nbsp;&nbsp;(1)';
   btn.classList.toggle('is-claimed', giftPickState.claimedToday);
+  btn.disabled = giftPickState.claimedToday;
 }
 
 function applyGiftPickState(data){
@@ -5878,12 +5924,17 @@ function onGiftOpenClick(){
   }
 
   giftPickBusy = true;
-  runAdGate(function(){ runGiftClaimRequest(initData, selectedBox); }, function(){ giftPickBusy = false; });
+  setButtonBusy(document.getElementById('btn-gift-open'), true);
+  runAdGate(function(){ runGiftClaimRequest(initData, selectedBox); }, function(){
+    giftPickBusy = false;
+    var giftBtn = document.getElementById('btn-gift-open');
+    setButtonBusy(giftBtn, false);
+    if (giftBtn) giftBtn.disabled = false;
+  });
 }
 
 function runGiftClaimRequest(initData, selectedBox){
   var btn = document.getElementById('btn-gift-open');
-  if (btn) btn.disabled = true;
 
   fetch('/api/giftpick/claim', {
     method: 'POST',
@@ -5898,6 +5949,7 @@ function runGiftClaimRequest(initData, selectedBox){
         applyGiftPickState({ claimed_today: true, next_reset_utc: data.next_reset_utc });
       } else {
         console.error('gift pick claim error:', data.error);
+        setButtonBusy(btn, false);
         if (btn) btn.disabled = false;
       }
       return;
@@ -5918,10 +5970,11 @@ function runGiftClaimRequest(initData, selectedBox){
       updateBalanceDisplay({ coins: data.coins, gram: data.gram });
       applyGiftPickState({ claimed_today: true, next_reset_utc: data.next_reset_utc });
       showPrizeToast(data.prize_type, data.prize_amount);
-    }, 700); // بعد انتهاء أنيميشن القلب تماماً
+    }, 700); // بعد انتهاء أنيميشن القلب تماماً (renderGiftOpenButton يمسح الدائرة عندها)
   })
   .catch(function(err){
     console.error('gift pick request failed:', err);
+    setButtonBusy(btn, false);
     if (btn) btn.disabled = false;
   })
   .finally(function(){
@@ -6033,6 +6086,11 @@ function fetchRealmStatus(){
   if (!initData) return;
   realmStatusFetched = true;
 
+  var realmPage = document.getElementById('page-realm');
+  var realmSkeleton = document.getElementById('realm-skeleton');
+  if (realmPage) realmPage.classList.add('is-loading');
+  if (realmSkeleton){ realmSkeleton.innerHTML = skeletonRowsHtml(8, 'thin'); realmSkeleton.style.display = ''; }
+
   fetch('/api/realm/status', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -6051,6 +6109,11 @@ function fetchRealmStatus(){
 }
 
 function applyRealmStatusData(data){
+  var realmPage = document.getElementById('page-realm');
+  var realmSkeleton = document.getElementById('realm-skeleton');
+  if (realmPage) realmPage.classList.remove('is-loading');
+  if (realmSkeleton) realmSkeleton.style.display = 'none';
+
   applyPetsState(data.pets);
   applyStorageState({
     storage_has_pet: data.storage_has_pet,
@@ -6202,6 +6265,7 @@ function onPetUpgradeConfirm(){
   .finally(function(){
     petUpgradeBusy = false;
     setButtonBusy(petUpgradeBtn, false);
+    if (petUpgradeBtn) petUpgradeBtn.disabled = false;
   });
 }
 
@@ -6611,7 +6675,7 @@ function openLeaderboardModal(){
 
   ['ads', 'referrals'].forEach(function(type){
     var listEl = document.getElementById('lb-list-' + type);
-    if (listEl) listEl.innerHTML = skeletonRowsHtml(3, true);
+    if (listEl) listEl.innerHTML = skeletonRowsHtml(3, 'avatar');
   });
 
   fetch('/api/leaderboard', {
@@ -6715,14 +6779,14 @@ function setButtonBusy(btn, busy){
 
 // يُنتج نص HTML لصفوف Skeleton بسيطة (أشرطة رمادية لامعة) — تُستخدَم فقط عند Cache Miss الحقيقي
 // (قبل أول جلب فعلي)، أبداً عند Cache Hit لأن المحتوى الحقيقي يظهر فوراً دون انتظار. count = عدد
-// الصفوف الوهمية، withAvatar = true يضيف دائرة صغيرة يسار كل شريط (لعناصر بها صورة/أيقونة كالأصدقاء).
-function skeletonRowsHtml(count, withAvatar){
+// الصفوف الوهمية. variant: 'avatar' يضيف دائرة صغيرة يسار كل شريط (Friends/Leaderboard)، 'thin'
+// أشرطة رفيعة لغطاء قسم كامل (Profile/Realm/Milestones)، وبلا variant = شريط كامل (Wallet/Tasks).
+function skeletonRowsHtml(count, variant){
+  var rowHtml = variant === 'avatar'
+    ? '<div class="skeleton-list-item"><div class="skeleton-avatar"></div><div class="skeleton-row"></div></div>'
+    : (variant === 'thin' ? '<div class="skeleton-row skeleton-row--thin"></div>' : '<div class="skeleton-row"></div>');
   var rows = [];
-  for (var i = 0; i < count; i++){
-    rows.push(withAvatar
-      ? '<div class="skeleton-list-item"><div class="skeleton-avatar"></div><div class="skeleton-row"></div></div>'
-      : '<div class="skeleton-row"></div>');
-  }
+  for (var i = 0; i < count; i++) rows.push(rowHtml);
   return rows.join('');
 }
 
@@ -6735,6 +6799,11 @@ function openProfileModal(){
 
   var initData = getTelegramInitData();
   if (!initData) return;
+
+  var pfStats = document.getElementById('pf-stats');
+  var pfSkeleton = document.getElementById('pf-stats-skeleton');
+  if (pfStats) pfStats.classList.add('is-loading');
+  if (pfSkeleton){ pfSkeleton.innerHTML = skeletonRowsHtml(10, 'thin'); pfSkeleton.style.display = ''; }
 
   fetch('/api/profile', {
     method: 'POST',
@@ -6753,6 +6822,11 @@ function openProfileModal(){
 }
 
 function applyProfileData(data){
+  var pfStats = document.getElementById('pf-stats');
+  var pfSkeleton = document.getElementById('pf-stats-skeleton');
+  if (pfStats) pfStats.classList.remove('is-loading');
+  if (pfSkeleton) pfSkeleton.style.display = 'none';
+
   var nameEl = document.getElementById('pf-name');
   if (nameEl) nameEl.textContent = data.display_name;
 
@@ -6888,6 +6962,7 @@ function onStorageUpgradeConfirm(){
   .finally(function(){
     storageUpgradeBusy = false;
     setButtonBusy(storageUpgradeBtn, false);
+    if (storageUpgradeBtn) storageUpgradeBtn.disabled = false;
   });
 }
 
@@ -7388,8 +7463,14 @@ function renderAdsTaskButton(){
   var cooldownRemaining = Math.ceil((adsTaskState.cooldownUntil - Date.now()) / 1000);
   var inCooldown = cooldownRemaining > 0;
   if (btn){
-    btn.textContent = inCooldown ? String(cooldownRemaining) : 'Watch';
-    btn.classList.toggle('is-claimed', adsTaskState.watchedToday >= adsTaskState.dailyLimit || adsTaskState.busy || inCooldown);
+    if (adsTaskState.busy){
+      setButtonBusy(btn, true);
+    } else {
+      setButtonBusy(btn, false);
+      btn.disabled = false;
+      btn.textContent = inCooldown ? String(cooldownRemaining) : 'Watch';
+      btn.classList.toggle('is-claimed', adsTaskState.watchedToday >= adsTaskState.dailyLimit || inCooldown);
+    }
   }
 }
 
@@ -7529,9 +7610,15 @@ function renderBonusAdButton(){
   var remainingMs = bonusAdState.nextAvailableAt - Date.now();
   var inCooldown = !dailyDone && remainingMs > 0;
   if (btn){
-    var minutesLeft = Math.max(1, Math.ceil(remainingMs / 60000));
-    btn.textContent = inCooldown ? String(minutesLeft) : 'Watch';
-    btn.classList.toggle('is-claimed', dailyDone || bonusAdState.busy || inCooldown);
+    if (bonusAdState.busy){
+      setButtonBusy(btn, true);
+    } else {
+      setButtonBusy(btn, false);
+      btn.disabled = false;
+      var minutesLeft = Math.max(1, Math.ceil(remainingMs / 60000));
+      btn.textContent = inCooldown ? String(minutesLeft) : 'Watch';
+      btn.classList.toggle('is-claimed', dailyDone || inCooldown);
+    }
   }
 }
 
@@ -7686,8 +7773,14 @@ function renderGigapubButton(){
   var cooldownRemaining = Math.ceil((gigapubState.cooldownUntil - Date.now()) / 1000);
   var inCooldown = cooldownRemaining > 0;
   if (btn){
-    btn.textContent = inCooldown ? String(cooldownRemaining) : 'Watch';
-    btn.classList.toggle('is-claimed', dailyDone || gigapubState.busy || inCooldown);
+    if (gigapubState.busy){
+      setButtonBusy(btn, true);
+    } else {
+      setButtonBusy(btn, false);
+      btn.disabled = false; // setButtonBusy(false) لا تلمس disabled؛ هذا الزر لم يكن يستخدم disabled أصلاً قبل إضافة setButtonBusy، فيجب إعادة ضبطه صراحة هنا وإلا يبقى معطَّلاً للأبد بعد أول استخدام
+      btn.textContent = inCooldown ? String(cooldownRemaining) : 'Watch';
+      btn.classList.toggle('is-claimed', dailyDone || inCooldown);
+    }
   }
 }
 
@@ -7726,7 +7819,7 @@ function onWatchGigapubClick(){
   setAdLoadingOverlayVia('GigaPub');
 
   window.showGiga('main').then(function(){
-    hideAdLoadingOverlay();
+    setAdLoadingOverlayVerifying();
     pollGigapubRewardConfirmation(baselineWatched, 0);
   }).catch(function(){
     hideAdLoadingOverlay();
@@ -7742,6 +7835,7 @@ function pollGigapubRewardConfirmation(baselineWatched, attempt){
   if (!initData){
     gigapubState.busy = false;
     renderGigapubButton();
+    hideAdLoadingOverlay();
     return;
   }
 
@@ -7765,6 +7859,7 @@ function pollGigapubRewardConfirmation(baselineWatched, attempt){
       triggerConfetti();
       gigapubState.busy = false;
       startGigapubTaskCooldown();
+      hideAdLoadingOverlay();
       return;
     }
 
@@ -7773,6 +7868,7 @@ function pollGigapubRewardConfirmation(baselineWatched, attempt){
     } else {
       gigapubState.busy = false;
       renderGigapubButton();
+      hideAdLoadingOverlay();
       showBuyErrorToast('Reward is taking longer than usual, check back shortly', { title: 'Watch gigapub ads' });
     }
   })
@@ -7780,6 +7876,7 @@ function pollGigapubRewardConfirmation(baselineWatched, attempt){
     console.error('gigapub reward poll failed:', err);
     gigapubState.busy = false;
     renderGigapubButton();
+    hideAdLoadingOverlay();
   });
 }
 
@@ -7909,8 +8006,14 @@ function renderMonetixButton(){
   var cooldownRemaining = Math.ceil((monetixState.cooldownUntil - Date.now()) / 1000);
   var inCooldown = cooldownRemaining > 0;
   if (btn){
-    btn.textContent = inCooldown ? String(cooldownRemaining) : 'Watch';
-    btn.classList.toggle('is-claimed', dailyDone || monetixState.busy || inCooldown);
+    if (monetixState.busy){
+      setButtonBusy(btn, true);
+    } else {
+      setButtonBusy(btn, false);
+      btn.disabled = false;
+      btn.textContent = inCooldown ? String(cooldownRemaining) : 'Watch';
+      btn.classList.toggle('is-claimed', dailyDone || inCooldown);
+    }
   }
 }
 
@@ -7958,11 +8061,12 @@ function onWatchMonetixClick(){
     if (settled) return;
     settled = true;
     clearTimeout(noAdTimeout);
-    hideAdLoadingOverlay();
 
     if (res && (res.status === 'completed' || res.status === 'closed')){
+      setAdLoadingOverlayVerifying();
       creditMonetixReward();
     } else {
+      hideAdLoadingOverlay();
       monetixState.busy = false;
       renderMonetixButton();
       showBuyErrorToast('Ad was not completed', { title: 'Watch MonetixAds' });
@@ -7975,6 +8079,7 @@ function creditMonetixReward(){
   if (!initData){
     monetixState.busy = false;
     renderMonetixButton();
+    hideAdLoadingOverlay();
     return;
   }
 
@@ -7991,6 +8096,7 @@ function creditMonetixReward(){
       }
       monetixState.busy = false;
       renderMonetixButton();
+      hideAdLoadingOverlay();
       return;
     }
 
@@ -8000,11 +8106,13 @@ function creditMonetixReward(){
     triggerConfetti();
     monetixState.busy = false;
     startMonetixTaskCooldown();
+    hideAdLoadingOverlay();
   })
   .catch(function(err){
     console.error('monetix reward request failed:', err);
     monetixState.busy = false;
     renderMonetixButton();
+    hideAdLoadingOverlay();
   });
 }
 
@@ -8211,7 +8319,7 @@ function fetchAdminTasks(section){
   if (!initData) return;
 
   var tasksListEl = document.getElementById(section + '-tasks-list');
-  if (tasksListEl) tasksListEl.innerHTML = skeletonRowsHtml(2, false);
+  if (tasksListEl) tasksListEl.innerHTML = skeletonRowsHtml(2);
 
   fetch('/api/tasks/list', {
     method: 'POST',
@@ -8849,7 +8957,9 @@ function onShowMilestonesClick(){
   var initData = getTelegramInitData();
   if (!initData) return;
 
-  if (btn) btn.textContent = 'Loading...';
+  setButtonBusy(btn, true);
+  var msSkeleton = document.getElementById('milestone-missions-skeleton');
+  if (msSkeleton){ msSkeleton.innerHTML = skeletonRowsHtml(4, 'thin'); msSkeleton.style.display = ''; }
 
   fetch('/api/friends/milestones', {
     method: 'POST',
@@ -8863,13 +8973,16 @@ function onShowMilestonesClick(){
     friendsState.milestones = data.milestones;
     localCacheSet('milestones', friendsState.milestones);
     renderMilestones();
+    if (msSkeleton) msSkeleton.style.display = 'none';
     var list = document.getElementById('milestone-missions-list');
     if (list) list.style.display = '';
     if (btn) btn.remove();
   })
   .catch(function(err){
     console.error('fetch friends milestones failed:', err);
-    if (btn) btn.textContent = 'Show Missions'; // اسمح بإعادة المحاولة
+    if (msSkeleton) msSkeleton.style.display = 'none';
+    setButtonBusy(btn, false);
+    if (btn) btn.disabled = false; // اسمح بإعادة المحاولة
   });
 }
 
@@ -8889,6 +9002,7 @@ function renderFriendsStats(){
       setButtonBusy(claimBtn, true);
     } else {
       setButtonBusy(claimBtn, false);
+      claimBtn.disabled = false;
       claimBtn.textContent = 'Claim';
       claimBtn.classList.toggle('is-claimed', friendsState.pendingEarnings < friendsState.minClaim);
     }
@@ -8989,10 +9103,10 @@ function onClaimMilestoneClick(tier){
 function onShowFriendsListClick(){
   if (friendsListState.loaded) return;
   var btn = document.getElementById('btn-show-friends-list');
-  if (btn) btn.textContent = 'Loading...';
+  setButtonBusy(btn, true);
 
   fetchFriendsListPage(0, function(ok){
-    if (!ok){ if (btn) btn.textContent = 'Show The List'; return; }
+    if (!ok){ setButtonBusy(btn, false); if (btn) btn.disabled = false; return; }
     friendsListState.loaded = true;
     if (btn) btn.remove();
   });
@@ -9024,7 +9138,7 @@ function fetchFriendsListPage(page, callback){
   friendsListState.busy = true;
   updateFriendsListNav();
   var friendsContainer = document.getElementById('friends-list-container');
-  if (friendsContainer) friendsContainer.innerHTML = skeletonRowsHtml(4, true);
+  if (friendsContainer) friendsContainer.innerHTML = skeletonRowsHtml(4, 'avatar');
 
   fetch('/api/friends/list', {
     method: 'POST',
@@ -9249,11 +9363,18 @@ function onPromoRedeemClick(){
     return;
   }
 
+  var promoBtn = document.getElementById('promo-redeem-btn');
   promoRedeemBusy = true;
-  runAdGate(function(){ runPromoRedeemRequest(initData, code, input); }, function(){ promoRedeemBusy = false; });
+  setButtonBusy(promoBtn, true);
+  runAdGate(function(){ runPromoRedeemRequest(initData, code, input); }, function(){
+    promoRedeemBusy = false;
+    setButtonBusy(promoBtn, false);
+    if (promoBtn) promoBtn.disabled = false;
+  });
 }
 
 function runPromoRedeemRequest(initData, code, input){
+  var btn = document.getElementById('promo-redeem-btn');
   fetch('/api/promo/redeem', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -9283,6 +9404,8 @@ function runPromoRedeemRequest(initData, code, input){
   })
   .finally(function(){
     promoRedeemBusy = false;
+    setButtonBusy(btn, false);
+    if (btn) btn.disabled = false;
     hideAdLoadingOverlay();
   });
 }
@@ -9587,9 +9710,9 @@ function onShowTxHistoryClick(){
   var initData = getTelegramInitData();
   if (!initData) return;
 
-  if (btn) btn.textContent = 'Loading...';
+  setButtonBusy(btn, true);
   var txList = document.getElementById('tx-history-list');
-  if (txList) txList.innerHTML = skeletonRowsHtml(4, false);
+  if (txList) txList.innerHTML = skeletonRowsHtml(4);
 
   fetch('/api/wallet/history', {
     method: 'POST',
@@ -9606,7 +9729,8 @@ function onShowTxHistoryClick(){
   })
   .catch(function(err){
     console.error('wallet history request failed:', err);
-    if (btn) btn.textContent = 'Show History';
+    setButtonBusy(btn, false);
+    if (btn) btn.disabled = false;
   });
 }
 
