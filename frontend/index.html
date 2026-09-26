@@ -5376,7 +5376,12 @@ function onMiningButtonClick(){
     runMiningRequest(true);
   } else {
     miningBusy = true;
-    runAdGate(function(){ runMiningRequest(false); }, function(){ miningBusy = false; });
+    setButtonBusy(domCache.miningBtn, true);
+    runAdGate(function(){ runMiningRequest(false); }, function(){
+      miningBusy = false;
+      setButtonBusy(domCache.miningBtn, false);
+      if (domCache.miningBtn) domCache.miningBtn.disabled = false;
+    });
   }
 }
 
@@ -5418,8 +5423,9 @@ function runMiningRequest(isReadyToClaim){
   })
   .catch(function(err){
     if (err.message !== 'no_init_data') console.error('mining request failed:', err);
-    // فشل الشبكة فقط: لا فرع آخر في .then() يستدعي setMiningButton هنا، فنستعيد النص يدوياً لمنع بقاء الدائرة عالقة للأبد.
+    // فشل الشبكة فقط: لا فرع آخر في .then() يستدعي setMiningButton هنا، فنستعيد النص والتفعيل يدوياً لمنع بقاء الدائرة/التعطيل عالقين للأبد.
     setButtonBusy(domCache.miningBtn, false);
+    if (domCache.miningBtn) domCache.miningBtn.disabled = false;
   })
   .finally(function(){
     miningBusy = false;
@@ -5505,7 +5511,13 @@ function onStreakClaimClick(){
   }
 
   streakBusy = true;
-  runAdGate(function(){ runStreakClaimRequest(initData); }, function(){ streakBusy = false; });
+  setButtonBusy(document.getElementById('streak-claim-btn'), true);
+  runAdGate(function(){ runStreakClaimRequest(initData); }, function(){
+    streakBusy = false;
+    var streakBtn = document.getElementById('streak-claim-btn');
+    setButtonBusy(streakBtn, false);
+    if (streakBtn) streakBtn.disabled = false;
+  });
 }
 
 function runStreakClaimRequest(initData){
@@ -5522,6 +5534,9 @@ function runStreakClaimRequest(initData){
         applyStreakState({ display_day: data.claimed_day, claimed_today: true, next_reset_utc: data.next_reset_utc });
       } else {
         console.error('streak claim error:', data.error);
+        var streakBtnErr = document.getElementById('streak-claim-btn');
+        setButtonBusy(streakBtnErr, false);
+        if (streakBtnErr) streakBtnErr.disabled = false;
       }
       return;
     }
@@ -5533,6 +5548,9 @@ function runStreakClaimRequest(initData){
   })
   .catch(function(err){
     console.error('streak claim request failed:', err);
+    var streakBtnCatch = document.getElementById('streak-claim-btn');
+    setButtonBusy(streakBtnCatch, false);
+    if (streakBtnCatch) streakBtnCatch.disabled = false;
   })
   .finally(function(){
     streakBusy = false;
@@ -5735,13 +5753,16 @@ function onSpinButtonClick(){
 
   var btn = document.getElementById('btn-spin');
   spinBusy = true;
+  setButtonBusy(btn, true);
 
-  runAdGate(function(){ runSpinClaimRequest(initData, btn); }, function(){ spinBusy = false; });
+  runAdGate(function(){ runSpinClaimRequest(initData, btn); }, function(){
+    spinBusy = false;
+    setButtonBusy(btn, false);
+    if (btn) btn.disabled = false;
+  });
 }
 
 function runSpinClaimRequest(initData, btn){
-  if (btn) btn.disabled = true;
-
   fetch('/api/spin/claim', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -5755,6 +5776,7 @@ function runSpinClaimRequest(initData, btn){
         applySpinState({ claimed_today: true, next_reset_utc: data.next_reset_utc });
       } else {
         console.error('spin claim error:', data.error);
+        setButtonBusy(btn, false);
         if (btn) btn.disabled = false;
       }
       return;
@@ -5765,10 +5787,11 @@ function runSpinClaimRequest(initData, btn){
       updateBalanceDisplay({ coins: data.coins, gram: data.gram });
       applySpinState({ claimed_today: true, next_reset_utc: data.next_reset_utc });
       showPrizeToast(data.prize_type, data.prize_amount);
-    }, 4000); // نفس مدة أنيميشن الدوران — الرصيد يتحدث بعد توقف العجلة تماماً
+    }, 4000); // نفس مدة أنيميشن الدوران — الرصيد يتحدث بعد توقف العجلة تماماً (renderSpinButton يمسح الدائرة عندها)
   })
   .catch(function(err){
     console.error('spin request failed:', err);
+    setButtonBusy(btn, false);
     if (btn) btn.disabled = false;
   })
   .finally(function(){
@@ -5808,12 +5831,17 @@ function onChestOpenClick(){
   }
 
   chestBusy = true;
-  runAdGate(function(){ runChestClaimRequest(initData); }, function(){ chestBusy = false; });
+  setButtonBusy(document.getElementById('btn-open-chest'), true);
+  runAdGate(function(){ runChestClaimRequest(initData); }, function(){
+    chestBusy = false;
+    var chestBtn = document.getElementById('btn-open-chest');
+    setButtonBusy(chestBtn, false);
+    if (chestBtn) chestBtn.disabled = false;
+  });
 }
 
 function runChestClaimRequest(initData){
   var btn = document.getElementById('btn-open-chest');
-  if (btn) btn.disabled = true;
 
   var iconWrap = document.getElementById('chest-icon-wrap');
   if (iconWrap) iconWrap.classList.add('is-opening');
@@ -5833,6 +5861,7 @@ function runChestClaimRequest(initData){
         applyChestState({ claimed_today: true, next_reset_utc: data.next_reset_utc });
       } else {
         console.error('chest claim error:', data.error);
+        setButtonBusy(btn, false);
         if (btn) btn.disabled = false;
       }
       return;
@@ -5842,10 +5871,11 @@ function runChestClaimRequest(initData){
       updateBalanceDisplay({ coins: data.coins, gram: data.gram });
       applyChestState({ claimed_today: true, next_reset_utc: data.next_reset_utc });
       showPrizeToast(data.prize_type, data.prize_amount);
-    }, 650); // بعد انتهاء الاهتزاز والومضة تماماً
+    }, 650); // بعد انتهاء الاهتزاز والومضة تماماً (renderChestButton يمسح الدائرة عندها)
   })
   .catch(function(err){
     console.error('chest request failed:', err);
+    setButtonBusy(btn, false);
     if (btn) btn.disabled = false;
   })
   .finally(function(){
@@ -5891,12 +5921,17 @@ function onGiftOpenClick(){
   }
 
   giftPickBusy = true;
-  runAdGate(function(){ runGiftClaimRequest(initData, selectedBox); }, function(){ giftPickBusy = false; });
+  setButtonBusy(document.getElementById('btn-gift-open'), true);
+  runAdGate(function(){ runGiftClaimRequest(initData, selectedBox); }, function(){
+    giftPickBusy = false;
+    var giftBtn = document.getElementById('btn-gift-open');
+    setButtonBusy(giftBtn, false);
+    if (giftBtn) giftBtn.disabled = false;
+  });
 }
 
 function runGiftClaimRequest(initData, selectedBox){
   var btn = document.getElementById('btn-gift-open');
-  if (btn) btn.disabled = true;
 
   fetch('/api/giftpick/claim', {
     method: 'POST',
@@ -5911,6 +5946,7 @@ function runGiftClaimRequest(initData, selectedBox){
         applyGiftPickState({ claimed_today: true, next_reset_utc: data.next_reset_utc });
       } else {
         console.error('gift pick claim error:', data.error);
+        setButtonBusy(btn, false);
         if (btn) btn.disabled = false;
       }
       return;
@@ -5931,10 +5967,11 @@ function runGiftClaimRequest(initData, selectedBox){
       updateBalanceDisplay({ coins: data.coins, gram: data.gram });
       applyGiftPickState({ claimed_today: true, next_reset_utc: data.next_reset_utc });
       showPrizeToast(data.prize_type, data.prize_amount);
-    }, 700); // بعد انتهاء أنيميشن القلب تماماً
+    }, 700); // بعد انتهاء أنيميشن القلب تماماً (renderGiftOpenButton يمسح الدائرة عندها)
   })
   .catch(function(err){
     console.error('gift pick request failed:', err);
+    setButtonBusy(btn, false);
     if (btn) btn.disabled = false;
   })
   .finally(function(){
@@ -9318,11 +9355,18 @@ function onPromoRedeemClick(){
     return;
   }
 
+  var promoBtn = document.getElementById('promo-redeem-btn');
   promoRedeemBusy = true;
-  runAdGate(function(){ runPromoRedeemRequest(initData, code, input); }, function(){ promoRedeemBusy = false; });
+  setButtonBusy(promoBtn, true);
+  runAdGate(function(){ runPromoRedeemRequest(initData, code, input); }, function(){
+    promoRedeemBusy = false;
+    setButtonBusy(promoBtn, false);
+    if (promoBtn) promoBtn.disabled = false;
+  });
 }
 
 function runPromoRedeemRequest(initData, code, input){
+  var btn = document.getElementById('promo-redeem-btn');
   fetch('/api/promo/redeem', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -9352,6 +9396,8 @@ function runPromoRedeemRequest(initData, code, input){
   })
   .finally(function(){
     promoRedeemBusy = false;
+    setButtonBusy(btn, false);
+    if (btn) btn.disabled = false;
     hideAdLoadingOverlay();
   });
 }
