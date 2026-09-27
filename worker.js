@@ -32,7 +32,7 @@ const EXCHANGE_MIN_COINS = 1000;
 
 // Deposit config
 const DEPOSIT_GRAM_TO_COINS_RATE = 1 / EXCHANGE_RATE_COIN_TO_GRAM;
-const DEPOSIT_MIN_GRAM = 3;
+const DEPOSIT_MIN_GRAM = 2;
 const DEPOSIT_CHECK_TIMEOUT_MS = 120_000;
 const DEPOSIT_CHECK_MAX_ATTEMPTS = 8;
 const DEPOSIT_CHECK_FIRST_DELAY_MS = 5_000;
@@ -92,7 +92,7 @@ const MONETIX_DAILY_LIMIT = 10;
 
 // Realm pets & Storage config
 const PETS = {
-  duck:         { basespeed: 114,   price: 300000 },
+  duck:         { basespeed: 77,    price: 200000 },
   polar_bear:   { basespeed: 191,   price: 500000 },
   scorpion:     { basespeed: 379,   price: 1000000 },
   penguin:      { basespeed: 1894,  price: 5000000 },
