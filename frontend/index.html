@@ -4781,6 +4781,18 @@ positionTopbarLogo();
 setTimeout(positionTopbarLogo, 300);
 
 // User Data
+// Server clock: timers compared against server timestamps use the server's time (X-Server-Time header), not the device clock
+var serverClockOffsetMs = 0;
+function syncServerClock(res, sentAt){
+  var header = res && res.headers ? res.headers.get('X-Server-Time') : null;
+  var serverMs = header ? Number(header) : NaN;
+  if (!isFinite(serverMs) || serverMs <= 0) return;
+  var offset = serverMs - (sentAt + Date.now()) / 2;
+  serverClockOffsetMs = Math.abs(offset) > 1000 ? offset : 0;
+}
+function serverNow(){
+  return Date.now() + serverClockOffsetMs;
+}
 function getTelegramInitData(){
   try{
     if (window.Telegram && window.Telegram.WebApp){
@@ -4875,14 +4887,16 @@ function fetchUserData(){
     hideSplashScreen();
     return;
   }
+  var requestedAt = Date.now();
   fetch('/api/user', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ initData: initData })
   })
-  .then(function(res){ return res.json(); })
+  .then(function(res){ syncServerClock(res, requestedAt); return res.json(); })
   .then(function(data){
     if (!data.user) return;
+    onUserDataRefreshed(requestedAt);
     updateBalanceDisplay(data.user);
     applyMiningState({
       mining_started_at: data.user.mining_started_at,
@@ -4962,6 +4976,7 @@ function setMiningButton(text, opts){
   opts = opts || {};
   var btn = domCache.miningBtn;
   if (!btn) return;
+  delete btn.dataset.origHtml;
   btn.textContent = text;
   btn.classList.toggle('is-mining', !!opts.mining);
   btn.classList.toggle('is-claim-ready', !!opts.claimReady);
@@ -4991,34 +5006,49 @@ function setCharacterMining(isMining){
   if (miningArt) miningArt.classList.toggle('is-visible', isMining);
   if (slot) slot.classList.toggle('is-mining', isMining);
 }
+function isMiningCycleFromPastDay(){
+  return !!miningState.startedAt && miningState.startedAt.toISOString().slice(0, 10) !== new Date(serverNow()).toISOString().slice(0, 10);
+}
 function applyMiningState(data){
   miningState.cyclesToday = data.cycles_today || 0;
   miningState.cyclesMax = data.cycles_max || miningState.cyclesMax;
   miningState.cycleDurationSec = data.cycle_duration_seconds || miningState.cycleDurationSec;
   miningState.startedAt = data.mining_started_at ? new Date(data.mining_started_at) : null;
+  if (isMiningCycleFromPastDay()){
+    miningState.startedAt = null;
+    miningState.cyclesToday = 0;
+  }
   renderMiningCounter();
   clearInterval(miningTickTimer);
   if (!miningState.startedAt){
     setCharacterMining(false);
     var reachedLimit = miningState.cyclesToday >= miningState.cyclesMax;
-    setMiningButton(reachedLimit ? 'Come back tomorrow' : 'Start Mining', { disabled: reachedLimit });
+    if (!miningBusy) setMiningButton(reachedLimit ? 'Come back tomorrow' : 'Start Mining', { disabled: reachedLimit });
     renderMiningProgress(0);
     return;
   }
-  setCharacterMining(true);
   miningTick();
   miningTickTimer = setInterval(miningTick, 1000);
 }
 function miningTick(){
-  var elapsedSec = (Date.now() - miningState.startedAt.getTime()) / 1000;
+  if (isMiningCycleFromPastDay()){
+    applyMiningState({ mining_started_at: null, cycles_today: 0 });
+    return;
+  }
+  var elapsedSec = (serverNow() - miningState.startedAt.getTime()) / 1000;
   if (elapsedSec >= miningState.cycleDurationSec){
     renderMiningProgress(miningState.cycleDurationSec);
-    setMiningButton('Claim Reward', { claimReady: true });
-    clearInterval(miningTickTimer);
+    setCharacterMining(false);
+    if (!miningBusy) setMiningButton('Claim Reward', { claimReady: true });
     return;
   }
   renderMiningProgress(elapsedSec);
+  setCharacterMining(true);
   setMiningButton('Mining in Progress', { mining: true, disabled: true });
+}
+function renderMiningIdleButton(){
+  if (miningState.startedAt) miningTick();
+  else applyMiningState({ mining_started_at: null, cycles_today: miningState.cyclesToday });
 }
 function callMiningApi(path){
   var initData = getTelegramInitData();
@@ -5026,30 +5056,27 @@ function callMiningApi(path){
     alert('Open this app from Telegram to mine.');
     return Promise.reject(new Error('no_init_data'));
   }
+  var sentAt = Date.now();
   return fetch(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ initData: initData })
   }).then(function(res){
+    syncServerClock(res, sentAt);
     return res.json().then(function(data){ return { status: res.status, data: data }; });
   });
 }
 function onMiningButtonClick(){
   if (miningBusy) return;
   var isReadyToClaim = miningState.startedAt &&
-    (Date.now() - miningState.startedAt.getTime()) / 1000 >= miningState.cycleDurationSec;
+    (serverNow() - miningState.startedAt.getTime()) / 1000 >= miningState.cycleDurationSec;
   if (miningState.startedAt && !isReadyToClaim) return;
-  if (isReadyToClaim){
-    runMiningRequest(true);
-  } else {
-    miningBusy = true;
-    setButtonBusy(domCache.miningBtn, true);
-    runAdGate(function(){ runMiningRequest(false); }, function(){
-      miningBusy = false;
-      setButtonBusy(domCache.miningBtn, false);
-      if (domCache.miningBtn) domCache.miningBtn.disabled = false;
-    });
-  }
+  miningBusy = true;
+  setButtonBusy(domCache.miningBtn, true);
+  runAdGate(function(){ runMiningRequest(!!isReadyToClaim); }, function(){
+    miningBusy = false;
+    renderMiningIdleButton();
+  });
 }
 function runMiningRequest(isReadyToClaim){
   miningBusy = true;
@@ -5057,37 +5084,32 @@ function runMiningRequest(isReadyToClaim){
   var request = isReadyToClaim ? callMiningApi('/api/mine/claim') : callMiningApi('/api/mine/start');
   request.then(function(result){
     var data = result.data;
+    miningBusy = false;
     if (data.error){
-      if (data.error === 'cycle_not_finished'){
-        miningTick();
-        return;
-      }
-      if (data.error === 'daily_limit_reached'){
+      if (data.error === 'daily_limit_reached' || data.error === 'cycle_expired'){
         applyMiningState({ mining_started_at: null, cycles_today: data.cycles_today, cycles_max: data.cycles_max });
         return;
       }
-      if (data.error === 'already_mining' || data.error === 'already_claimed'){
+      if (data.error === 'already_mining' || data.error === 'already_claimed' || data.error === 'not_mining'){
+        renderMiningIdleButton();
         fetchUserData();
         return;
       }
-      console.error('mining api error:', data.error);
+      if (data.error !== 'cycle_not_finished') console.error('mining api error:', data.error);
+      renderMiningIdleButton();
       return;
     }
-    if (isReadyToClaim){
-      if (typeof data.coins === 'number'){
-        updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE, total_mined: data.total_mined });
-        showPrizeToast('coins', data.reward, 'You Got');
-        triggerConfetti();
-      }
-      applyMiningState({ mining_started_at: null, cycles_today: data.cycles_today, cycles_max: data.cycles_max, cycle_duration_seconds: miningState.cycleDurationSec });
-    } else {
-      applyMiningState(data);
+    if (isReadyToClaim && typeof data.coins === 'number'){
+      updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE, total_mined: data.total_mined });
+      showPrizeToast('coins', data.reward, 'You Got');
+      triggerConfetti();
     }
+    applyMiningState(data);
   })
   .catch(function(err){
     if (err.message !== 'no_init_data') console.error('mining request failed:', err);
-    setButtonBusy(domCache.miningBtn, false);
-    if (domCache.miningBtn) domCache.miningBtn.disabled = false;
+    miningBusy = false;
+    renderMiningIdleButton();
   })
   .finally(function(){
     miningBusy = false;
@@ -5102,6 +5124,7 @@ var streakState = {
   nextResetUtc: null
 };
 var streakTickTimer = null;
+var streakResetRefreshAt = 0;
 var streakBusy = false;
 function renderStreakDayBadge(){
   var badge = document.getElementById('streak-day-badge');
@@ -5130,10 +5153,13 @@ function renderStreakButton(){
 function renderStreakTimer(){
   var timerEl = domCache.streakTimer;
   if (!timerEl || !streakState.nextResetUtc) return;
-  var remainingMs = new Date(streakState.nextResetUtc).getTime() - Date.now();
+  var remainingMs = new Date(streakState.nextResetUtc).getTime() - serverNow();
   if (remainingMs <= 0){
     timerEl.textContent = '00:00:00';
-    fetchUserData();
+    if (Date.now() - streakResetRefreshAt >= 5000){
+      streakResetRefreshAt = Date.now();
+      fetchUserData();
+    }
     return;
   }
   var totalSec = Math.floor(remainingMs / 1000);
@@ -6858,6 +6884,36 @@ function onComboCheckClick(){
 var ADSGRAM_BLOCK_ID = '49294';
 var ADSGRAM_DEBUG = false;
 var adsgramController = null;
+// Post-ad verification: the reward shows right away, and one /api/user check runs 1 minute after the last ad
+var AD_VERIFY_DELAY_MS = 60000;
+var adVerifyTimer = null;
+var adVerifyPending = false;
+var lastAdRewardAt = 0;
+function pauseAdVerification(){
+  clearTimeout(adVerifyTimer);
+  adVerifyTimer = null;
+}
+function scheduleAdVerification(rewarded){
+  if (rewarded){
+    adVerifyPending = true;
+    lastAdRewardAt = Date.now();
+  }
+  if (!adVerifyPending) return;
+  clearTimeout(adVerifyTimer);
+  adVerifyTimer = setTimeout(function(){
+    adVerifyTimer = null;
+    fetchUserData();
+  }, AD_VERIFY_DELAY_MS);
+}
+function onUserDataRefreshed(requestedAt){
+  if (adVerifyPending && requestedAt - lastAdRewardAt >= AD_VERIFY_DELAY_MS){
+    adVerifyPending = false;
+    pauseAdVerification();
+  }
+}
+function creditAdRewardOptimistically(amount){
+  updateBalanceDisplay({ coins: CURRENT_COINS_BALANCE + amount, gram: CURRENT_GRAM_BALANCE });
+}
 var adsTaskState = { watchedToday: 0, dailyLimit: 10, rewardCoins: 15, busy: false, cooldownUntil: 0 };
 var adsTaskCooldownTimer = null;
 function initAdsgramController(){
@@ -6916,63 +6972,29 @@ function onWatchAdsgramClick(){
     showBuyErrorToast('Ad not available right now', { title: 'Watch Ad' });
     return;
   }
-  var baselineWatched = adsTaskState.watchedToday;
   adsTaskState.busy = true;
   renderAdsTaskButton();
+  pauseAdVerification();
   adsgramController.show().then(function(){
-    pollAdsRewardConfirmation(baselineWatched, 0);
+    adsTaskState.busy = false;
+    adsTaskState.watchedToday++;
+    creditAdRewardOptimistically(adsTaskState.rewardCoins);
+    showAppToast({ title: 'Ad Reward', icon: PRIZE_ICON_URLS.coins, amount: '+' + adsTaskState.rewardCoins + ' Coins' });
+    triggerConfetti();
+    startAdsTaskCooldown();
+    scheduleAdVerification(true);
   }).catch(function(){
     adsTaskState.busy = false;
     renderAdsTaskButton();
     showBuyErrorToast('Ad was not completed', { title: 'Watch Ad' });
-  });
-}
-function pollAdsRewardConfirmation(baselineWatched, attempt){
-  var initData = getTelegramInitData();
-  if (!initData){
-    adsTaskState.busy = false;
-    renderAdsTaskButton();
-    return;
-  }
-  fetch('/api/user', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData: initData })
-  })
-  .then(function(res){ return res.json(); })
-  .then(function(data){
-    if (!data.user){ throw new Error('no user in response'); }
-    if (data.user.ads_watched_today > baselineWatched){
-      updateBalanceDisplay(data.user);
-      applyAdsTaskState({
-        watched_today: data.user.ads_watched_today,
-        daily_limit: data.user.ads_daily_limit,
-        reward_coins: data.user.ads_reward_coins
-      });
-      showAppToast({ title: 'Ad Reward', icon: PRIZE_ICON_URLS.coins, amount: '+' + adsTaskState.rewardCoins + ' Coins' });
-      triggerConfetti();
-      adsTaskState.busy = false;
-      startAdsTaskCooldown();
-      return;
-    }
-    if (attempt < 1){
-      setTimeout(function(){ pollAdsRewardConfirmation(baselineWatched, attempt + 1); }, 4000);
-    } else {
-      adsTaskState.busy = false;
-      renderAdsTaskButton();
-      showBuyErrorToast('Reward is taking longer than usual, check back shortly', { title: 'Watch Ad' });
-    }
-  })
-  .catch(function(err){
-    console.error('ads reward poll failed:', err);
-    adsTaskState.busy = false;
-    renderAdsTaskButton();
+    scheduleAdVerification(false);
   });
 }
 
 // Bonus AD Every 1H
 var BONUS_AD_BLOCK_ID = 'REPLACE_WITH_NEW_ADSGRAM_BLOCK_ID';
 var bonusAdsgramController = null;
+var BONUS_AD_COOLDOWN_MS = 60 * 60 * 1000;
 var bonusAdState = { watchedToday: 0, dailyLimit: 5, rewardCoins: 15, busy: false, nextAvailableAt: 0 };
 var bonusAdCountdownTimer = null;
 function isValidAdsgramBlockId(id){
@@ -7010,7 +7032,7 @@ function renderBonusAdButton(){
   }
   var dailyDone = bonusAdState.watchedToday >= bonusAdState.dailyLimit;
   if (avail) avail.textContent = dailyDone ? 'Come Back Tomorrow' : 'Available';
-  var remainingMs = bonusAdState.nextAvailableAt - Date.now();
+  var remainingMs = bonusAdState.nextAvailableAt - serverNow();
   var inCooldown = !dailyDone && remainingMs > 0;
   if (btn){
     if (bonusAdState.busy){
@@ -7028,7 +7050,7 @@ function startBonusAdCountdown(){
   clearInterval(bonusAdCountdownTimer);
   renderBonusAdButton();
   bonusAdCountdownTimer = setInterval(function(){
-    if (Date.now() >= bonusAdState.nextAvailableAt){
+    if (serverNow() >= bonusAdState.nextAvailableAt){
       clearInterval(bonusAdCountdownTimer);
     }
     renderBonusAdButton();
@@ -7044,58 +7066,24 @@ function onWatchBonusAdClick(){
     showComeBackTomorrowToast();
     return;
   }
-  if (Date.now() < bonusAdState.nextAvailableAt) return;
-  var baselineWatched = bonusAdState.watchedToday;
+  if (serverNow() < bonusAdState.nextAvailableAt) return;
   bonusAdState.busy = true;
   renderBonusAdButton();
+  pauseAdVerification();
   bonusAdsgramController.show().then(function(){
-    pollBonusAdRewardConfirmation(baselineWatched, 0);
+    bonusAdState.busy = false;
+    bonusAdState.watchedToday++;
+    bonusAdState.nextAvailableAt = serverNow() + BONUS_AD_COOLDOWN_MS;
+    creditAdRewardOptimistically(bonusAdState.rewardCoins);
+    showAppToast({ title: 'Bonus Ad Reward', icon: PRIZE_ICON_URLS.coins, amount: '+' + bonusAdState.rewardCoins + ' Coins' });
+    triggerConfetti();
+    startBonusAdCountdown();
+    scheduleAdVerification(true);
   }).catch(function(){
     bonusAdState.busy = false;
     renderBonusAdButton();
     showBuyErrorToast('Ad was not completed', { title: 'Bonus Ad' });
-  });
-}
-function pollBonusAdRewardConfirmation(baselineWatched, attempt){
-  var initData = getTelegramInitData();
-  if (!initData){
-    bonusAdState.busy = false;
-    renderBonusAdButton();
-    return;
-  }
-  fetch('/api/user', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData: initData })
-  })
-  .then(function(res){ return res.json(); })
-  .then(function(data){
-    if (!data.user){ throw new Error('no user in response'); }
-    if (data.user.bonus_ad_watched_today > baselineWatched){
-      updateBalanceDisplay(data.user);
-      applyBonusAdState({
-        watched_today: data.user.bonus_ad_watched_today,
-        daily_limit: data.user.bonus_ad_daily_limit,
-        reward_coins: data.user.bonus_ad_reward_coins,
-        next_available_at: data.user.bonus_ad_next_available_at
-      });
-      showAppToast({ title: 'Bonus Ad Reward', icon: PRIZE_ICON_URLS.coins, amount: '+' + bonusAdState.rewardCoins + ' Coins' });
-      triggerConfetti();
-      bonusAdState.busy = false;
-      return;
-    }
-    if (attempt < 1){
-      setTimeout(function(){ pollBonusAdRewardConfirmation(baselineWatched, attempt + 1); }, 4000);
-    } else {
-      bonusAdState.busy = false;
-      renderBonusAdButton();
-      showBuyErrorToast('Reward is taking longer than usual, check back shortly', { title: 'Bonus Ad' });
-    }
-  })
-  .catch(function(err){
-    console.error('bonus ad reward poll failed:', err);
-    bonusAdState.busy = false;
-    renderBonusAdButton();
+    scheduleAdVerification(false);
   });
 }
 
@@ -7194,65 +7182,26 @@ function onWatchGigapubClick(){
     showBuyErrorToast('Ad not available right now', { title: 'Watch gigapub ads' });
     return;
   }
-  var baselineWatched = gigapubState.watchedToday;
   gigapubState.busy = true;
   renderGigapubButton();
   showAdLoadingOverlay();
   setAdLoadingOverlayVia('GigaPub');
+  pauseAdVerification();
   window.showGiga('main').then(function(){
-    setAdLoadingOverlayVerifying();
-    pollGigapubRewardConfirmation(baselineWatched, 0);
+    hideAdLoadingOverlay();
+    gigapubState.busy = false;
+    gigapubState.watchedToday++;
+    creditAdRewardOptimistically(gigapubState.rewardCoins);
+    showAppToast({ title: 'Watch gigapub ads', icon: PRIZE_ICON_URLS.coins, amount: '+' + gigapubState.rewardCoins + ' Coins' });
+    triggerConfetti();
+    startGigapubTaskCooldown();
+    scheduleAdVerification(true);
   }).catch(function(){
     hideAdLoadingOverlay();
     gigapubState.busy = false;
     renderGigapubButton();
     showBuyErrorToast('Ad was not completed', { title: 'Watch gigapub ads' });
-  });
-}
-function pollGigapubRewardConfirmation(baselineWatched, attempt){
-  var initData = getTelegramInitData();
-  if (!initData){
-    gigapubState.busy = false;
-    renderGigapubButton();
-    hideAdLoadingOverlay();
-    return;
-  }
-  fetch('/api/user', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData: initData })
-  })
-  .then(function(res){ return res.json(); })
-  .then(function(data){
-    if (!data.user){ throw new Error('no user in response'); }
-    if (data.user.gigapub_watched_today > baselineWatched){
-      updateBalanceDisplay(data.user);
-      applyGigapubState({
-        watched_today: data.user.gigapub_watched_today,
-        daily_limit: data.user.gigapub_daily_limit,
-        reward_coins: data.user.gigapub_reward_coins
-      });
-      showAppToast({ title: 'Watch gigapub ads', icon: PRIZE_ICON_URLS.coins, amount: '+' + gigapubState.rewardCoins + ' Coins' });
-      triggerConfetti();
-      gigapubState.busy = false;
-      startGigapubTaskCooldown();
-      hideAdLoadingOverlay();
-      return;
-    }
-    if (attempt < 1){
-      setTimeout(function(){ pollGigapubRewardConfirmation(baselineWatched, attempt + 1); }, 4000);
-    } else {
-      gigapubState.busy = false;
-      renderGigapubButton();
-      hideAdLoadingOverlay();
-      showBuyErrorToast('Reward is taking longer than usual, check back shortly', { title: 'Watch gigapub ads' });
-    }
-  })
-  .catch(function(err){
-    console.error('gigapub reward poll failed:', err);
-    gigapubState.busy = false;
-    renderGigapubButton();
-    hideAdLoadingOverlay();
+    scheduleAdVerification(false);
   });
 }
 
@@ -7545,35 +7494,7 @@ function onCheckinShareClick(task){
 }
 function onCheckinVerifyClick(task){
   if (checkinState.claimedToday[task] || checkinState.busy[task]) return;
-  if (checkinState.ready[task]){
-    onCheckinClaimClick(task);
-    return;
-  }
-  var initData = getTelegramInitData();
-  if (!initData) return;
-  checkinState.busy[task] = true;
-  renderCheckinButton(task);
-  fetch('/api/checkin/verify', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData: initData, task: task })
-  })
-  .then(function(res){ return res.json(); })
-  .then(function(data){
-    checkinState.busy[task] = false;
-    if (data.verified){
-      checkinState.ready[task] = true;
-      renderCheckinButton(task);
-    } else {
-      renderCheckinButton(task);
-      showBuyErrorToast('Task not completed yet', { title: 'Check-in' });
-    }
-  })
-  .catch(function(err){
-    console.error('checkin verify failed:', err);
-    checkinState.busy[task] = false;
-    renderCheckinButton(task);
-  });
+  onCheckinClaimClick(task);
 }
 function onCheckinClaimClick(task){
   if (checkinState.busy[task]) return;
@@ -8590,6 +8511,11 @@ var DEPOSIT_MEMO = '';
 var DEPOSIT_MIN_GRAM = 2;
 var depositPollTimer = null;
 var depositCheckBusy = false;
+var depositPollStartedAt = 0;
+var DEPOSIT_POLL_AFTER_CHECK_MS = 2000;
+var DEPOSIT_POLL_CHECK_RUNNING_MS = 4000;
+var DEPOSIT_POLL_MAX_WAIT_MS = 17000;
+var DEPOSIT_POLL_LIMIT_MS = 3 * 60 * 1000;
 function openDepositModal(){
   document.getElementById('deposit-input').value = '';
   document.getElementById('deposit-output').textContent = '0';
@@ -8668,23 +8594,37 @@ function checkDepositStatus(){
       showBuyErrorToast(data.error === 'deposit_not_configured' ? 'Deposit unavailable right now' : 'Could not start check', { title: 'Deposit Failed', icon: PRIZE_ICON_URLS.gram });
       return;
     }
-    pollDepositStatus(initData);
+    depositPollStartedAt = Date.now();
+    scheduleDepositPoll(initData, data.next_check_at);
   })
   .catch(function(err){
     console.error('deposit check request failed:', err);
     stopDepositPolling();
   });
 }
+// Asks for the result right after each server-side check (the server says when its next check runs)
+function scheduleDepositPoll(initData, nextCheckAt){
+  if (Date.now() - depositPollStartedAt >= DEPOSIT_POLL_LIMIT_MS){
+    stopDepositPolling();
+    showBuyErrorToast('Transaction not found yet — try again in a few minutes', { title: 'Deposit Failed', icon: PRIZE_ICON_URLS.gram });
+    return;
+  }
+  var untilCheck = nextCheckAt ? nextCheckAt - serverNow() : -1;
+  var delay = untilCheck >= 0 ? untilCheck + DEPOSIT_POLL_AFTER_CHECK_MS : DEPOSIT_POLL_CHECK_RUNNING_MS;
+  delay = Math.min(delay, DEPOSIT_POLL_MAX_WAIT_MS);
+  depositPollTimer = setTimeout(function(){ pollDepositStatus(initData); }, delay);
+}
 function pollDepositStatus(initData){
+  var sentAt = Date.now();
   fetch('/api/deposit/status', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ initData: initData })
   })
-  .then(function(res){ return res.json(); })
+  .then(function(res){ syncServerClock(res, sentAt); return res.json(); })
   .then(function(data){
     if (data.status === 'pending' || data.status === 'idle'){
-      depositPollTimer = setTimeout(function(){ pollDepositStatus(initData); }, 4000);
+      scheduleDepositPoll(initData, data.next_check_at);
       return;
     }
     if (data.status === 'found' || data.status === 'already_processed'){
