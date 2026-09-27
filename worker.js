@@ -507,7 +507,7 @@ async function handleGetUser(request, env) {
   const today = todayUTC();
 
   const userQuery = `
-    SELECT u.telegram_id, u.username, u.coins, u.gram, u.total_speed, u.total_mined, u.is_admin,
+    SELECT u.telegram_id, u.username, u.coins, u.gram, u.total_speed, u.total_mined,
            u.mining_started_at, u.mining_cycles_today, u.mining_cycle_date,
            u.streak_day, u.streak_last_claim_date,
            u.last_spin_date, u.last_chest_date, u.last_giftpick_date,
