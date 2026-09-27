@@ -131,10 +131,9 @@ async function applyDailyPetBoost(env) {
     const deltaSpeed = basespeed * (cfg.dailyPct / 100);
 
     const rows = await env.DB.prepare(
-      `SELECT p.telegram_id, u.total_speed, s.capacity_hours, s.last_claim_at
+      `SELECT p.telegram_id, u.total_speed, u.capacity_hours, u.last_claim_at
        FROM user_pets p
        JOIN users u ON u.telegram_id = p.telegram_id
-       LEFT JOIN user_storage s ON s.telegram_id = p.telegram_id
        WHERE p.pet_id = ? AND p.daily_boost_days < ?`
     ).bind(petId, cfg.maxDays).all();
 
@@ -159,7 +158,7 @@ async function applyDailyPetBoost(env) {
         env.DB.prepare(
           "UPDATE user_pets SET current_speed = current_speed + ?, daily_boost_days = daily_boost_days + 1 WHERE telegram_id = ? AND pet_id = ?"
         ).bind(deltaSpeed, row.telegram_id, petId),
-        env.DB.prepare("UPDATE user_storage SET last_claim_at = ? WHERE telegram_id = ?").bind(nowIso, row.telegram_id)
+        env.DB.prepare("UPDATE users SET last_claim_at = ? WHERE telegram_id = ?").bind(nowIso, row.telegram_id)
       );
       if (preBoostAccrued > 0) {
         stmts.push(env.DB.prepare(
@@ -620,9 +619,8 @@ async function handleRealmStatus(request, env) {
   const [row, petsResult, ambassadorGrant] = await Promise.all([
     env.DB.prepare(
       `SELECT u.total_speed, u.lifetime_ads_watched,
-              s.capacity_hours AS storage_capacity_hours, s.last_claim_at AS storage_last_claim_at
+              u.capacity_hours AS storage_capacity_hours, u.last_claim_at AS storage_last_claim_at
        FROM users u
-       LEFT JOIN user_storage s ON s.telegram_id = u.telegram_id
        WHERE u.telegram_id = ?`
     ).bind(telegramId).first(),
     env.DB.prepare(
@@ -928,12 +926,12 @@ async function handlePetBuy(request, env, petId) {
   if (existing) return jsonResponse({ error: "already_owned" }, 409);
 
   const storageRow = await env.DB.prepare(
-    `SELECT u.total_speed, s.capacity_hours, s.last_claim_at
-     FROM users u LEFT JOIN user_storage s ON s.telegram_id = u.telegram_id
+    `SELECT u.total_speed, u.capacity_hours, u.last_claim_at
+     FROM users u
      WHERE u.telegram_id = ?`
   ).bind(telegramId).first();
 
-  // نُصفّي (checkpoint) ما تراكم في Storage بالسرعة الكلية القديمة *قبل* شراء هذه الشخصية — تنطبق فقط عند شراء ثانية شخصية فأكثر (صف user_storage موجود بالفعل من الشراء الأول)، نفس أسلوب handlePetUpgrade/ handleClaimHappyDog بالضبط، لمنع احتساب كل الوقت المنقضي منذ آخر Claim (حتى ما قبل هذا الشراء) بالسرعة الجديدة الأعلى.
+  // نُصفّي (checkpoint) ما تراكم في Storage بالسرعة الكلية القديمة *قبل* شراء هذه الشخصية — تنطبق فقط عند شراء ثانية شخصية فأكثر (capacity_hours/last_claim_at مضبوطان بالفعل من الشراء الأول)، نفس أسلوب handlePetUpgrade/ handleClaimHappyDog بالضبط، لمنع احتساب كل الوقت المنقضي منذ آخر Claim (حتى ما قبل هذا الشراء) بالسرعة الجديدة الأعلى.
   let preBuyAccrued = 0;
   if (storageRow && storageRow.last_claim_at) {
     const capacitySeconds = (storageRow.capacity_hours || STORAGE_DEFAULT_CAPACITY_HOURS) * 3600;
@@ -955,10 +953,10 @@ async function handlePetBuy(request, env, petId) {
     "INSERT INTO user_pets (telegram_id, pet_id, level, current_speed) VALUES (?, ?, 1, ?)"
   ).bind(telegramId, petId, pet.basespeed);
   const storageStmt = (storageRow && storageRow.last_claim_at)
-    ? env.DB.prepare("UPDATE user_storage SET last_claim_at = ? WHERE telegram_id = ?").bind(nowIso, telegramId)
+    ? env.DB.prepare("UPDATE users SET last_claim_at = ? WHERE telegram_id = ?").bind(nowIso, telegramId)
     : env.DB.prepare(
-        "INSERT OR IGNORE INTO user_storage (telegram_id, capacity_hours, last_claim_at) VALUES (?, ?, ?)"
-      ).bind(telegramId, STORAGE_DEFAULT_CAPACITY_HOURS, nowIso);
+        "UPDATE users SET capacity_hours = ?, last_claim_at = ? WHERE telegram_id = ?"
+      ).bind(STORAGE_DEFAULT_CAPACITY_HOURS, nowIso, telegramId);
   const txnStmt = env.DB.prepare(
     "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'pet_purchase', ?, 'coins')"
   ).bind(telegramId, -pet.price);
@@ -1002,10 +1000,9 @@ async function handlePetUpgrade(request, env, petId) {
 
   // ملاحظة مهمة: نجلب total_speed *الكلي* من users (وليس سرعة هذا الحيوان فقط) لأن أكثر من حيوان قد يساهم بنفس Storage في آن واحد — إن استخدمنا سرعة الحيوان المُرقّى فقط لحساب ما تراكم فسنُغفل مساهمة الحيوانات الأخرى.
   const row = await env.DB.prepare(
-    `SELECT p.level, p.current_speed, u.total_speed, s.capacity_hours, s.last_claim_at
+    `SELECT p.level, p.current_speed, u.total_speed, u.capacity_hours, u.last_claim_at
      FROM user_pets p
      JOIN users u ON u.telegram_id = p.telegram_id
-     LEFT JOIN user_storage s ON s.telegram_id = p.telegram_id
      WHERE p.telegram_id = ? AND p.pet_id = ?`
   ).bind(telegramId, petId).first();
   if (!row) return jsonResponse({ error: "not_owned" }, 400);
@@ -1046,7 +1043,7 @@ async function handlePetUpgrade(request, env, petId) {
 
   // تصفير نقطة بداية التراكم الآن — السرعة الجديدة تُحسب من هذه اللحظة فقط
   const resetStorageStmt = env.DB.prepare(
-    "UPDATE user_storage SET last_claim_at = ? WHERE telegram_id = ?"
+    "UPDATE users SET last_claim_at = ? WHERE telegram_id = ?"
   ).bind(nowIso, telegramId);
 
   const txnStmt = env.DB.prepare(
@@ -1092,8 +1089,8 @@ async function handleStorageClaim(request, env) {
   const { telegramId } = auth;
 
   const row = await env.DB.prepare(
-    `SELECT u.total_speed, s.capacity_hours, s.last_claim_at
-     FROM users u LEFT JOIN user_storage s ON s.telegram_id = u.telegram_id
+    `SELECT u.total_speed, u.capacity_hours, u.last_claim_at
+     FROM users u
      WHERE u.telegram_id = ?`
   ).bind(telegramId).first();
 
@@ -1118,7 +1115,7 @@ async function handleStorageClaim(request, env) {
 
   // شرط CAS على last_claim_at يمنع استلام مكافأتين لنفس التراكم
   const resetResult = await env.DB.prepare(
-    "UPDATE user_storage SET last_claim_at = ? WHERE telegram_id = ? AND last_claim_at = ?"
+    "UPDATE users SET last_claim_at = ? WHERE telegram_id = ? AND last_claim_at = ?"
   ).bind(nowIso, telegramId, row.last_claim_at).run();
 
   if (!resetResult.meta || resetResult.meta.changes === 0) {
@@ -1152,8 +1149,8 @@ async function handleStorageUpgrade(request, env) {
   const { telegramId } = auth;
 
   const row = await env.DB.prepare(
-    `SELECT u.total_speed, s.capacity_hours, s.last_claim_at
-     FROM users u LEFT JOIN user_storage s ON s.telegram_id = u.telegram_id
+    `SELECT u.total_speed, u.capacity_hours, u.last_claim_at
+     FROM users u
      WHERE u.telegram_id = ?`
   ).bind(telegramId).first();
 
@@ -1189,7 +1186,7 @@ async function handleStorageUpgrade(request, env) {
 
   // شرط "capacity_hours = القيمة القديمة" يمنع تطبيق ترقيتين متزامنتين
   const updateStorageStmt = env.DB.prepare(
-    `UPDATE user_storage SET capacity_hours = ?, last_claim_at = ?
+    `UPDATE users SET capacity_hours = ?, last_claim_at = ?
      WHERE telegram_id = ? AND capacity_hours = ?`
   ).bind(newCapacityHours, nowIso, telegramId, currentCapacityHours);
 
@@ -1843,8 +1840,8 @@ async function handleClaimHappyDog(request, env) {
   if (existing) return jsonResponse({ error: "already_claimed" }, 409);
 
   const row = await env.DB.prepare(
-    `SELECT u.active_referrals_count, u.total_speed, s.capacity_hours, s.last_claim_at
-     FROM users u LEFT JOIN user_storage s ON s.telegram_id = u.telegram_id
+    `SELECT u.active_referrals_count, u.total_speed, u.capacity_hours, u.last_claim_at
+     FROM users u
      WHERE u.telegram_id = ?`
   ).bind(telegramId).first();
   if (!row) return jsonResponse({ error: "user_not_found" }, 404);
@@ -1869,10 +1866,10 @@ async function handleClaimHappyDog(request, env) {
     "UPDATE users SET total_speed = total_speed + ?, coins = coins + ? WHERE telegram_id = ?"
   ).bind(HAPPY_DOG_SPEED, preClaimAccrued, telegramId);
   const storageStmt = row.last_claim_at
-    ? env.DB.prepare("UPDATE user_storage SET last_claim_at = ? WHERE telegram_id = ?").bind(nowIso, telegramId)
+    ? env.DB.prepare("UPDATE users SET last_claim_at = ? WHERE telegram_id = ?").bind(nowIso, telegramId)
     : env.DB.prepare(
-        "INSERT OR IGNORE INTO user_storage (telegram_id, capacity_hours, last_claim_at) VALUES (?, ?, ?)"
-      ).bind(telegramId, STORAGE_DEFAULT_CAPACITY_HOURS, nowIso);
+        "UPDATE users SET capacity_hours = ?, last_claim_at = ? WHERE telegram_id = ?"
+      ).bind(STORAGE_DEFAULT_CAPACITY_HOURS, nowIso, telegramId);
 
   const stmts = [insertPetStmt, speedStmt, storageStmt];
   if (preClaimAccrued > 0) {
@@ -1913,8 +1910,8 @@ async function handleClaimGuardian(request, env) {
   if (existing) return jsonResponse({ error: "already_claimed" }, 409);
 
   const row = await env.DB.prepare(
-    `SELECT u.lifetime_ads_watched, u.total_speed, s.capacity_hours, s.last_claim_at
-     FROM users u LEFT JOIN user_storage s ON s.telegram_id = u.telegram_id
+    `SELECT u.lifetime_ads_watched, u.total_speed, u.capacity_hours, u.last_claim_at
+     FROM users u
      WHERE u.telegram_id = ?`
   ).bind(telegramId).first();
   if (!row) return jsonResponse({ error: "user_not_found" }, 404);
@@ -1939,10 +1936,10 @@ async function handleClaimGuardian(request, env) {
     "UPDATE users SET total_speed = total_speed + ?, coins = coins + ? WHERE telegram_id = ?"
   ).bind(GUARDIAN_SPEED, preClaimAccrued, telegramId);
   const storageStmt = row.last_claim_at
-    ? env.DB.prepare("UPDATE user_storage SET last_claim_at = ? WHERE telegram_id = ?").bind(nowIso, telegramId)
+    ? env.DB.prepare("UPDATE users SET last_claim_at = ? WHERE telegram_id = ?").bind(nowIso, telegramId)
     : env.DB.prepare(
-        "INSERT OR IGNORE INTO user_storage (telegram_id, capacity_hours, last_claim_at) VALUES (?, ?, ?)"
-      ).bind(telegramId, STORAGE_DEFAULT_CAPACITY_HOURS, nowIso);
+        "UPDATE users SET capacity_hours = ?, last_claim_at = ? WHERE telegram_id = ?"
+      ).bind(STORAGE_DEFAULT_CAPACITY_HOURS, nowIso, telegramId);
 
   const stmts = [insertPetStmt, speedStmt, storageStmt];
   if (preClaimAccrued > 0) {
@@ -1989,8 +1986,8 @@ async function handleClaimAmbassador(request, env) {
   const ambassadorSpeed = grantRow.speed;
 
   const storageRow = await env.DB.prepare(
-    `SELECT u.total_speed, s.capacity_hours, s.last_claim_at
-     FROM users u LEFT JOIN user_storage s ON s.telegram_id = u.telegram_id
+    `SELECT u.total_speed, u.capacity_hours, u.last_claim_at
+     FROM users u
      WHERE u.telegram_id = ?`
   ).bind(telegramId).first();
   if (!storageRow) return jsonResponse({ error: "user_not_found" }, 404);
@@ -2010,10 +2007,10 @@ async function handleClaimAmbassador(request, env) {
     "UPDATE users SET total_speed = total_speed + ?, coins = coins + ? WHERE telegram_id = ?"
   ).bind(ambassadorSpeed, preClaimAccrued, telegramId);
   const storageStmt = storageRow.last_claim_at
-    ? env.DB.prepare("UPDATE user_storage SET last_claim_at = ? WHERE telegram_id = ?").bind(nowIso, telegramId)
+    ? env.DB.prepare("UPDATE users SET last_claim_at = ? WHERE telegram_id = ?").bind(nowIso, telegramId)
     : env.DB.prepare(
-        "INSERT OR IGNORE INTO user_storage (telegram_id, capacity_hours, last_claim_at) VALUES (?, ?, ?)"
-      ).bind(telegramId, STORAGE_DEFAULT_CAPACITY_HOURS, nowIso);
+        "UPDATE users SET capacity_hours = ?, last_claim_at = ? WHERE telegram_id = ?"
+      ).bind(STORAGE_DEFAULT_CAPACITY_HOURS, nowIso, telegramId);
   const deleteGrantStmt = env.DB.prepare(
     "DELETE FROM ambassador_grants WHERE telegram_id = ?"
   ).bind(telegramId);
@@ -2340,10 +2337,9 @@ async function handleAdminAmbassadorGrant(request, env) {
   if (!Number.isInteger(speed) || speed <= 0) return jsonResponse({ error: "invalid_speed" }, 400);
 
   const petRow = await env.DB.prepare(
-    `SELECT p.current_speed, u.total_speed, s.capacity_hours, s.last_claim_at
+    `SELECT p.current_speed, u.total_speed, u.capacity_hours, u.last_claim_at
      FROM user_pets p
      JOIN users u ON u.telegram_id = p.telegram_id
-     LEFT JOIN user_storage s ON s.telegram_id = p.telegram_id
      WHERE p.telegram_id = ? AND p.pet_id = 'ambassador'`
   ).bind(targetId).first();
 
@@ -2374,7 +2370,7 @@ async function handleAdminAmbassadorGrant(request, env) {
     env.DB.prepare("UPDATE users SET total_speed = total_speed + ?, coins = coins + ? WHERE telegram_id = ?").bind(speedDelta, preChangeAccrued, targetId)
   ];
   if (petRow.last_claim_at) {
-    stmts.push(env.DB.prepare("UPDATE user_storage SET last_claim_at = ? WHERE telegram_id = ?").bind(nowIso, targetId));
+    stmts.push(env.DB.prepare("UPDATE users SET last_claim_at = ? WHERE telegram_id = ?").bind(nowIso, targetId));
   }
   if (preChangeAccrued > 0) {
     stmts.push(env.DB.prepare(
@@ -2406,10 +2402,9 @@ async function handleAdminAmbassadorRevoke(request, env) {
   // بعد الاستلام مباشرة؛ حذف الحالتين معاً هنا يضمن عدم ترك أي أثر متبقٍّ في كل الأحوال.
   const pendingGrant = await env.DB.prepare("SELECT 1 FROM ambassador_grants WHERE telegram_id = ?").bind(targetId).first();
   const petRow = await env.DB.prepare(
-    `SELECT p.current_speed, u.total_speed, s.capacity_hours, s.last_claim_at
+    `SELECT p.current_speed, u.total_speed, u.capacity_hours, u.last_claim_at
      FROM user_pets p
      JOIN users u ON u.telegram_id = p.telegram_id
-     LEFT JOIN user_storage s ON s.telegram_id = p.telegram_id
      WHERE p.telegram_id = ? AND p.pet_id = 'ambassador'`
   ).bind(targetId).first();
 
@@ -2433,7 +2428,7 @@ async function handleAdminAmbassadorRevoke(request, env) {
     env.DB.prepare("UPDATE users SET total_speed = total_speed - ?, coins = coins + ? WHERE telegram_id = ?").bind(petRow.current_speed, preRevokeAccrued, targetId)
   ];
   if (petRow.last_claim_at) {
-    stmts.push(env.DB.prepare("UPDATE user_storage SET last_claim_at = ? WHERE telegram_id = ?").bind(nowIso, targetId));
+    stmts.push(env.DB.prepare("UPDATE users SET last_claim_at = ? WHERE telegram_id = ?").bind(nowIso, targetId));
   }
   if (preRevokeAccrued > 0) {
     stmts.push(env.DB.prepare(
