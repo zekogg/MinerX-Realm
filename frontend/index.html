@@ -639,7 +639,6 @@ img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
   padding:4px 8px;
 }
 .prizes-trigger svg{ width:16px; height:16px; }
-.prizes-trigger span{ font-size:7.5px; font-weight:800; letter-spacing:.3px; text-transform:uppercase; color:#e3a542; }
 .prizes-trigger:active{ transform:translateY(-50%) scale(.97); }
 .pet-trigger:active{ transform:translateY(-50%) scale(.97); }
 .pet-trigger{
@@ -647,8 +646,19 @@ img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
   display:flex; flex-direction:column; align-items:center; gap:2px;
   padding:4px 8px;
 }
-.pet-trigger__icon{ font-size:42px; line-height:1; }
-.pet-trigger span:last-child{ font-size:7.5px; font-weight:800; letter-spacing:.3px; text-transform:uppercase; color:#a56cf0; }
+.pet-trigger__icon{ width:37.8px; height:37.8px; }
+/* -- شريط صغير ملكي/فاخر (نفس فكرة .realm-label) تحت أيقونتي Prizes وFree Pet بصف Quick Actions -- */
+.prizes-trigger__banner, .pet-trigger__banner{
+  padding:2px 8px; border-radius:999px;
+  background:linear-gradient(135deg, rgba(36,26,12,.8), rgba(18,12,6,.88));
+  border:1px solid rgba(227,165,66,.55);
+  font-family:var(--font-display); font-size:7.5px; font-weight:800; letter-spacing:.3px; text-transform:uppercase;
+  white-space:nowrap;
+  text-shadow:0 0 6px rgba(227,165,66,.5);
+  box-shadow:0 0 10px rgba(227,165,66,.28), inset 0 1px 0 rgba(255,255,255,.08);
+}
+.prizes-trigger__banner{ color:#e3a542; }
+.pet-trigger__banner{ color:#ffe9b8; }
 .earn-rate{
   font-family:var(--font-display);
   font-size:20px;   /* was 34px */
@@ -3272,12 +3282,12 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         <div class="earn-rate-row">
           <button class="prizes-trigger" onclick="openLeaderboardModal()">
             <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/54404f088855f864d7dbeb9a6adcf4e37fe5db6d/frontend/Leaderboard%20icon.svg" alt="Leaderboard" style="width:33.25px;height:33.25px;">
-            <span>Prizes</span>
+            <span class="prizes-trigger__banner">Prizes</span>
           </button>
           <div class="earn-rate">80<span>Coins/hr</span></div>
           <button class="pet-trigger" onclick="openFreePetModal()">
-            <span class="pet-trigger__icon">🦴</span>
-            <span>Free Pet</span>
+            <img draggable="false" class="pet-trigger__icon" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/bone%20Free%20Pet%20icon%20.webp" alt="Free Pet">
+            <span class="pet-trigger__banner">Free Pet</span>
           </button>
         </div>
         <div class="earn-label">Your current mining rate</div>
