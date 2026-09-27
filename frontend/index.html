@@ -955,16 +955,16 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 }
 .chest-card__row{ display:flex; align-items:center; gap:14px; }
 .chest-card__icon-wrap{ position:relative; flex-shrink:0; }
-.chest-card__icon-art{ width:91px; height:91px; object-fit:contain; flex-shrink:0; }
+.chest-card__icon-art{ width:91px; height:91px; object-fit:contain; flex-shrink:0; transform:scale(1.2); }
 /* -- اهتزاز الصندوق + ومضة توهج ذهبية عند الضغط على Open (لا صورة "مفتوح" متوفرة، فالإحساس بالفتح يأتي من الحركة والضوء فقط) -- */
 @keyframes chest-shake{
-  0%,100%{ transform:translateX(0) rotate(0deg); }
-  15%{ transform:translateX(-4px) rotate(-4deg); }
-  30%{ transform:translateX(4px) rotate(4deg); }
-  45%{ transform:translateX(-4px) rotate(-3deg); }
-  60%{ transform:translateX(4px) rotate(3deg); }
-  75%{ transform:translateX(-2px) rotate(-2deg); }
-  90%{ transform:translateX(2px) rotate(1deg); }
+  0%,100%{ transform:scale(1.2) translateX(0) rotate(0deg); }
+  15%{ transform:scale(1.2) translateX(-4px) rotate(-4deg); }
+  30%{ transform:scale(1.2) translateX(4px) rotate(4deg); }
+  45%{ transform:scale(1.2) translateX(-4px) rotate(-3deg); }
+  60%{ transform:scale(1.2) translateX(4px) rotate(3deg); }
+  75%{ transform:scale(1.2) translateX(-2px) rotate(-2deg); }
+  90%{ transform:scale(1.2) translateX(2px) rotate(1deg); }
 }
 @keyframes chest-burst-pop{
   0%{ transform:scale(.3); opacity:0; }
