@@ -543,15 +543,14 @@ img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; poi
   display:flex; flex-direction:column; align-items:center; gap:2px;
   padding:4px 8px;
 }
-.pet-trigger__icon{ width:39.69px; height:39.69px; }
+.pet-trigger__icon{ width:43.66px; height:43.66px; }
 .prizes-trigger__banner, .pet-trigger__banner{
-  padding:1.9px 7.6px; border-radius:999px;
-  background:linear-gradient(135deg, rgba(36,26,12,.8), rgba(18,12,6,.88));
-  border:1px solid rgba(227,165,66,.55);
-  font-family:var(--font-display); font-size:7.125px; font-weight:800; letter-spacing:.3px; text-transform:uppercase;
+  padding:1.62px 6.46px; border-radius:999px;
+  background:rgba(28,22,46,.55);
+  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  border:1px solid var(--stone-border-2);
+  font-family:var(--font-display); font-size:6.06px; font-weight:800; letter-spacing:.26px; text-transform:uppercase;
   white-space:nowrap;
-  text-shadow:0 0 6px rgba(227,165,66,.5);
-  box-shadow:0 0 10px rgba(227,165,66,.28), inset 0 1px 0 rgba(255,255,255,.08);
 }
 .prizes-trigger__banner{ color:#e3a542; }
 .pet-trigger__banner{ color:#ffe9b8; }
@@ -3068,7 +3067,7 @@ body.reduce-motion .firefly{
         </div>
         <div class="earn-rate-row">
           <button class="prizes-trigger" onclick="openLeaderboardModal()">
-            <img draggable="false" src="/Leaderboard%20icon.svg" alt="Leaderboard" style="width:34.91px;height:34.91px;">
+            <img draggable="false" src="/Leaderboard%20icon.svg" alt="Leaderboard" style="width:38.4px;height:38.4px;">
             <span class="prizes-trigger__banner">Prizes</span>
           </button>
           <div class="earn-rate">80<span>Coins/hr</span></div>
@@ -4083,7 +4082,7 @@ body.reduce-motion .firefly{
       <div class="pf-scroll">
         <div class="pf-avatar-wrap">
           <div class="pf-avatar">
-            <img loading="lazy" draggable="false" id="pf-avatar-img" alt="" style="display:none;width:100%;height:100%;border-radius:50%;object-fit:cover;">
+            <img draggable="false" id="pf-avatar-img" alt="" style="display:none;width:100%;height:100%;border-radius:50%;object-fit:cover;">
             <span id="pf-avatar-emoji">👤</span>
           </div>
         </div>
