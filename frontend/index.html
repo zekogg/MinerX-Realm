@@ -4781,6 +4781,18 @@ positionTopbarLogo();
 setTimeout(positionTopbarLogo, 300);
 
 // User Data
+// Server clock: timers compared against server timestamps use the server's time (X-Server-Time header), not the device clock
+var serverClockOffsetMs = 0;
+function syncServerClock(res, sentAt){
+  var header = res && res.headers ? res.headers.get('X-Server-Time') : null;
+  var serverMs = header ? Number(header) : NaN;
+  if (!isFinite(serverMs) || serverMs <= 0) return;
+  var offset = serverMs - (sentAt + Date.now()) / 2;
+  serverClockOffsetMs = Math.abs(offset) > 1000 ? offset : 0;
+}
+function serverNow(){
+  return Date.now() + serverClockOffsetMs;
+}
 function getTelegramInitData(){
   try{
     if (window.Telegram && window.Telegram.WebApp){
@@ -4881,7 +4893,7 @@ function fetchUserData(){
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ initData: initData })
   })
-  .then(function(res){ return res.json(); })
+  .then(function(res){ syncServerClock(res, requestedAt); return res.json(); })
   .then(function(data){
     if (!data.user) return;
     onUserDataRefreshed(requestedAt);
@@ -4995,7 +5007,7 @@ function setCharacterMining(isMining){
   if (slot) slot.classList.toggle('is-mining', isMining);
 }
 function isMiningCycleFromPastDay(){
-  return !!miningState.startedAt && miningState.startedAt.toISOString().slice(0, 10) !== new Date().toISOString().slice(0, 10);
+  return !!miningState.startedAt && miningState.startedAt.toISOString().slice(0, 10) !== new Date(serverNow()).toISOString().slice(0, 10);
 }
 function applyMiningState(data){
   miningState.cyclesToday = data.cycles_today || 0;
@@ -5023,7 +5035,7 @@ function miningTick(){
     applyMiningState({ mining_started_at: null, cycles_today: 0 });
     return;
   }
-  var elapsedSec = (Date.now() - miningState.startedAt.getTime()) / 1000;
+  var elapsedSec = (serverNow() - miningState.startedAt.getTime()) / 1000;
   if (elapsedSec >= miningState.cycleDurationSec){
     renderMiningProgress(miningState.cycleDurationSec);
     setCharacterMining(false);
@@ -5044,18 +5056,20 @@ function callMiningApi(path){
     alert('Open this app from Telegram to mine.');
     return Promise.reject(new Error('no_init_data'));
   }
+  var sentAt = Date.now();
   return fetch(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ initData: initData })
   }).then(function(res){
+    syncServerClock(res, sentAt);
     return res.json().then(function(data){ return { status: res.status, data: data }; });
   });
 }
 function onMiningButtonClick(){
   if (miningBusy) return;
   var isReadyToClaim = miningState.startedAt &&
-    (Date.now() - miningState.startedAt.getTime()) / 1000 >= miningState.cycleDurationSec;
+    (serverNow() - miningState.startedAt.getTime()) / 1000 >= miningState.cycleDurationSec;
   if (miningState.startedAt && !isReadyToClaim) return;
   miningBusy = true;
   setButtonBusy(domCache.miningBtn, true);
@@ -5110,6 +5124,7 @@ var streakState = {
   nextResetUtc: null
 };
 var streakTickTimer = null;
+var streakResetRefreshAt = 0;
 var streakBusy = false;
 function renderStreakDayBadge(){
   var badge = document.getElementById('streak-day-badge');
@@ -5138,10 +5153,13 @@ function renderStreakButton(){
 function renderStreakTimer(){
   var timerEl = domCache.streakTimer;
   if (!timerEl || !streakState.nextResetUtc) return;
-  var remainingMs = new Date(streakState.nextResetUtc).getTime() - Date.now();
+  var remainingMs = new Date(streakState.nextResetUtc).getTime() - serverNow();
   if (remainingMs <= 0){
     timerEl.textContent = '00:00:00';
-    fetchUserData();
+    if (Date.now() - streakResetRefreshAt >= 5000){
+      streakResetRefreshAt = Date.now();
+      fetchUserData();
+    }
     return;
   }
   var totalSec = Math.floor(remainingMs / 1000);
@@ -7014,7 +7032,7 @@ function renderBonusAdButton(){
   }
   var dailyDone = bonusAdState.watchedToday >= bonusAdState.dailyLimit;
   if (avail) avail.textContent = dailyDone ? 'Come Back Tomorrow' : 'Available';
-  var remainingMs = bonusAdState.nextAvailableAt - Date.now();
+  var remainingMs = bonusAdState.nextAvailableAt - serverNow();
   var inCooldown = !dailyDone && remainingMs > 0;
   if (btn){
     if (bonusAdState.busy){
@@ -7032,7 +7050,7 @@ function startBonusAdCountdown(){
   clearInterval(bonusAdCountdownTimer);
   renderBonusAdButton();
   bonusAdCountdownTimer = setInterval(function(){
-    if (Date.now() >= bonusAdState.nextAvailableAt){
+    if (serverNow() >= bonusAdState.nextAvailableAt){
       clearInterval(bonusAdCountdownTimer);
     }
     renderBonusAdButton();
@@ -7048,14 +7066,14 @@ function onWatchBonusAdClick(){
     showComeBackTomorrowToast();
     return;
   }
-  if (Date.now() < bonusAdState.nextAvailableAt) return;
+  if (serverNow() < bonusAdState.nextAvailableAt) return;
   bonusAdState.busy = true;
   renderBonusAdButton();
   pauseAdVerification();
   bonusAdsgramController.show().then(function(){
     bonusAdState.busy = false;
     bonusAdState.watchedToday++;
-    bonusAdState.nextAvailableAt = Date.now() + BONUS_AD_COOLDOWN_MS;
+    bonusAdState.nextAvailableAt = serverNow() + BONUS_AD_COOLDOWN_MS;
     creditAdRewardOptimistically(bonusAdState.rewardCoins);
     showAppToast({ title: 'Bonus Ad Reward', icon: PRIZE_ICON_URLS.coins, amount: '+' + bonusAdState.rewardCoins + ' Coins' });
     triggerConfetti();
@@ -8493,6 +8511,11 @@ var DEPOSIT_MEMO = '';
 var DEPOSIT_MIN_GRAM = 2;
 var depositPollTimer = null;
 var depositCheckBusy = false;
+var depositPollStartedAt = 0;
+var DEPOSIT_POLL_AFTER_CHECK_MS = 2000;
+var DEPOSIT_POLL_CHECK_RUNNING_MS = 4000;
+var DEPOSIT_POLL_MAX_WAIT_MS = 17000;
+var DEPOSIT_POLL_LIMIT_MS = 3 * 60 * 1000;
 function openDepositModal(){
   document.getElementById('deposit-input').value = '';
   document.getElementById('deposit-output').textContent = '0';
@@ -8571,23 +8594,37 @@ function checkDepositStatus(){
       showBuyErrorToast(data.error === 'deposit_not_configured' ? 'Deposit unavailable right now' : 'Could not start check', { title: 'Deposit Failed', icon: PRIZE_ICON_URLS.gram });
       return;
     }
-    pollDepositStatus(initData);
+    depositPollStartedAt = Date.now();
+    scheduleDepositPoll(initData, data.next_check_at);
   })
   .catch(function(err){
     console.error('deposit check request failed:', err);
     stopDepositPolling();
   });
 }
+// Asks for the result right after each server-side check (the server says when its next check runs)
+function scheduleDepositPoll(initData, nextCheckAt){
+  if (Date.now() - depositPollStartedAt >= DEPOSIT_POLL_LIMIT_MS){
+    stopDepositPolling();
+    showBuyErrorToast('Transaction not found yet — try again in a few minutes', { title: 'Deposit Failed', icon: PRIZE_ICON_URLS.gram });
+    return;
+  }
+  var untilCheck = nextCheckAt ? nextCheckAt - serverNow() : -1;
+  var delay = untilCheck >= 0 ? untilCheck + DEPOSIT_POLL_AFTER_CHECK_MS : DEPOSIT_POLL_CHECK_RUNNING_MS;
+  delay = Math.min(delay, DEPOSIT_POLL_MAX_WAIT_MS);
+  depositPollTimer = setTimeout(function(){ pollDepositStatus(initData); }, delay);
+}
 function pollDepositStatus(initData){
+  var sentAt = Date.now();
   fetch('/api/deposit/status', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ initData: initData })
   })
-  .then(function(res){ return res.json(); })
+  .then(function(res){ syncServerClock(res, sentAt); return res.json(); })
   .then(function(data){
     if (data.status === 'pending' || data.status === 'idle'){
-      depositPollTimer = setTimeout(function(){ pollDepositStatus(initData); }, 4000);
+      scheduleDepositPoll(initData, data.next_check_at);
       return;
     }
     if (data.status === 'found' || data.status === 'already_processed'){

@@ -1128,7 +1128,7 @@ export class DepositChecker {
     if (url.pathname === "/start" && request.method === "POST") {
       const currentStatus = await this.state.storage.get("status");
       if (currentStatus === "pending") {
-        return jsonResponse({ status: "pending", alreadyRunning: true });
+        return jsonResponse({ status: "pending", alreadyRunning: true, next_check_at: await this.state.storage.getAlarm() });
       }
       const { telegramId, memo } = await request.json();
       await this.state.storage.put("telegramId", telegramId);
@@ -1138,14 +1138,16 @@ export class DepositChecker {
       await this.state.storage.put("attempts", 0);
       await this.state.storage.delete("amountGram");
       await this.state.storage.delete("coinsCredited");
-      await this.state.storage.setAlarm(Date.now() + DEPOSIT_CHECK_FIRST_DELAY_MS);
-      return jsonResponse({ status: "pending" });
+      const nextCheckAt = Date.now() + DEPOSIT_CHECK_FIRST_DELAY_MS;
+      await this.state.storage.setAlarm(nextCheckAt);
+      return jsonResponse({ status: "pending", next_check_at: nextCheckAt });
     }
     if (url.pathname === "/status" && request.method === "GET") {
       const status = (await this.state.storage.get("status")) ?? "idle";
       const amountGram = (await this.state.storage.get("amountGram")) ?? null;
       const coinsCredited = (await this.state.storage.get("coinsCredited")) ?? null;
-      return jsonResponse({ status, amount_gram: amountGram, coins_credited: coinsCredited });
+      const nextCheckAt = status === "pending" ? await this.state.storage.getAlarm() : null;
+      return jsonResponse({ status, amount_gram: amountGram, coins_credited: coinsCredited, next_check_at: nextCheckAt });
     }
     return jsonResponse({ error: "not_found" }, 404);
   }
@@ -2734,7 +2736,7 @@ async function validateInitData(initData, botToken) {
 function jsonResponse(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { "Content-Type": "application/json" }
+    headers: { "Content-Type": "application/json", "X-Server-Time": String(Date.now()) }
   });
 }
 async function handleTelegram(request, env) {
