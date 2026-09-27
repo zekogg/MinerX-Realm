@@ -166,7 +166,7 @@ img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
     radial-gradient(600px 380px at 15% -6%, var(--bg-glow-1), transparent 60%),
     radial-gradient(520px 360px at 100% 8%, var(--bg-glow-2), transparent 55%),
     linear-gradient(rgba(14,11,24,.5), rgba(14,11,24,.68)),
-    url('https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/TheRealmX.webp');
+    url('/TheRealmX.webp');
   background-size:auto, auto, cover, cover;
   background-position:center, center, center, center;
   background-repeat:no-repeat;
@@ -2974,7 +2974,7 @@ body.reduce-motion .firefly{
 
   <!-- Splash Screen -->
   <div class="loading-screen" id="loading-screen">
-    <img draggable="false" class="loading-screen__logo" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/MinerXRealm%20Logo.webp" alt="MinerX Realm">
+    <img draggable="false" class="loading-screen__logo" src="/MinerXRealm%20Logo.webp" alt="MinerX Realm">
     <div class="progress-track loading-screen__bar"><div class="progress-fill" id="loading-screen-fill" style="width:0%"></div></div>
   </div>
 
@@ -3016,11 +3016,11 @@ body.reduce-motion .firefly{
         <span id="topbar-avatar-emoji">👤</span>
       </div>
     </div>
-    <img draggable="false" class="topbar-logo" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/MinerXRealm%20Logo.webp" alt="MinerX Realm">
+    <img draggable="false" class="topbar-logo" src="/MinerXRealm%20Logo.webp" alt="MinerX Realm">
     <div class="topbar-right">
       <div class="topbar-coin-card">
         <div class="topbar-coin-card__icon-wrap">
-          <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:28px;height:28px;">
+          <img draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:28px;height:28px;">
         </div>
         <div class="topbar-coin-card__text">
           <span class="topbar-coin-card__num" style="position:relative; cursor:pointer;" onclick="togglePriceTooltip('topbar-coins-exact-tooltip')">
@@ -3033,7 +3033,7 @@ body.reduce-motion .firefly{
       <span class="topbar-right__divider"></span>
       <div class="topbar-badge">
         <div class="topbar-badge__icon-wrap">
-          <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:24px;height:24px;">
+          <img draggable="false" src="/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:24px;height:24px;">
         </div>
         <span class="topbar-badge__num" id="display-gram-topbar">0.00</span>
       </div>
@@ -3058,8 +3058,8 @@ body.reduce-motion .firefly{
             <div class="char-slot" id="char-slot">
               <div class="char-slot__outer-ring"></div>
               <div class="char-slot__ring"></div>
-              <img draggable="false" class="char-slot__art char-slot__art--idle is-visible" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/c564887c059e956ef50c9510409b98266c483040/frontend/Doge%20Sleeping%20.svg" alt="Doge Sleeping">
-              <img draggable="false" class="char-slot__art char-slot__art--mining" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/c564887c059e956ef50c9510409b98266c483040/frontend/Doge%20is%20Mining%20.svg" alt="Doge Mining">
+              <img draggable="false" class="char-slot__art char-slot__art--idle is-visible" src="/Doge%20Sleeping%20.svg" alt="Doge Sleeping">
+              <img draggable="false" class="char-slot__art char-slot__art--mining" src="/Doge%20is%20Mining%20.svg" alt="Doge Mining">
             </div>
           </div>
           <div class="rate-pill-wrap">
@@ -3068,12 +3068,12 @@ body.reduce-motion .firefly{
         </div>
         <div class="earn-rate-row">
           <button class="prizes-trigger" onclick="openLeaderboardModal()">
-            <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/54404f088855f864d7dbeb9a6adcf4e37fe5db6d/frontend/Leaderboard%20icon.svg" alt="Leaderboard" style="width:34.91px;height:34.91px;">
+            <img draggable="false" src="/Leaderboard%20icon.svg" alt="Leaderboard" style="width:34.91px;height:34.91px;">
             <span class="prizes-trigger__banner">Prizes</span>
           </button>
           <div class="earn-rate">80<span>Coins/hr</span></div>
           <button class="pet-trigger" onclick="openFreePetModal()">
-            <img draggable="false" class="pet-trigger__icon" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/bone%20Free%20Pet%20icon%20.webp" alt="Free Pet">
+            <img draggable="false" class="pet-trigger__icon" src="/bone%20Free%20Pet%20icon%20.webp" alt="Free Pet">
             <span class="pet-trigger__banner">Free Pet</span>
           </button>
         </div>
@@ -3118,7 +3118,7 @@ body.reduce-motion .firefly{
         </div>
         <div class="streak-chest">
           <div class="streak-chest__left">
-            <img draggable="false" class="streak-chest__icon" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/cc0ac6de33faf82ed7fae32bbda97030d525f6da/frontend/Daily%20Chest%20.svg" alt="Daily Chest">
+            <img loading="lazy" draggable="false" class="streak-chest__icon" src="/Daily%20Chest%20.svg" alt="Daily Chest">
             <div>
               <div class="streak-chest__label" id="streak-timer-label">Next Claim in</div>
               <div class="streak-chest__timer">
@@ -3137,15 +3137,15 @@ body.reduce-motion .firefly{
           <span class="price-tooltip price-tooltip--wide" id="chest-help-tooltip">
             You get 1 free try every day, resetting at 00:00 UTC.
             <span class="prize-tooltip-icons">
-              <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" style="width:13px;height:13px;">Coins
+              <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" style="width:13px;height:13px;">Coins
               &amp;
-              <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" style="width:11px;height:11px;">Gram
+              <img loading="lazy" draggable="false" src="/Gram_symbol.png" alt="Gram" style="width:11px;height:11px;">Gram
             </span>
           </span>
         </span>
         <div class="chest-card__row">
           <span class="chest-card__icon-wrap" id="chest-icon-wrap">
-            <img draggable="false" class="chest-card__icon-art" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/74339362a9afb6b9cc3c9159fd5913c1220933b0/frontend/The%20Chest.svg" alt="Chest">
+            <img loading="lazy" draggable="false" class="chest-card__icon-art" src="/The%20Chest.svg" alt="Chest">
           </span>
           <button class="chest-card__open" id="btn-open-chest" onclick="onChestOpenClick()">Open Chest&nbsp;&nbsp;(1)</button>
         </div>
@@ -3163,49 +3163,49 @@ body.reduce-motion .firefly{
           <div class="spin-wheel">
           <div class="spin-seg">
             <div class="spin-seg__content" style="transform:translate(-50%,-50%) rotate(0deg) translateY(-66px) rotate(-0deg);">
-              <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:24px;height:24px;flex-shrink:0;vertical-align:middle;">
+              <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:24px;height:24px;flex-shrink:0;vertical-align:middle;">
               <span>100</span>
             </div>
           </div>
           <div class="spin-seg">
             <div class="spin-seg__content" style="transform:translate(-50%,-50%) rotate(45deg) translateY(-66px) rotate(-45deg);">
-              <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:15px;height:15px;filter:drop-shadow(0 1px 1px rgba(0,0,0,.5));">
+              <img loading="lazy" draggable="false" src="/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:15px;height:15px;filter:drop-shadow(0 1px 1px rgba(0,0,0,.5));">
               <span>0.0025</span>
             </div>
           </div>
           <div class="spin-seg">
             <div class="spin-seg__content" style="transform:translate(-50%,-50%) rotate(90deg) translateY(-66px) rotate(-90deg);">
-              <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:24px;height:24px;flex-shrink:0;vertical-align:middle;">
+              <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:24px;height:24px;flex-shrink:0;vertical-align:middle;">
               <span>500</span>
             </div>
           </div>
           <div class="spin-seg">
             <div class="spin-seg__content" style="transform:translate(-50%,-50%) rotate(135deg) translateY(-66px) rotate(-135deg);">
-              <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:15px;height:15px;filter:drop-shadow(0 1px 1px rgba(0,0,0,.5));">
+              <img loading="lazy" draggable="false" src="/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:15px;height:15px;filter:drop-shadow(0 1px 1px rgba(0,0,0,.5));">
               <span>0.005</span>
             </div>
           </div>
           <div class="spin-seg">
             <div class="spin-seg__content" style="transform:translate(-50%,-50%) rotate(180deg) translateY(-66px) rotate(-180deg);">
-              <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:24px;height:24px;flex-shrink:0;vertical-align:middle;">
+              <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:24px;height:24px;flex-shrink:0;vertical-align:middle;">
               <span>150</span>
             </div>
           </div>
           <div class="spin-seg">
             <div class="spin-seg__content" style="transform:translate(-50%,-50%) rotate(225deg) translateY(-66px) rotate(-225deg);">
-              <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:15px;height:15px;filter:drop-shadow(0 1px 1px rgba(0,0,0,.5));">
+              <img loading="lazy" draggable="false" src="/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:15px;height:15px;filter:drop-shadow(0 1px 1px rgba(0,0,0,.5));">
               <span>0.001</span>
             </div>
           </div>
           <div class="spin-seg">
             <div class="spin-seg__content" style="transform:translate(-50%,-50%) rotate(270deg) translateY(-66px) rotate(-270deg);">
-              <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:24px;height:24px;flex-shrink:0;vertical-align:middle;">
+              <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:24px;height:24px;flex-shrink:0;vertical-align:middle;">
               <span>50</span>
             </div>
           </div>
           <div class="spin-seg">
             <div class="spin-seg__content" style="transform:translate(-50%,-50%) rotate(315deg) translateY(-66px) rotate(-315deg);">
-              <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:15px;height:15px;filter:drop-shadow(0 1px 1px rgba(0,0,0,.5));">
+              <img loading="lazy" draggable="false" src="/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:15px;height:15px;filter:drop-shadow(0 1px 1px rgba(0,0,0,.5));">
               <span>0.01</span>
             </div>
           </div>
@@ -3226,9 +3226,9 @@ body.reduce-motion .firefly{
             <span class="price-tooltip price-tooltip--wide" id="gift-help-tooltip" style="left:auto; right:0; bottom:100%; transform:translateY(-6px);">
               You get 1 free try every day, resetting at 00:00 UTC.
               <span class="prize-tooltip-icons">
-                <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" style="width:13px;height:13px;">Coins
+                <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" style="width:13px;height:13px;">Coins
                 &amp;
-                <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" style="width:11px;height:11px;">Gram
+                <img loading="lazy" draggable="false" src="/Gram_symbol.png" alt="Gram" style="width:11px;height:11px;">Gram
               </span>
             </span>
           </span>
@@ -3237,10 +3237,10 @@ body.reduce-motion .firefly{
           <button class="gift-pick-box" data-gift="1">
             <div class="gift-pick-box__flip">
               <div class="gift-pick-box__face gift-pick-box__face--front">
-                <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/3ffa2eead4190f8d42f414f1e20860a8dd4a4889/frontend/Pick%20A%20Gift%20.svg" alt="Gift" class="gift-pick-box__art">
+                <img loading="lazy" draggable="false" src="/Pick%20A%20Gift%20.svg" alt="Gift" class="gift-pick-box__art">
               </div>
               <div class="gift-pick-box__face gift-pick-box__face--back">
-                <img draggable="false" class="gift-pick-box__prize-icon" src="" alt="">
+                <img loading="lazy" draggable="false" class="gift-pick-box__prize-icon" src="" alt="">
                 <span class="gift-pick-box__prize-amount"></span>
               </div>
             </div>
@@ -3248,10 +3248,10 @@ body.reduce-motion .firefly{
           <button class="gift-pick-box" data-gift="2">
             <div class="gift-pick-box__flip">
               <div class="gift-pick-box__face gift-pick-box__face--front">
-                <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/3ffa2eead4190f8d42f414f1e20860a8dd4a4889/frontend/Pick%20A%20Gift%20.svg" alt="Gift" class="gift-pick-box__art">
+                <img loading="lazy" draggable="false" src="/Pick%20A%20Gift%20.svg" alt="Gift" class="gift-pick-box__art">
               </div>
               <div class="gift-pick-box__face gift-pick-box__face--back">
-                <img draggable="false" class="gift-pick-box__prize-icon" src="" alt="">
+                <img loading="lazy" draggable="false" class="gift-pick-box__prize-icon" src="" alt="">
                 <span class="gift-pick-box__prize-amount"></span>
               </div>
             </div>
@@ -3259,10 +3259,10 @@ body.reduce-motion .firefly{
           <button class="gift-pick-box" data-gift="3">
             <div class="gift-pick-box__flip">
               <div class="gift-pick-box__face gift-pick-box__face--front">
-                <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/3ffa2eead4190f8d42f414f1e20860a8dd4a4889/frontend/Pick%20A%20Gift%20.svg" alt="Gift" class="gift-pick-box__art">
+                <img loading="lazy" draggable="false" src="/Pick%20A%20Gift%20.svg" alt="Gift" class="gift-pick-box__art">
               </div>
               <div class="gift-pick-box__face gift-pick-box__face--back">
-                <img draggable="false" class="gift-pick-box__prize-icon" src="" alt="">
+                <img loading="lazy" draggable="false" class="gift-pick-box__prize-icon" src="" alt="">
                 <span class="gift-pick-box__prize-amount"></span>
               </div>
             </div>
@@ -3276,19 +3276,19 @@ body.reduce-motion .firefly{
         <div class="quick-actions__title">Quick Actions</div>
         <div class="quick-actions__grid">
           <button class="qa-btn" onclick="openProfileModal()">
-            <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/bd0f38f5b1b335a06503dbede5e266d49fbbfe4a/frontend/Profile%20icon%20.svg" alt="Profile" style="width:25.3px;height:25.3px;flex-shrink:0;">
+            <img loading="lazy" draggable="false" src="/Profile%20icon%20.svg" alt="Profile" style="width:25.3px;height:25.3px;flex-shrink:0;">
             <span>Profile</span>
           </button>
           <button class="qa-btn qa-btn--free-pet" onclick="openQuickFreePetModal()">
-            <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/bd0f38f5b1b335a06503dbede5e266d49fbbfe4a/frontend/Free%20Pet%20Icon%20.svg" alt="Free Pet" style="width:27.5px;height:27.5px;flex-shrink:0;">
+            <img loading="lazy" draggable="false" src="/Free%20Pet%20Icon%20.svg" alt="Free Pet" style="width:27.5px;height:27.5px;flex-shrink:0;">
             <span>Free Pet</span>
           </button>
           <button class="qa-btn" onclick="openExchangeModal()">
-            <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/bd0f38f5b1b335a06503dbede5e266d49fbbfe4a/frontend/Exchange%20icon%20.svg" alt="Exchange" style="width:33px;height:33px;flex-shrink:0;">
+            <img loading="lazy" draggable="false" src="/Exchange%20icon%20.svg" alt="Exchange" style="width:33px;height:33px;flex-shrink:0;">
             <span>Exchange</span>
           </button>
           <button class="qa-btn" onclick="openWithdrawModal()">
-            <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/bd0f38f5b1b335a06503dbede5e266d49fbbfe4a/frontend/Withdraw%20icon%20.svg" alt="Withdraw" style="width:25.3px;height:25.3px;flex-shrink:0;">
+            <img loading="lazy" draggable="false" src="/Withdraw%20icon%20.svg" alt="Withdraw" style="width:25.3px;height:25.3px;flex-shrink:0;">
             <span>Withdraw</span>
           </button>
         </div>
@@ -3303,7 +3303,7 @@ body.reduce-motion .firefly{
       <div class="tasks-top-grid">
         <div class="card promo-card">
           <div class="promo-card__icon-title">
-            <img draggable="false" class="promo-card__icon-art" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/d7a452799ac3bcb686ea6fafefc29bba470455e5/frontend/Promo%20Code%20icon%20.svg" alt="Promo Code">
+            <img loading="lazy" draggable="false" class="promo-card__icon-art" src="/Promo%20Code%20icon%20.svg" alt="Promo Code">
             <div class="promo-card__title">Promo Code</div>
           </div>
           <div class="promo-card__input-row">
@@ -3317,14 +3317,14 @@ body.reduce-motion .firefly{
             <div class="mystery-box__slot" id="combo-slot-0"><span>Empty</span></div>
             <div class="mystery-box__slot" id="combo-slot-1"><span>Empty</span></div>
             <div class="mystery-box__slot" id="combo-slot-2"><span>Empty</span></div>
-            <button class="mystery-box__slot mystery-box__pick" onclick="pickCombo(this, 'https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Duck%20Combo%20.webp', 'Duck', 'duck')">
-              <img draggable="false" class="mystery-box__pick-art" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Duck%20Combo%20.webp" alt="Duck">
+            <button class="mystery-box__slot mystery-box__pick" onclick="pickCombo(this, '/Duck%20Combo%20.webp', 'Duck', 'duck')">
+              <img loading="lazy" draggable="false" class="mystery-box__pick-art" src="/Duck%20Combo%20.webp" alt="Duck">
             </button>
-            <button class="mystery-box__slot mystery-box__pick" onclick="pickCombo(this, 'https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Penguin%20Combo%20.webp', 'Penguin', 'penguin')">
-              <img draggable="false" class="mystery-box__pick-art" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Penguin%20Combo%20.webp" alt="Penguin">
+            <button class="mystery-box__slot mystery-box__pick" onclick="pickCombo(this, '/Penguin%20Combo%20.webp', 'Penguin', 'penguin')">
+              <img loading="lazy" draggable="false" class="mystery-box__pick-art" src="/Penguin%20Combo%20.webp" alt="Penguin">
             </button>
-            <button class="mystery-box__slot mystery-box__pick" onclick="pickCombo(this, 'https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Polar%20Combo%20.webp', 'Polar Bear', 'polar_bear')">
-              <img draggable="false" class="mystery-box__pick-art" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Polar%20Combo%20.webp" alt="Polar Bear">
+            <button class="mystery-box__slot mystery-box__pick" onclick="pickCombo(this, '/Polar%20Combo%20.webp', 'Polar Bear', 'polar_bear')">
+              <img loading="lazy" draggable="false" class="mystery-box__pick-art" src="/Polar%20Combo%20.webp" alt="Polar Bear">
             </button>
           </div>
           <button class="mystery-box__check" id="combo-check-btn" onclick="onComboCheckClick()">Check</button>
@@ -3351,7 +3351,7 @@ body.reduce-motion .firefly{
       <div class="task-panel is-active" id="task-panel-daily">
       <div class="card free-pet-box">
         <div class="free-pet-box__top">
-          <img draggable="false" class="free-pet-box__icon-art" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/bd0f38f5b1b335a06503dbede5e266d49fbbfe4a/frontend/Free%20Pet%20Icon%20.svg" alt="Free Pet">
+          <img loading="lazy" draggable="false" class="free-pet-box__icon-art" src="/Free%20Pet%20Icon%20.svg" alt="Free Pet">
           <div>
             <div class="free-pet-box__title">Get A Free Pet</div>
             <div class="free-pet-box__sub">Watch 4000 ads in total — one-time reward</div>
@@ -3364,11 +3364,11 @@ body.reduce-motion .firefly{
       <div class="ad-tasks-grid">
         <div class="card ad-task">
           <div class="ad-task__icon">
-            <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Adsgram%20Icon%20.webp" alt="Adsgram" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">
+            <img loading="lazy" draggable="false" src="/Adsgram%20Icon%20.webp" alt="Adsgram" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">
           </div>
           <div class="ad-task__title">Watch Adsgram Ad</div>
           <div class="ad-task__meta">
-            <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
+            <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
             <span class="ad-task__reward">+15 / Ad</span>
             <span class="ad-task__avail">Coming Soon</span>
           </div>
@@ -3380,11 +3380,11 @@ body.reduce-motion .firefly{
         </div>
         <div class="card ad-task">
           <div class="ad-task__icon">
-            <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Adsgram%20Bonus%20Ad%20icon%20.webp" alt="Bonus AD" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">
+            <img loading="lazy" draggable="false" src="/Adsgram%20Bonus%20Ad%20icon%20.webp" alt="Bonus AD" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">
           </div>
           <div class="ad-task__title">Bonus AD Every 1H</div>
           <div class="ad-task__meta">
-            <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
+            <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
             <span class="ad-task__reward">+15 / Ad</span>
             <span class="ad-task__avail" id="bonus-ad-avail">Available</span>
           </div>
@@ -3396,11 +3396,11 @@ body.reduce-motion .firefly{
         </div>
         <div class="card ad-task">
           <div class="ad-task__icon">
-            <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/GigaPub%20icon.webp" alt="GigaPub" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">
+            <img loading="lazy" draggable="false" src="/GigaPub%20icon.webp" alt="GigaPub" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">
           </div>
           <div class="ad-task__title">Watch gigapub ads</div>
           <div class="ad-task__meta">
-            <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
+            <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
             <span class="ad-task__reward">+15 / Ad</span>
             <span class="ad-task__avail" id="gigapub-task-avail">Available</span>
           </div>
@@ -3412,11 +3412,11 @@ body.reduce-motion .firefly{
         </div>
         <div class="card ad-task">
           <div class="ad-task__icon">
-            <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Monetix%20Ads%20icon.webp" alt="MonetixAds" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">
+            <img loading="lazy" draggable="false" src="/Monetix%20Ads%20icon.webp" alt="MonetixAds" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">
           </div>
           <div class="ad-task__title">Watch MonetixAds</div>
           <div class="ad-task__meta">
-            <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
+            <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
             <span class="ad-task__reward">+15 / Ad</span>
             <span class="ad-task__avail" id="monetix-task-avail">Available</span>
           </div>
@@ -3428,11 +3428,11 @@ body.reduce-motion .firefly{
         </div>
         <div class="card ad-task">
           <div class="ad-task__icon">
-            <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/adexium%20icon.webp" alt="adexium" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">
+            <img loading="lazy" draggable="false" src="/adexium%20icon.webp" alt="adexium" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">
           </div>
           <div class="ad-task__title">Watch adexium ads</div>
           <div class="ad-task__meta">
-            <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
+            <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
             <span class="ad-task__reward">+15 / Ad</span>
             <span class="ad-task__avail">Coming Soon</span>
           </div>
@@ -3456,7 +3456,7 @@ body.reduce-motion .firefly{
             <div class="partner-task__body">
               <div class="ad-task__title">React To The Latest Post</div>
               <div class="ad-task__meta">
-                <img draggable="false" loading="lazy" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
+                <img draggable="false" loading="lazy" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
                 <span class="ad-task__reward">+10</span>
                 <span class="ad-task__avail">Available</span>
               </div>
@@ -3470,7 +3470,7 @@ body.reduce-motion .firefly{
             <div class="partner-task__body">
               <div class="ad-task__title">Share with Friends</div>
               <div class="ad-task__meta">
-                <img draggable="false" loading="lazy" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
+                <img draggable="false" loading="lazy" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
                 <span class="ad-task__reward">+10</span>
                 <span class="ad-task__avail">Available</span>
               </div>
@@ -3484,7 +3484,7 @@ body.reduce-motion .firefly{
             <div class="partner-task__body">
               <div class="ad-task__title">Put This @MinerXRealmBot With Your Name</div>
               <div class="ad-task__meta">
-                <img draggable="false" loading="lazy" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
+                <img draggable="false" loading="lazy" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
                 <span class="ad-task__reward">+20</span>
                 <span class="ad-task__avail">Available</span>
               </div>
@@ -3501,7 +3501,7 @@ body.reduce-motion .firefly{
             <div class="partner-task__body">
               <div class="ad-task__title">Put Your Link In Bio</div>
               <div class="ad-task__meta">
-                <img draggable="false" loading="lazy" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
+                <img draggable="false" loading="lazy" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
                 <span class="ad-task__reward">+20</span>
                 <span class="ad-task__avail">Available</span>
               </div>
@@ -3545,7 +3545,7 @@ body.reduce-motion .firefly{
     <section class="page" id="page-friends">
       <div class="page-title">Friends</div>
       <div class="card invite-box">
-        <img draggable="false" class="invite-box__gift" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/d7a452799ac3bcb686ea6fafefc29bba470455e5/frontend/Friends%20icon.svg" alt="Friends">
+        <img loading="lazy" draggable="false" class="invite-box__gift" src="/Friends%20icon.svg" alt="Friends">
         <div class="invite-box__title">Invite A Friend · Earn</div>
         <div class="invite-box__amount"><span class="invite-box__tiny">Up to</span> 200<span class="invite-box__plus">+ 5%</span></div>
         <div class="invite-box__sub">Coins + Commission · Per Referral</div>
@@ -3608,7 +3608,7 @@ body.reduce-motion .firefly{
           <div class="milestone-mission__head">
             <span class="milestone-mission__title">Invite 10 Active Friends</span>
             <span class="milestone-mission__reward">
-              <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:13px;height:13px;flex-shrink:0;vertical-align:middle;">
+              <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:13px;height:13px;flex-shrink:0;vertical-align:middle;">
               5K
             </span>
           </div>
@@ -3622,7 +3622,7 @@ body.reduce-motion .firefly{
           <div class="milestone-mission__head">
             <span class="milestone-mission__title">Invite 25 Active Friends</span>
             <span class="milestone-mission__reward">
-              <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:13px;height:13px;flex-shrink:0;vertical-align:middle;">
+              <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:13px;height:13px;flex-shrink:0;vertical-align:middle;">
               10K
             </span>
           </div>
@@ -3636,7 +3636,7 @@ body.reduce-motion .firefly{
           <div class="milestone-mission__head">
             <span class="milestone-mission__title">Invite 50 Active Friends</span>
             <span class="milestone-mission__reward">
-              <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:13px;height:13px;flex-shrink:0;vertical-align:middle;">
+              <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:13px;height:13px;flex-shrink:0;vertical-align:middle;">
               20K
             </span>
           </div>
@@ -3650,7 +3650,7 @@ body.reduce-motion .firefly{
           <div class="milestone-mission__head">
             <span class="milestone-mission__title">Invite 100 Active Friends</span>
             <span class="milestone-mission__reward">
-              <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:13px;height:13px;flex-shrink:0;vertical-align:middle;">
+              <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:13px;height:13px;flex-shrink:0;vertical-align:middle;">
               50K <span style="margin-left:2px;">+ Pet Card</span>
             </span>
           </div>
@@ -3680,7 +3680,7 @@ body.reduce-motion .firefly{
         <div class="wallet-balances">
           <div class="wallet-balances__item">
             <div class="wallet-icon-wrap">
-              <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:42px;height:42px;">
+              <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:42px;height:42px;">
             </div>
             <span class="wb-num" id="display-coins-wallet" style="position:relative; cursor:pointer;" onclick="togglePriceTooltip('wallet-coins-exact-tooltip')">
               <span id="display-coins-wallet-text">0</span>
@@ -3690,7 +3690,7 @@ body.reduce-motion .firefly{
           </div>
           <div class="wallet-balances__item">
             <div class="wallet-icon-wrap">
-              <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:36px;height:36px;">
+              <img loading="lazy" draggable="false" src="/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:36px;height:36px;">
             </div>
             <span class="wb-num" id="display-gram-wallet">0,000</span>
             <span class="wb-label">Gram</span>
@@ -3719,7 +3719,7 @@ body.reduce-motion .firefly{
       <div class="card storage-card">
         <span class="realm-label realm-label--nav-gold" id="total-speed-badge">Total Speed (+0 Coins / hr)</span>
         <div class="storage-card__icon">
-          <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:34px;height:34px;flex-shrink:0;">
+          <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:34px;height:34px;flex-shrink:0;">
         </div>
         <div class="storage-card__info">
           <div class="storage-card__label">Storage</div>
@@ -3738,18 +3738,18 @@ body.reduce-motion .firefly{
             <span class="pet-card__lv" id="bear-lv-badge">Lv.0</span>
             <span class="pet-card__rarity pet-card__rarity--rare">Rare</span>
             <div class="pet-card__art-wrap" onclick="tiltPetImage(event, this)">
-              <img draggable="false" class="pet-card__art" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/The%20Polar%20Bear%20.webp" alt="The Polar Bear">
+              <img loading="lazy" draggable="false" class="pet-card__art" src="/The%20Polar%20Bear%20.webp" alt="The Polar Bear">
             </div>
           </div>
           <div class="pet-info-card pet-info-card--rare">
             <div class="pet-info-card__row">
               <div class="pet-card__rate">
-                <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
+                <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
                 <span id="bear-rate-text">+191/hr</span>
               </div>
               <span class="pet-info-card__divider"></span>
               <div class="pet-card__price" id="pet-card-price-bear" onclick="togglePriceTooltip('price-tooltip-bear')">
-                <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:19px;height:19px;flex-shrink:0;vertical-align:middle;">
+                <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:19px;height:19px;flex-shrink:0;vertical-align:middle;">
                 <span>500K</span>
                 <span class="price-tooltip" id="price-tooltip-bear">500,000 Coins</span>
               </div>
@@ -3769,18 +3769,18 @@ body.reduce-motion .firefly{
             <span class="pet-card__lv" id="duck-lv-badge">Lv.0</span>
             <span class="pet-card__rarity">Common</span>
             <div class="pet-card__art-wrap" onclick="tiltPetImage(event, this)">
-              <img draggable="false" class="pet-card__art" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Duck%20Hero%20.webp" alt="Duck Hero">
+              <img loading="lazy" draggable="false" class="pet-card__art" src="/Duck%20Hero%20.webp" alt="Duck Hero">
             </div>
           </div>
           <div class="pet-info-card">
             <div class="pet-info-card__row">
               <div class="pet-card__rate">
-                <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
+                <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
                 <span id="duck-rate-text">+114/hr</span>
               </div>
               <span class="pet-info-card__divider"></span>
               <div class="pet-card__price" id="pet-card-price" onclick="togglePriceTooltip('price-tooltip')">
-                <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:19px;height:19px;flex-shrink:0;vertical-align:middle;">
+                <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:19px;height:19px;flex-shrink:0;vertical-align:middle;">
                 <span>300K</span>
                 <span class="price-tooltip" id="price-tooltip">300,000 Coins</span>
               </div>
@@ -3800,18 +3800,18 @@ body.reduce-motion .firefly{
             <span class="pet-card__lv" id="penguin-lv-badge">Lv.0</span>
             <span class="pet-card__rarity pet-card__rarity--legendary">Legendary</span>
             <div class="pet-card__art-wrap" onclick="tiltPetImage(event, this)">
-              <img draggable="false" class="pet-card__art" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/The%20Penguin.webp" alt="The Penguin">
+              <img loading="lazy" draggable="false" class="pet-card__art" src="/The%20Penguin.webp" alt="The Penguin">
             </div>
           </div>
           <div class="pet-info-card pet-info-card--legendary">
             <div class="pet-info-card__row">
               <div class="pet-card__rate">
-                <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
+                <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
                 <span id="penguin-rate-text">+1,894/hr</span>
               </div>
               <span class="pet-info-card__divider"></span>
               <div class="pet-card__price" id="pet-card-price-penguin" onclick="togglePriceTooltip('price-tooltip-penguin')">
-                <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:19px;height:19px;flex-shrink:0;vertical-align:middle;">
+                <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:19px;height:19px;flex-shrink:0;vertical-align:middle;">
                 <span>5M</span>
                 <span class="price-tooltip" id="price-tooltip-penguin">5,000,000 Coins</span>
               </div>
@@ -3831,18 +3831,18 @@ body.reduce-motion .firefly{
             <span class="pet-card__lv" id="scorpion-lv-badge">Lv.0</span>
             <span class="pet-card__rarity pet-card__rarity--epic">Epic</span>
             <div class="pet-card__art-wrap" onclick="tiltPetImage(event, this)">
-              <img draggable="false" class="pet-card__art" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/The%20Scorpion%20.webp" alt="The Scorpion">
+              <img loading="lazy" draggable="false" class="pet-card__art" src="/The%20Scorpion%20.webp" alt="The Scorpion">
             </div>
           </div>
           <div class="pet-info-card pet-info-card--epic">
             <div class="pet-info-card__row">
               <div class="pet-card__rate">
-                <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
+                <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
                 <span id="scorpion-rate-text">+379/hr</span>
               </div>
               <span class="pet-info-card__divider"></span>
               <div class="pet-card__price" id="pet-card-price-scorpion" onclick="togglePriceTooltip('price-tooltip-scorpion')">
-                <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:19px;height:19px;flex-shrink:0;vertical-align:middle;">
+                <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:19px;height:19px;flex-shrink:0;vertical-align:middle;">
                 <span>1M</span>
                 <span class="price-tooltip" id="price-tooltip-scorpion">1,000,000 Coins</span>
               </div>
@@ -3879,18 +3879,18 @@ body.reduce-motion .firefly{
             </button>
             <div class="db-right-stack">
               <div class="db-speed">
-                <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:11px;height:11px;flex-shrink:0;vertical-align:middle;">
+                <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:11px;height:11px;flex-shrink:0;vertical-align:middle;">
                 <span id="dancing_bear-rate-text">3788/hr</span>
               </div>
               <span class="db-right-stack__divider"></span>
               <div class="db-price" id="pet-card-price-db">
-                <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:11px;height:11px;flex-shrink:0;vertical-align:middle;">
+                <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:11px;height:11px;flex-shrink:0;vertical-align:middle;">
                 <span>10M</span>
               </div>
               <button class="db-action-btn db-action-btn--buy" id="dancing_bear-buy-btn" onclick="onPetBuyClick('dancing_bear', this)">Buy</button>
             </div>
             <div class="pet-slot--exclusive__backdrop"></div>
-            <img draggable="false" class="pet-slot--exclusive__art" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/ed9ceea42346d7809e7d8db349a0a9e0d72e9aa4/frontend/Dancing%20Bear.svg" alt="Dancing Bear">
+            <img loading="lazy" draggable="false" class="pet-slot--exclusive__art" src="/Dancing%20Bear.svg" alt="Dancing Bear">
           </div>
         </div>
         <div class="pet-card-wrap" style="position:relative; margin-top:14px;">
@@ -3911,18 +3911,18 @@ body.reduce-motion .firefly{
             </button>
             <div class="tc-right-stack">
               <div class="tc-speed">
-                <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:11px;height:11px;flex-shrink:0;vertical-align:middle;">
+                <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:11px;height:11px;flex-shrink:0;vertical-align:middle;">
                 <span id="the_cat-rate-text">18940/hr</span>
               </div>
               <span class="tc-right-stack__divider"></span>
               <div class="tc-price" id="pet-card-price-tc">
-                <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:11px;height:11px;flex-shrink:0;vertical-align:middle;">
+                <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:11px;height:11px;flex-shrink:0;vertical-align:middle;">
                 <span>50M</span>
               </div>
               <button class="tc-action-btn tc-action-btn--buy" id="the_cat-buy-btn" onclick="onPetBuyClick('the_cat', this)">Buy</button>
             </div>
             <div class="pet-slot--exclusive__backdrop"></div>
-            <img draggable="false" class="pet-slot--exclusive__art" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/882f7bf5c55a528db062aa4e7ff46109146af9fb/frontend/Cat%20fishing%20on%20moon.svg" alt="The Cat">
+            <img loading="lazy" draggable="false" class="pet-slot--exclusive__art" src="/Cat%20fishing%20on%20moon.svg" alt="The Cat">
           </div>
         </div>
         <div class="pet-card-wrap" style="position:relative; margin-top:14px;">
@@ -3938,14 +3938,14 @@ body.reduce-motion .firefly{
             </div>
             <div class="hd-right-stack">
               <div class="hd-speed">
-                <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:11px;height:11px;flex-shrink:0;vertical-align:middle;">
+                <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:11px;height:11px;flex-shrink:0;vertical-align:middle;">
                 <span id="hd-speed-value">??/hr</span>
               </div>
               <span class="hd-right-stack__divider"></span>
               <button class="hd-claim-btn" id="hd-claim-btn" onclick="onClaimHappyDogClick()">Claim</button>
             </div>
             <div class="pet-slot--exclusive__backdrop"></div>
-            <img draggable="false" class="pet-slot--exclusive__art" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/187bbf0071e1651c314318166c4605ba8f82b430/frontend/Happy%20Dog%20(100%20Reward)%20.svg" alt="Happy Dog">
+            <img loading="lazy" draggable="false" class="pet-slot--exclusive__art" src="/Happy%20Dog%20(100%20Reward)%20.svg" alt="Happy Dog">
           </div>
           <span class="pet-exclusive-tip" id="hd-help-tooltip">Unlocks when you invite 100 active friends.</span>
         </div>
@@ -3960,13 +3960,13 @@ body.reduce-motion .firefly{
             <span class="tg-progress-badge" id="tg-progress-badge">AD (0/4000)</span>
             <div class="tg-right-stack">
               <div class="tg-speed">
-                <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:11px;height:11px;flex-shrink:0;vertical-align:middle;">
+                <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:11px;height:11px;flex-shrink:0;vertical-align:middle;">
                 <span id="tg-speed-value">??/hr</span>
               </div>
               <span class="tg-right-stack__divider"></span>
               <button class="tg-claim-btn" id="tg-claim-btn" onclick="onClaimGuardianClick()">Claim</button>
             </div>
-            <img draggable="false" class="pet-slot--exclusive__art" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Ads%20Guardian%20Reward%20.webp" alt="The Guardian">
+            <img loading="lazy" draggable="false" class="pet-slot--exclusive__art" src="/Ads%20Guardian%20Reward%20.webp" alt="The Guardian">
           </div>
           <span class="pet-exclusive-tip" id="tg-help-tooltip">Unlocks after watching 4,000 ads in total. Every ad you watch anywhere in the bot counts toward this.</span>
         </div>
@@ -3980,13 +3980,13 @@ body.reduce-motion .firefly{
             </div>
             <div class="amb-right-stack">
               <div class="amb-speed">
-                <img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:11px;height:11px;flex-shrink:0;vertical-align:middle;">
+                <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:11px;height:11px;flex-shrink:0;vertical-align:middle;">
                 <span id="amb-speed-value">???/hr</span>
               </div>
               <span class="amb-right-stack__divider"></span>
               <button class="amb-claim-btn" id="amb-claim-btn" onclick="onClaimAmbassadorClick()">Claim</button>
             </div>
-            <img draggable="false" class="pet-slot--exclusive__art" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/187bbf0071e1651c314318166c4605ba8f82b430/frontend/The%20Ambassador%20Pet%20.svg" alt="The Ambassador">
+            <img loading="lazy" draggable="false" class="pet-slot--exclusive__art" src="/The%20Ambassador%20Pet%20.svg" alt="The Ambassador">
           </div>
           <span class="pet-exclusive-tip" id="amb-help-tooltip">Unlocks for active ambassadors.</span>
         </div>
@@ -3996,7 +3996,7 @@ body.reduce-motion .firefly{
 
   <!-- Prize Toast -->
   <div class="prize-toast" id="prize-toast">
-    <div class="prize-toast__icon-wrap"><img draggable="false" id="prize-toast-icon" src="" alt="Prize"></div>
+    <div class="prize-toast__icon-wrap"><img loading="lazy" draggable="false" id="prize-toast-icon" src="" alt="Prize"></div>
     <div class="prize-toast__text">
       <div class="prize-toast__title">You Won!</div>
       <div class="prize-toast__amount" id="prize-toast-amount">+0</div>
@@ -4008,27 +4008,27 @@ body.reduce-motion .firefly{
     <div class="nav">
       <button class="pod is-earn is-active" data-page="page-earnings" data-pod="true">
         <span class="pod__inner">
-          <span class="pod__icon-wrap"><img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/d7a452799ac3bcb686ea6fafefc29bba470455e5/frontend/Earn%20icon%20.svg" alt="Earn" style="width:36px;height:36px;"></span>
+          <span class="pod__icon-wrap"><img draggable="false" src="/Earn%20icon%20.svg" alt="Earn" style="width:36px;height:36px;"></span>
           <span style="color:var(--c-nav-earn-icon)">Earn</span>
         </span>
       </button>
       <div class="nav__console">
         <button class="nav__btn" data-page="page-tasks">
-          <span class="nav__btn-icon-wrap"><img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/d7a452799ac3bcb686ea6fafefc29bba470455e5/frontend/Task%20icon%20.svg" alt="Tasks" style="width:25.2px;height:25.2px;"></span>
+          <span class="nav__btn-icon-wrap"><img draggable="false" src="/Task%20icon%20.svg" alt="Tasks" style="width:25.2px;height:25.2px;"></span>
           <span>Tasks</span>
         </button>
         <button class="nav__btn" data-page="page-friends">
-          <span class="nav__btn-icon-wrap"><img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/d7a452799ac3bcb686ea6fafefc29bba470455e5/frontend/Friends%20icon.svg" alt="Friends" style="width:25.2px;height:25.2px;"></span>
+          <span class="nav__btn-icon-wrap"><img draggable="false" src="/Friends%20icon.svg" alt="Friends" style="width:25.2px;height:25.2px;"></span>
           <span>Friends</span>
         </button>
         <button class="nav__btn" data-page="page-wallet">
-          <span class="nav__btn-icon-wrap"><img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/d7a452799ac3bcb686ea6fafefc29bba470455e5/frontend/Wallet%20icon%20.svg" alt="Wallet" style="width:25.2px;height:25.2px;"></span>
+          <span class="nav__btn-icon-wrap"><img draggable="false" src="/Wallet%20icon%20.svg" alt="Wallet" style="width:25.2px;height:25.2px;"></span>
           <span>Wallet</span>
         </button>
       </div>
       <button class="pod is-realm" data-page="page-realm" data-pod="true">
         <span class="pod__inner">
-          <span class="pod__icon-wrap"><img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/d7a452799ac3bcb686ea6fafefc29bba470455e5/frontend/Realm%20icon%20.svg" alt="Realm" style="width:36px;height:36px;"></span>
+          <span class="pod__icon-wrap"><img draggable="false" src="/Realm%20icon%20.svg" alt="Realm" style="width:36px;height:36px;"></span>
           <span>Realm</span>
         </span>
       </button>
@@ -4044,7 +4044,7 @@ body.reduce-motion .firefly{
       <div class="fp-title">Happy Dog</div>
       <div class="fp-title-divider"></div>
       <div class="fp-pet-slot">
-        <img draggable="false" loading="lazy" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/187bbf0071e1651c314318166c4605ba8f82b430/frontend/Happy%20Dog%20(100%20Reward)%20.svg" alt="Happy Dog" style="width:100%;height:100%;object-fit:contain;">
+        <img draggable="false" loading="lazy" src="/Happy%20Dog%20(100%20Reward)%20.svg" alt="Happy Dog" style="width:100%;height:100%;object-fit:contain;">
       </div>
       <div class="fp-desc">Invite <b>100</b> Active Friends And Get Happy Dog — Free, Forever, Mining Right Away At <b>Full Speed</b></div>
       <div class="fp-progress-label">Active Friends (<span id="fp-progress-num">0</span>/100)</div>
@@ -4083,7 +4083,7 @@ body.reduce-motion .firefly{
       <div class="pf-scroll">
         <div class="pf-avatar-wrap">
           <div class="pf-avatar">
-            <img draggable="false" id="pf-avatar-img" alt="" style="display:none;width:100%;height:100%;border-radius:50%;object-fit:cover;">
+            <img loading="lazy" draggable="false" id="pf-avatar-img" alt="" style="display:none;width:100%;height:100%;border-radius:50%;object-fit:cover;">
             <span id="pf-avatar-emoji">👤</span>
           </div>
         </div>
@@ -4292,7 +4292,7 @@ body.reduce-motion .firefly{
       <div class="upgrade-cost-row">
         <span class="upgrade-cost-row__label">Upgrade Cost</span>
         <span class="upgrade-cost-row__val">
-          <img draggable="false" loading="lazy" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:16px;height:16px;flex-shrink:0;vertical-align:middle;">
+          <img draggable="false" loading="lazy" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:16px;height:16px;flex-shrink:0;vertical-align:middle;">
           300K Coins
         </span>
       </div>
@@ -4329,7 +4329,7 @@ body.reduce-motion .firefly{
       <div class="upgrade-cost-row">
         <span class="upgrade-cost-row__label">Upgrade Cost</span>
         <span class="upgrade-cost-row__val">
-          <img draggable="false" loading="lazy" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:16px;height:16px;flex-shrink:0;vertical-align:middle;">
+          <img draggable="false" loading="lazy" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:16px;height:16px;flex-shrink:0;vertical-align:middle;">
           <span id="pet-upgrade-cost">30K Coins</span>
         </span>
       </div>
@@ -4342,7 +4342,7 @@ body.reduce-motion .firefly{
     <div class="modal-sheet">
       <div class="modal-head">
         <div class="modal-head__title-wrap">
-          <img draggable="false" loading="lazy" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/bd0f38f5b1b335a06503dbede5e266d49fbbfe4a/frontend/Free%20Pet%20Icon%20.svg" alt="Free Pet" style="width:25px;height:25px;flex-shrink:0;">
+          <img draggable="false" loading="lazy" src="/Free%20Pet%20Icon%20.svg" alt="Free Pet" style="width:25px;height:25px;flex-shrink:0;">
           <div>
             <div class="modal-head__title">Free Pet Tasks</div>
             <div class="modal-head__sub">Complete a task to earn a card</div>
@@ -4503,7 +4503,7 @@ body.reduce-motion .firefly{
       <span class="fp-corner fp-corner--tr"></span>
       <div class="modal-head">
         <div class="modal-head__title-wrap">
-          <img draggable="false" loading="lazy" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/bd0f38f5b1b335a06503dbede5e266d49fbbfe4a/frontend/Exchange%20icon%20.svg" alt="Exchange" style="width:30px;height:30px;flex-shrink:0;">
+          <img draggable="false" loading="lazy" src="/Exchange%20icon%20.svg" alt="Exchange" style="width:30px;height:30px;flex-shrink:0;">
           <div>
             <div class="modal-head__title">Exchange</div>
             <div class="modal-head__sub">Coins to Gram</div>
@@ -4518,14 +4518,14 @@ body.reduce-motion .firefly{
       <div class="modal-balances">
         <div class="modal-balance-box">
           <div class="modal-balance-box__head">
-            <img draggable="false" loading="lazy" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:21px;height:21px;flex-shrink:0;vertical-align:middle;">
+            <img draggable="false" loading="lazy" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:21px;height:21px;flex-shrink:0;vertical-align:middle;">
             <span>Coin Balance</span>
           </div>
           <div class="modal-balance-box__val" id="exchange-coin-balance">0,000</div>
         </div>
         <div class="modal-balance-box has-gram">
           <div class="modal-balance-box__head">
-            <img draggable="false" loading="lazy" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:21px;height:21px;flex-shrink:0;vertical-align:middle;">
+            <img draggable="false" loading="lazy" src="/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:21px;height:21px;flex-shrink:0;vertical-align:middle;">
             <span>Gram Balance</span>
           </div>
           <div class="modal-balance-box__val" id="exchange-gram-balance" style="color:#4a9eff">0,000</div>
@@ -4536,14 +4536,14 @@ body.reduce-motion .firefly{
         <button class="modal-max" onclick="setMaxExchange()">MAX</button>
       </div>
       <div class="modal-input-row">
-        <span class="modal-input-icon"><img draggable="false" loading="lazy" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:21px;height:21px;flex-shrink:0;vertical-align:middle;"></span>
+        <span class="modal-input-icon"><img draggable="false" loading="lazy" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:21px;height:21px;flex-shrink:0;vertical-align:middle;"></span>
         <input type="number" id="exchange-input" placeholder="0" oninput="updateExchange()">
         <span class="modal-input-suffix">COINS</span>
       </div>
       <div class="modal-swap-arrow">↓</div>
       <div class="modal-field-label"><span>You Receive</span></div>
       <div class="modal-input-row is-receive">
-        <span class="modal-input-icon"><img draggable="false" loading="lazy" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:21px;height:21px;flex-shrink:0;vertical-align:middle;"></span>
+        <span class="modal-input-icon"><img draggable="false" loading="lazy" src="/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:21px;height:21px;flex-shrink:0;vertical-align:middle;"></span>
         <span id="exchange-output">0.00000</span>
         <span class="modal-input-suffix">GRAM</span>
       </div>
@@ -4561,18 +4561,18 @@ body.reduce-motion .firefly{
         <button class="modal-close" onclick="closeModal('modal-deposit')">✕</button>
       </div>
       <div id="deposit-step1">
-        <div class="modal-field-label"><span>Deposit Amount (Gram):</span> <img draggable="false" loading="lazy" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:14px;height:14px;flex-shrink:0;vertical-align:middle;"></div>
+        <div class="modal-field-label"><span>Deposit Amount (Gram):</span> <img draggable="false" loading="lazy" src="/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:14px;height:14px;flex-shrink:0;vertical-align:middle;"></div>
         <input type="number" class="modal-plain-input" id="deposit-input" placeholder="0" oninput="updateDeposit()">
         <div class="modal-field-label"><span>You will Get</span></div>
         <div class="modal-plain-box" style="display:flex;flex-direction:column;align-items:center;gap:4px;">
           <span><span id="deposit-output">0</span> +Coins</span>
-          <img draggable="false" loading="lazy" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:30px;height:30px;flex-shrink:0;">
+          <img draggable="false" loading="lazy" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:30px;height:30px;flex-shrink:0;">
         </div>
         <button class="modal-cta" id="deposit-cta" disabled onclick="goDepositStep2()" style="margin-top:6px;">Deposit</button>
       </div>
       <div id="deposit-step2" style="display:none;">
         <div class="modal-field-label"><span>Send exactly:</span></div>
-        <div class="modal-plain-box has-gram" id="deposit-amount-display" style="display:flex;align-items:center;gap:6px;"><span id="deposit-amount-display-text">1 Gram</span> <img draggable="false" loading="lazy" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:16px;height:16px;flex-shrink:0;"></div>
+        <div class="modal-plain-box has-gram" id="deposit-amount-display" style="display:flex;align-items:center;gap:6px;"><span id="deposit-amount-display-text">1 Gram</span> <img draggable="false" loading="lazy" src="/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:16px;height:16px;flex-shrink:0;"></div>
         <div class="modal-field-label"><span>To wallet address:</span></div>
         <div class="modal-plain-box modal-mono" id="deposit-address">Your_Deposit_wallet</div>
         <button class="modal-secondary-btn" onclick="copyText('deposit-address')">Copy address</button>
@@ -4602,7 +4602,7 @@ body.reduce-motion .firefly{
       <div class="modal-field-label"><span>Address (Gram~Ton):</span></div>
       <input type="text" class="modal-plain-input" id="withdraw-address" placeholder="UQ...">
       <div class="modal-field-label"><span>Amount to be received:</span></div>
-      <div class="modal-plain-box has-gram" style="display:flex;align-items:center;gap:6px;"><span id="withdraw-output">0.0000</span> Gram <img draggable="false" loading="lazy" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:16px;height:16px;flex-shrink:0;"></div>
+      <div class="modal-plain-box has-gram" style="display:flex;align-items:center;gap:6px;"><span id="withdraw-output">0.0000</span> Gram <img draggable="false" loading="lazy" src="/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:16px;height:16px;flex-shrink:0;"></div>
       <div class="wd-req">
         <div class="wd-req__label"><span>Min Withdraw : <span id="withdraw-min-label">0.1</span></span></div>
       </div>
@@ -5271,8 +5271,8 @@ function triggerConfetti(){
   if (!confettiRafId) confettiRafId = requestAnimationFrame(confettiStep);
 }
 var PRIZE_ICON_URLS = {
-  coins: 'https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp',
-  gram: 'https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Gram_symbol.png'
+  coins: '/Pet%20Coin.webp',
+  gram: '/Gram_symbol.png'
 };
 var prizeToastTimer = null;
 function showAppToast(opts){
@@ -7678,7 +7678,7 @@ function renderAdminTasks(section){
           '<div class="ad-task__title">' + escapeHtmlClient(t.title) + '</div>' +
           descHtml +
           '<div class="ad-task__meta">' +
-            '<img draggable="false" src="https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">' +
+            '<img draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">' +
             '<span class="ad-task__reward">+' + Number(t.reward) + '</span>' +
             '<span class="ad-task__avail">Available</span>' +
           '</div>' +
