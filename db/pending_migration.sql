@@ -202,3 +202,17 @@ DROP TABLE user_storage;
 -- DROP TABLE user_pets;
 -- CREATE TABLE user_pets (telegram_id INTEGER NOT NULL, pet_id TEXT NOT NULL, level INTEGER NOT NULL DEFAULT 1, current_speed REAL NOT NULL, daily_boost_days INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (telegram_id, pet_id), FOREIGN KEY (telegram_id) REFERENCES users(telegram_id));
 -- DROP TABLE pets;
+
+-- =====================================================================
+-- دمج combo_attempts داخل users (صف واحد لكل مستخدم بدل صف يومي جديد)، وحذف transactions (سجل لا يقرؤه البوت).
+-- =====================================================================
+ALTER TABLE users ADD COLUMN combo_date TEXT;
+ALTER TABLE users ADD COLUMN combo_attempts_used INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN combo_solved INTEGER NOT NULL DEFAULT 0;
+UPDATE users SET
+  combo_date = (SELECT ca.date FROM combo_attempts ca WHERE ca.telegram_id = users.telegram_id ORDER BY ca.date DESC LIMIT 1),
+  combo_attempts_used = (SELECT ca.attempts_used FROM combo_attempts ca WHERE ca.telegram_id = users.telegram_id ORDER BY ca.date DESC LIMIT 1),
+  combo_solved = (SELECT ca.solved FROM combo_attempts ca WHERE ca.telegram_id = users.telegram_id ORDER BY ca.date DESC LIMIT 1)
+WHERE telegram_id IN (SELECT telegram_id FROM combo_attempts);
+DROP TABLE combo_attempts;
+DROP TABLE transactions;

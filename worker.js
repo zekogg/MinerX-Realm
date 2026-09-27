@@ -146,11 +146,6 @@ async function applyDailyPetBoost(env) {
         ).bind(deltaSpeed, row.telegram_id, petId),
         env.DB.prepare("UPDATE users SET last_claim_at = ? WHERE telegram_id = ?").bind(nowIso, row.telegram_id)
       );
-      if (preBoostAccrued > 0) {
-        stmts.push(env.DB.prepare(
-          "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'storage_auto_collect', ?, 'coins')"
-        ).bind(row.telegram_id, preBoostAccrued));
-      }
     }
     try {
       await env.DB.batch(stmts);
@@ -439,12 +434,11 @@ async function handleGetUser(request, env) {
            u.bonus_ad_count_today, u.bonus_ad_date, u.bonus_ad_last_watched_at,
            u.gigapub_task_count, u.gigapub_task_date, u.photo_url,
            u.monetix_task_count, u.monetix_task_date, u.lifetime_ads_watched,
-           ca.attempts_used AS combo_attempts_used, ca.solved AS combo_solved
+           u.combo_date, u.combo_attempts_used, u.combo_solved
     FROM users u
-    LEFT JOIN combo_attempts ca ON ca.telegram_id = u.telegram_id AND ca.date = ?
     WHERE u.telegram_id = ?
   `;
-  let user = await env.DB.prepare(userQuery).bind(today, telegramId).first();
+  let user = await env.DB.prepare(userQuery).bind(telegramId).first();
   if (!user) {
     await env.DB.prepare(
       "INSERT INTO users (telegram_id, username, referred_by, created_at, photo_url) VALUES (?, ?, ?, ?, ?)"
@@ -462,7 +456,7 @@ async function handleGetUser(request, env) {
     try {
       await sendWelcomeMessage(env, telegramId);
     } catch (e) {   }
-    user = await env.DB.prepare(userQuery).bind(today, telegramId).first();
+    user = await env.DB.prepare(userQuery).bind(telegramId).first();
   } else if (photoUrl && photoUrl !== user.photo_url) {
     await env.DB.prepare("UPDATE users SET photo_url = ? WHERE telegram_id = ?").bind(photoUrl, telegramId).run();
     user.photo_url = photoUrl;
@@ -479,8 +473,9 @@ async function handleGetUser(request, env) {
   view.next_withdraw_allowed_at = user.last_withdraw_request_at
     ? user.last_withdraw_request_at + WITHDRAW_COOLDOWN_MS
     : null;
-  view.combo_solved_today = !!user.combo_solved;
-  view.combo_attempts_used = user.combo_attempts_used || 0;
+  const comboToday = user.combo_date === today;
+  view.combo_solved_today = comboToday && !!user.combo_solved;
+  view.combo_attempts_used = comboToday ? (user.combo_attempts_used || 0) : 0;
   view.combo_max_attempts = COMBO_MAX_ATTEMPTS;
   view.ads_watched_today = user.ads_task_date === today ? (user.ads_task_count || 0) : 0;
   view.ads_daily_limit = ADS_TASK_DAILY_LIMIT;
@@ -633,10 +628,7 @@ async function handleMineClaim(request, env) {
     `UPDATE users SET coins = coins + ?, total_mined = total_mined + ?, mining_started_at = NULL, mining_cycles_today = ?, mining_cycle_date = ?
      WHERE telegram_id = ? AND mining_started_at = ?`
   ).bind(MINING_REWARD_COINS, MINING_REWARD_COINS, newCyclesToday, today, telegramId, row.mining_started_at);
-  const txnStmt = env.DB.prepare(
-    "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'mining_claim', ?, 'coins')"
-  ).bind(telegramId, MINING_REWARD_COINS);
-  const [updateResult] = await env.DB.batch([updateStmt, txnStmt]);
+  const updateResult = await updateStmt.run();
   if (!updateResult.meta || updateResult.meta.changes === 0) {
     return jsonResponse({ error: "already_claimed" }, 409);
   }
@@ -673,10 +665,7 @@ async function handleStreakClaim(request, env) {
     `UPDATE users SET coins = coins + ?, streak_day = ?, streak_last_claim_date = ?
      WHERE telegram_id = ? AND (streak_last_claim_date IS NULL OR streak_last_claim_date <> ?)`
   ).bind(reward, nextStreakDay, state.today, telegramId, state.today);
-  const txnStmt = env.DB.prepare(
-    "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'daily_streak', ?, 'coins')"
-  ).bind(telegramId, reward);
-  const [updateResult] = await env.DB.batch([updateStmt, txnStmt]);
+  const updateResult = await updateStmt.run();
   if (!updateResult.meta || updateResult.meta.changes === 0) {
     return jsonResponse({ error: "already_claimed_today" }, 409);
   }
@@ -693,27 +682,24 @@ async function handleStreakClaim(request, env) {
 async function handleSpinClaim(request, env) {
   return handleDailyPrizeClaim(request, env, {
     dateColumn: "last_spin_date",
-    errorCode: "already_spun_today",
-    transactionType: "spin"
+    errorCode: "already_spun_today"
   });
 }
 async function handleChestClaim(request, env) {
   return handleDailyPrizeClaim(request, env, {
     dateColumn: "last_chest_date",
-    errorCode: "already_claimed_today",
-    transactionType: "chest_open"
+    errorCode: "already_claimed_today"
   });
 }
 async function handleGiftPickClaim(request, env) {
   return handleDailyPrizeClaim(request, env, {
     dateColumn: "last_giftpick_date",
-    errorCode: "already_claimed_today",
-    transactionType: "gift_pick"
+    errorCode: "already_claimed_today"
   });
 }
 
 // Daily prize logic (Spin / Chest / Gift Pick)
-async function handleDailyPrizeClaim(request, env, { dateColumn, errorCode, transactionType }) {
+async function handleDailyPrizeClaim(request, env, { dateColumn, errorCode }) {
   const auth = await authenticateRequest(request, env);
   if (!auth.ok) return auth.response;
   const { telegramId } = auth;
@@ -732,10 +718,7 @@ async function handleDailyPrizeClaim(request, env, { dateColumn, errorCode, tran
     `UPDATE users SET ${column} = ${column} + ?, ${dateColumn} = ?
      WHERE telegram_id = ? AND (${dateColumn} IS NULL OR ${dateColumn} <> ?)`
   ).bind(prize.amount, today, telegramId, today);
-  const txnStmt = env.DB.prepare(
-    "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, ?, ?, ?)"
-  ).bind(telegramId, transactionType, prize.amount, prize.type);
-  const [updateResult] = await env.DB.batch([updateStmt, txnStmt]);
+  const updateResult = await updateStmt.run();
   if (!updateResult.meta || updateResult.meta.changes === 0) {
     return jsonResponse({ error: errorCode }, 409);
   }
@@ -809,15 +792,7 @@ async function handlePetBuy(request, env, petId) {
     : env.DB.prepare(
         "UPDATE users SET capacity_hours = ?, last_claim_at = ? WHERE telegram_id = ?"
       ).bind(STORAGE_DEFAULT_CAPACITY_HOURS, nowIso, telegramId);
-  const txnStmt = env.DB.prepare(
-    "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'pet_purchase', ?, 'coins')"
-  ).bind(telegramId, -pet.price);
-  const stmts = [insertPetStmt, storageStmt, txnStmt];
-  if (preBuyAccrued > 0) {
-    stmts.push(env.DB.prepare(
-      "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'storage_auto_collect', ?, 'coins')"
-    ).bind(telegramId, preBuyAccrued));
-  }
+  const stmts = [insertPetStmt, storageStmt];
   try {
     await env.DB.batch(stmts);
   } catch (e) {
@@ -879,15 +854,7 @@ async function handlePetUpgrade(request, env, petId) {
   const resetStorageStmt = env.DB.prepare(
     "UPDATE users SET last_claim_at = ? WHERE telegram_id = ?"
   ).bind(nowIso, telegramId);
-  const txnStmt = env.DB.prepare(
-    "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'pet_upgrade', ?, 'coins')"
-  ).bind(telegramId, -upgradeCost);
-  const stmts = [updatePetStmt, resetStorageStmt, txnStmt];
-  if (preUpgradeAccrued > 0) {
-    stmts.push(env.DB.prepare(
-      "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'storage_auto_collect', ?, 'coins')"
-    ).bind(telegramId, preUpgradeAccrued));
-  }
+  const stmts = [updatePetStmt, resetStorageStmt];
   const [updatePetResult] = await env.DB.batch(stmts);
   if (!updatePetResult.meta || updatePetResult.meta.changes === 0) {
     await env.DB.prepare(
@@ -942,10 +909,7 @@ async function handleStorageClaim(request, env) {
   const creditStmt = env.DB.prepare(
     "UPDATE users SET coins = coins + ? WHERE telegram_id = ?"
   ).bind(accrued, telegramId);
-  const txnStmt = env.DB.prepare(
-    "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'storage_claim', ?, 'coins')"
-  ).bind(telegramId, accrued);
-  await env.DB.batch([creditStmt, txnStmt]);
+  await creditStmt.run();
   const updatedUser = await env.DB.prepare(
     "SELECT coins FROM users WHERE telegram_id = ?"
   ).bind(telegramId).first();
@@ -993,15 +957,7 @@ async function handleStorageUpgrade(request, env) {
     `UPDATE users SET capacity_hours = ?, last_claim_at = ?
      WHERE telegram_id = ? AND capacity_hours = ?`
   ).bind(newCapacityHours, nowIso, telegramId, currentCapacityHours);
-  const txnStmt = env.DB.prepare(
-    "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'storage_upgrade', ?, 'coins')"
-  ).bind(telegramId, -STORAGE_UPGRADE_COST_COINS);
-  const stmts = [updateStorageStmt, txnStmt];
-  if (preUpgradeAccrued > 0) {
-    stmts.push(env.DB.prepare(
-      "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'storage_auto_collect', ?, 'coins')"
-    ).bind(telegramId, preUpgradeAccrued));
-  }
+  const stmts = [updateStorageStmt];
   const [updateStorageResult] = await env.DB.batch(stmts);
   if (!updateStorageResult.meta || updateStorageResult.meta.changes === 0) {
     await env.DB.prepare(
@@ -1063,10 +1019,7 @@ async function handlePromoRedeem(request, env) {
   const creditStmt = env.DB.prepare(
     `UPDATE users SET ${column} = ${column} + ? WHERE telegram_id = ?`
   ).bind(promo.reward, telegramId);
-  const txnStmt = env.DB.prepare(
-    "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'promo_redeem', ?, ?)"
-  ).bind(telegramId, promo.reward, column);
-  await env.DB.batch([creditStmt, txnStmt]);
+  await creditStmt.run();
   const updatedUser = await env.DB.prepare(
     "SELECT coins, gram FROM users WHERE telegram_id = ?"
   ).bind(telegramId).first();
@@ -1104,9 +1057,6 @@ async function handleExchange(request, env) {
   if (!result.meta || result.meta.changes === 0) {
     return jsonResponse({ error: "insufficient_funds" }, 400);
   }
-  await env.DB.prepare(
-    "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'exchange', ?, 'coins')"
-  ).bind(telegramId, -amountCoins).run();
   const updatedUser = await env.DB.prepare(
     "SELECT coins, gram FROM users WHERE telegram_id = ?"
   ).bind(telegramId).first();
@@ -1261,10 +1211,7 @@ export class DepositChecker {
               ).bind(telegramId, txHash, amountGram, coinsCredited, memo, Date.now()),
               this.env.DB.prepare(
                 "UPDATE users SET coins = coins + ? WHERE telegram_id = ?"
-              ).bind(coinsCredited, telegramId),
-              this.env.DB.prepare(
-                "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'deposit', ?, 'coins')"
-              ).bind(telegramId, coinsCredited)
+              ).bind(coinsCredited, telegramId)
             ];
             if (referrerId) {
               depositBatch.push(
@@ -1353,12 +1300,9 @@ async function handleWithdrawRequest(request, env) {
        (telegram_id, raw_username, first_name, amount_gram, fee_gram, net_gram, address, status, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)`
   ).bind(telegramId, rawUsername, firstName, amountGram, feeGram, netGram, address, now);
-  const txnStmt = env.DB.prepare(
-    "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'withdraw_request', ?, 'gram')"
-  ).bind(telegramId, -amountGram);
   let batchResults;
   try {
-    batchResults = await env.DB.batch([reserveStmt, insertStmt, txnStmt]);
+    batchResults = await env.DB.batch([reserveStmt, insertStmt]);
   } catch (e) {
     console.error("withdraw request batch failed:", e?.message || e);
     return jsonResponse({ error: "server_error" }, 500);
@@ -1478,10 +1422,7 @@ async function handleAdsReward(url, env) {
     `UPDATE users SET coins = coins + ?, ads_task_count = ?, ads_task_date = ?, ads_task_total = ?
      WHERE telegram_id = ? AND (ads_task_date IS NULL OR ads_task_date <> ? OR ads_task_count = ?)`
   ).bind(ADS_TASK_REWARD_COINS, newCount, today, newTotal, telegramId, today, countToday);
-  const txnStmt = env.DB.prepare(
-    "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'ads_task', ?, 'coins')"
-  ).bind(telegramId, ADS_TASK_REWARD_COINS);
-  const [updateResult] = await env.DB.batch([updateStmt, txnStmt]);
+  const updateResult = await updateStmt.run();
   if (updateResult.meta && updateResult.meta.changes > 0 && row.referred_by && newTotal >= ACTIVE_FRIEND_ADS_THRESHOLD) {
     const activateResult = await env.DB.prepare(
       `UPDATE referrals SET is_active = 1, earned_coins = earned_coins + ?
@@ -1560,11 +1501,6 @@ async function handleClaimHappyDog(request, env) {
         "UPDATE users SET capacity_hours = ?, last_claim_at = ? WHERE telegram_id = ?"
       ).bind(STORAGE_DEFAULT_CAPACITY_HOURS, nowIso, telegramId);
   const stmts = [insertPetStmt, speedStmt, storageStmt];
-  if (preClaimAccrued > 0) {
-    stmts.push(env.DB.prepare(
-      "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'storage_auto_collect', ?, 'coins')"
-    ).bind(telegramId, preClaimAccrued));
-  }
   try {
     await env.DB.batch(stmts);
   } catch (e) {
@@ -1620,11 +1556,6 @@ async function handleClaimGuardian(request, env) {
         "UPDATE users SET capacity_hours = ?, last_claim_at = ? WHERE telegram_id = ?"
       ).bind(STORAGE_DEFAULT_CAPACITY_HOURS, nowIso, telegramId);
   const stmts = [insertPetStmt, speedStmt, storageStmt];
-  if (preClaimAccrued > 0) {
-    stmts.push(env.DB.prepare(
-      "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'storage_auto_collect', ?, 'coins')"
-    ).bind(telegramId, preClaimAccrued));
-  }
   try {
     await env.DB.batch(stmts);
   } catch (e) {
@@ -1685,11 +1616,6 @@ async function handleClaimAmbassador(request, env) {
     "DELETE FROM ambassador_grants WHERE telegram_id = ?"
   ).bind(telegramId);
   const stmts = [insertPetStmt, speedStmt, storageStmt, deleteGrantStmt];
-  if (preClaimAccrued > 0) {
-    stmts.push(env.DB.prepare(
-      "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'storage_auto_collect', ?, 'coins')"
-    ).bind(telegramId, preClaimAccrued));
-  }
   try {
     await env.DB.batch(stmts);
   } catch (e) {
@@ -1781,16 +1707,6 @@ async function handleAdminEditBalance(request, env) {
   const stmts = [
     env.DB.prepare("UPDATE users SET coins = ?, gram = ? WHERE telegram_id = ?").bind(newCoins, newGram, targetId)
   ];
-  if (coinsDelta !== 0) {
-    stmts.push(env.DB.prepare(
-      "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'admin_adjustment', ?, 'coins')"
-    ).bind(targetId, coinsDelta));
-  }
-  if (gramDelta !== 0) {
-    stmts.push(env.DB.prepare(
-      "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'admin_adjustment', ?, 'gram')"
-    ).bind(targetId, gramDelta));
-  }
   await env.DB.batch(stmts);
   return jsonResponse({ ok: true, coins: newCoins, gram: newGram });
 }
@@ -1987,11 +1903,6 @@ async function handleAdminAmbassadorGrant(request, env) {
   if (petRow.last_claim_at) {
     stmts.push(env.DB.prepare("UPDATE users SET last_claim_at = ? WHERE telegram_id = ?").bind(nowIso, targetId));
   }
-  if (preChangeAccrued > 0) {
-    stmts.push(env.DB.prepare(
-      "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'storage_auto_collect', ?, 'coins')"
-    ).bind(targetId, preChangeAccrued));
-  }
   await env.DB.batch(stmts);
   return jsonResponse({ ok: true, mode: "updated", speed });
 }
@@ -2033,11 +1944,6 @@ async function handleAdminAmbassadorRevoke(request, env) {
   ];
   if (petRow.last_claim_at) {
     stmts.push(env.DB.prepare("UPDATE users SET last_claim_at = ? WHERE telegram_id = ?").bind(nowIso, targetId));
-  }
-  if (preRevokeAccrued > 0) {
-    stmts.push(env.DB.prepare(
-      "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'storage_auto_collect', ?, 'coins')"
-    ).bind(targetId, preRevokeAccrued));
   }
   if (pendingGrant) {
     stmts.push(env.DB.prepare("DELETE FROM ambassador_grants WHERE telegram_id = ?").bind(targetId));
@@ -2127,9 +2033,6 @@ async function handleLeaderboardPayout(env) {
       const prize = LEADERBOARD_PRIZES[i] || 0;
       if (prize <= 0) return;
       stmts.push(env.DB.prepare("UPDATE users SET coins = coins + ? WHERE telegram_id = ?").bind(prize, r.telegram_id));
-      stmts.push(env.DB.prepare(
-        "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'leaderboard_reward', ?, 'coins')"
-      ).bind(r.telegram_id, prize));
     });
   };
   creditWinners(adsResult);
@@ -2171,10 +2074,7 @@ async function handleBonusAdReward(telegramId, env) {
        AND (bonus_ad_last_watched_at IS NULL OR bonus_ad_last_watched_at = ?)
        AND (bonus_ad_date IS NULL OR bonus_ad_date <> ? OR bonus_ad_count_today = ?)`
   ).bind(BONUS_AD_REWARD_COINS, newCount, today, now, telegramId, oldLastWatchedAt, today, countToday);
-  const txnStmt = env.DB.prepare(
-    "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'bonus_ad', ?, 'coins')"
-  ).bind(telegramId, BONUS_AD_REWARD_COINS);
-  await env.DB.batch([updateStmt, txnStmt]);
+  await updateStmt.run();
   return new Response("OK", { status: 200 });
 }
 
@@ -2208,10 +2108,7 @@ async function handleGigapubPostback(url, env) {
     `UPDATE users SET coins = coins + ?, gigapub_task_count = ?, gigapub_task_date = ?
      WHERE telegram_id = ? AND (gigapub_task_date IS NULL OR gigapub_task_date <> ? OR gigapub_task_count = ?)`
   ).bind(GIGAPUB_REWARD_COINS, newCount, today, telegramId, today, countToday);
-  const txnStmt = env.DB.prepare(
-    "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'gigapub_ad', ?, 'coins')"
-  ).bind(telegramId, GIGAPUB_REWARD_COINS);
-  await env.DB.batch([updateStmt, txnStmt]);
+  await updateStmt.run();
   await bumpLifetimeAdsWatched(env, telegramId);
   return new Response("OK", { status: 200 });
 }
@@ -2235,10 +2132,7 @@ async function handleMonetixReward(request, env) {
     `UPDATE users SET coins = coins + ?, monetix_task_count = ?, monetix_task_date = ?
      WHERE telegram_id = ? AND (monetix_task_date IS NULL OR monetix_task_date <> ? OR monetix_task_count = ?)`
   ).bind(MONETIX_REWARD_COINS, newCount, today, telegramId, today, countToday);
-  const txnStmt = env.DB.prepare(
-    "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'monetix_ad', ?, 'coins')"
-  ).bind(telegramId, MONETIX_REWARD_COINS);
-  const [updateResult] = await env.DB.batch([updateStmt, txnStmt]);
+  const updateResult = await updateStmt.run();
   if (!updateResult.meta || updateResult.meta.changes === 0) {
     return jsonResponse({ error: "daily_limit_reached", watched_today: countToday, daily_limit: MONETIX_DAILY_LIMIT }, 409);
   }
@@ -2455,10 +2349,7 @@ async function handleCheckinClaim(request, env) {
     `UPDATE users SET coins = coins + ?, ${column} = ?
      WHERE telegram_id = ? AND (${column} IS NULL OR ${column} <> ?)`
   ).bind(reward, today, telegramId, today);
-  const txnStmt = env.DB.prepare(
-    "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, ?, ?, 'coins')"
-  ).bind(telegramId, `checkin_task_${task}`, reward);
-  const [result] = await env.DB.batch([updateStmt, txnStmt]);
+  const result = await updateStmt.run();
   if (!result.meta || result.meta.changes === 0) {
     return jsonResponse({ error: "already_claimed_today" }, 409);
   }
@@ -2559,12 +2450,7 @@ async function handleTasksClaim(request, env) {
     ).bind(telegramId, taskId).run();
     return jsonResponse({ error: "task_full" }, 400);
   }
-  await env.DB.batch([
-    env.DB.prepare("UPDATE users SET coins = coins + ? WHERE telegram_id = ?").bind(task.reward_coins, telegramId),
-    env.DB.prepare(
-      "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'admin_task', ?, 'coins')"
-    ).bind(telegramId, task.reward_coins)
-  ]);
+  await env.DB.prepare("UPDATE users SET coins = coins + ? WHERE telegram_id = ?").bind(task.reward_coins, telegramId).run();
   const user = await env.DB.prepare("SELECT coins FROM users WHERE telegram_id = ?").bind(telegramId).first();
   return jsonResponse({ reward: task.reward_coins, coins: user.coins });
 }
@@ -2634,27 +2520,30 @@ async function handleComboCheck(request, env) {
   if (!combo) {
     return jsonResponse({ error: "combo_not_ready" }, 409);
   }
-  await env.DB.prepare(
-    "INSERT OR IGNORE INTO combo_attempts (telegram_id, date, attempts_used, solved) VALUES (?, ?, 0, 0)"
-  ).bind(telegramId, today).run();
-  const attemptRow = await env.DB.prepare(
-    "SELECT attempts_used, solved FROM combo_attempts WHERE telegram_id = ? AND date = ?"
-  ).bind(telegramId, today).first();
-  if (attemptRow.solved) {
+  const comboRow = await env.DB.prepare(
+    "SELECT combo_date, combo_attempts_used, combo_solved FROM users WHERE telegram_id = ?"
+  ).bind(telegramId).first();
+  if (!comboRow) return jsonResponse({ error: "user_not_found" }, 404);
+  const isToday = comboRow.combo_date === today;
+  const attemptsUsed = isToday ? (comboRow.combo_attempts_used || 0) : 0;
+  if (isToday && comboRow.combo_solved) {
     return jsonResponse({ error: "already_solved" }, 409);
   }
-  if (attemptRow.attempts_used >= COMBO_MAX_ATTEMPTS) {
+  if (attemptsUsed >= COMBO_MAX_ATTEMPTS) {
     return jsonResponse({ error: "no_attempts_left" }, 409);
   }
   const isCorrect = guess.join(",") === combo.card_order;
   const claimResult = await env.DB.prepare(
-    `UPDATE combo_attempts SET attempts_used = attempts_used + 1, solved = ?
-     WHERE telegram_id = ? AND date = ? AND solved = 0 AND attempts_used < ?`
-  ).bind(isCorrect ? 1 : 0, telegramId, today, COMBO_MAX_ATTEMPTS).run();
+    `UPDATE users SET combo_date = ?, combo_attempts_used = ?, combo_solved = ?, coins = coins + ?
+     WHERE telegram_id = ? AND combo_date IS ? AND combo_attempts_used IS ? AND combo_solved IS ?`
+  ).bind(
+    today, attemptsUsed + 1, isCorrect ? 1 : 0, isCorrect ? COMBO_REWARD_COINS : 0,
+    telegramId, comboRow.combo_date, comboRow.combo_attempts_used, comboRow.combo_solved
+  ).run();
   if (!claimResult.meta || claimResult.meta.changes === 0) {
     return jsonResponse({ error: "no_attempts_left" }, 409);
   }
-  const newAttemptsUsed = attemptRow.attempts_used + 1;
+  const newAttemptsUsed = attemptsUsed + 1;
   if (!isCorrect) {
     return jsonResponse({
       correct: false,
@@ -2662,13 +2551,6 @@ async function handleComboCheck(request, env) {
       attempts_left: COMBO_MAX_ATTEMPTS - newAttemptsUsed
     });
   }
-  const rewardStmt = env.DB.prepare(
-    "UPDATE users SET coins = coins + ? WHERE telegram_id = ?"
-  ).bind(COMBO_REWARD_COINS, telegramId);
-  const txnStmt = env.DB.prepare(
-    "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'daily_combo', ?, 'coins')"
-  ).bind(telegramId, COMBO_REWARD_COINS);
-  await env.DB.batch([rewardStmt, txnStmt]);
   const user = await env.DB.prepare(
     "SELECT coins FROM users WHERE telegram_id = ?"
   ).bind(telegramId).first();
@@ -2994,13 +2876,8 @@ async function handleWithdrawCallback(cbq, env) {
       "SELECT * FROM withdrawals WHERE id = ?"
     ).bind(withdrawalId).first();
     if (newStatus === "rejected") {
-      await env.DB.batch([
-        env.DB.prepare("UPDATE users SET gram = gram + ? WHERE telegram_id = ?")
-          .bind(w.amount_gram, w.telegram_id),
-        env.DB.prepare(
-          "INSERT INTO transactions (telegram_id, type, amount, currency) VALUES (?, 'withdraw_refund', ?, 'gram')"
-        ).bind(w.telegram_id, w.amount_gram)
-      ]);
+      await env.DB.prepare("UPDATE users SET gram = gram + ? WHERE telegram_id = ?")
+        .bind(w.amount_gram, w.telegram_id).run();
     }
     const textArgs = {
       telegramId: w.telegram_id,
