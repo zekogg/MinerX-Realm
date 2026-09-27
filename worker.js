@@ -340,9 +340,6 @@ async function routeRequest(request, env, url) {
     if (url.pathname === "/api/checkin/claim" && request.method === "POST") {
       return handleCheckinClaim(request, env);
     }
-    if (url.pathname === "/api/checkin/verify" && request.method === "POST") {
-      return handleCheckinVerify(request, env);
-    }
     if (url.pathname === "/api/tasks/list" && request.method === "POST") {
       return handleTasksList(request, env);
     }
@@ -406,13 +403,7 @@ async function routeRequest(request, env, url) {
     if (url.pathname === "/api/leaderboard" && request.method === "POST") {
       return handleLeaderboard(request, env);
     }
-    const assetResponse = await env.ASSETS.fetch(request);
-    if (url.pathname === "/" || url.pathname === "/index.html") {
-      const noCacheResponse = new Response(assetResponse.body, assetResponse);
-      noCacheResponse.headers.set("Cache-Control", "no-store, must-revalidate");
-      return noCacheResponse;
-    }
-    return assetResponse;
+    return env.ASSETS.fetch(request);
 }
 
 // /api/user
@@ -566,14 +557,14 @@ async function handleMineStart(request, env) {
     "SELECT mining_started_at, mining_cycles_today, mining_cycle_date FROM users WHERE telegram_id = ?"
   ).bind(telegramId).first();
   if (!row) return jsonResponse({ error: "user_not_found" }, 404);
-  if (row.mining_started_at) {
+  const today = todayUTC();
+  if (row.mining_started_at && row.mining_cycle_date === today) {
     return jsonResponse({
       error: "already_mining",
       mining_started_at: row.mining_started_at,
       cycle_duration_seconds: MINING_CYCLE_SECONDS
     }, 409);
   }
-  const today = todayUTC();
   const cyclesToday = row.mining_cycle_date === today ? (row.mining_cycles_today || 0) : 0;
   if (cyclesToday >= MINING_DAILY_LIMIT) {
     return jsonResponse({
@@ -585,8 +576,8 @@ async function handleMineStart(request, env) {
   const nowIso = new Date().toISOString();
   const result = await env.DB.prepare(
     `UPDATE users SET mining_started_at = ?, mining_cycle_date = ?, mining_cycles_today = ?
-     WHERE telegram_id = ? AND mining_started_at IS NULL`
-  ).bind(nowIso, today, cyclesToday, telegramId).run();
+     WHERE telegram_id = ? AND mining_started_at IS ?`
+  ).bind(nowIso, today, cyclesToday, telegramId, row.mining_started_at || null).run();
   if (!result.meta || result.meta.changes === 0) {
     return jsonResponse({ error: "already_mining" }, 409);
   }
@@ -610,6 +601,10 @@ async function handleMineClaim(request, env) {
   if (!row.mining_started_at) {
     return jsonResponse({ error: "not_mining" }, 400);
   }
+  const today = todayUTC();
+  if (row.mining_cycle_date !== today) {
+    return jsonResponse({ error: "cycle_expired", cycles_today: 0, cycles_max: MINING_DAILY_LIMIT }, 409);
+  }
   const startedAtMs = Date.parse(row.mining_started_at);
   const elapsedSeconds = (Date.now() - startedAtMs) / 1000;
   if (elapsedSeconds < MINING_CYCLE_SECONDS) {
@@ -618,16 +613,16 @@ async function handleMineClaim(request, env) {
       remaining_seconds: Math.ceil(MINING_CYCLE_SECONDS - elapsedSeconds)
     }, 400);
   }
-  const today = todayUTC();
-  const cyclesToday = row.mining_cycle_date === today ? (row.mining_cycles_today || 0) : 0;
+  const cyclesToday = row.mining_cycles_today || 0;
   if (cyclesToday >= MINING_DAILY_LIMIT) {
     return jsonResponse({ error: "daily_limit_reached", cycles_today: cyclesToday, cycles_max: MINING_DAILY_LIMIT }, 429);
   }
   const newCyclesToday = cyclesToday + 1;
+  const nextStartedAt = newCyclesToday < MINING_DAILY_LIMIT ? new Date().toISOString() : null;
   const updateStmt = env.DB.prepare(
-    `UPDATE users SET coins = coins + ?, total_mined = total_mined + ?, mining_started_at = NULL, mining_cycles_today = ?, mining_cycle_date = ?
+    `UPDATE users SET coins = coins + ?, total_mined = total_mined + ?, mining_started_at = ?, mining_cycles_today = ?, mining_cycle_date = ?
      WHERE telegram_id = ? AND mining_started_at = ?`
-  ).bind(MINING_REWARD_COINS, MINING_REWARD_COINS, newCyclesToday, today, telegramId, row.mining_started_at);
+  ).bind(MINING_REWARD_COINS, MINING_REWARD_COINS, nextStartedAt, newCyclesToday, today, telegramId, row.mining_started_at);
   const updateResult = await updateStmt.run();
   if (!updateResult.meta || updateResult.meta.changes === 0) {
     return jsonResponse({ error: "already_claimed" }, 409);
@@ -636,6 +631,8 @@ async function handleMineClaim(request, env) {
     reward: MINING_REWARD_COINS,
     coins: row.coins + MINING_REWARD_COINS,
     total_mined: (row.total_mined || 0) + MINING_REWARD_COINS,
+    mining_started_at: nextStartedAt,
+    cycle_duration_seconds: MINING_CYCLE_SECONDS,
     cycles_today: newCyclesToday,
     cycles_max: MINING_DAILY_LIMIT
   });
@@ -2357,27 +2354,6 @@ async function handleCheckinClaim(request, env) {
   return jsonResponse({ reward, coins: user.coins });
 }
 
-// /api/checkin/verify
-async function handleCheckinVerify(request, env) {
-  let body;
-  try {
-    body = await request.json();
-  } catch (e) {
-    return jsonResponse({ error: "invalid_body" }, 400);
-  }
-  const auth = await authenticateRequest(request, env, body);
-  if (!auth.ok) return auth.response;
-  const { telegramId } = auth;
-  const task = Number(body.task);
-  if (task !== 3 && task !== 4) {
-    return jsonResponse({ error: "invalid_task" }, 400);
-  }
-  const verified = task === 3
-    ? verifyNameContainsBotMention(auth)
-    : await verifyBioContainsReferralLink(env, telegramId);
-  return jsonResponse({ verified });
-}
-
 // /api/tasks/list
 async function handleTasksList(request, env) {
   let body;
@@ -2673,9 +2649,11 @@ function formatDateDDMMYYYY(ms) {
 // User view
 function withMiningView(user) {
   const today = todayUTC();
-  const cyclesToday = user.mining_cycle_date === today ? (user.mining_cycles_today || 0) : 0;
+  const isToday = user.mining_cycle_date === today;
+  const cyclesToday = isToday ? (user.mining_cycles_today || 0) : 0;
   return {
     ...user,
+    mining_started_at: isToday ? user.mining_started_at : null,
     mining_cycles_today: cyclesToday,
     mining_cycles_max: MINING_DAILY_LIMIT,
     mining_cycle_duration_seconds: MINING_CYCLE_SECONDS
