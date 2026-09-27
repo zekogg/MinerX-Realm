@@ -4340,9 +4340,9 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 L3 14h7l-1 8 10-12h-7z"/></svg>
             <span>Animation</span>
           </button>
-          <button class="pf-toggle-btn" onclick="this.classList.toggle('is-off')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M19 5a12 12 0 0 1 0 14M15.5 8.5a7 7 0 0 1 0 7"/></svg>
-            <span>Sound</span>
+          <button class="pf-toggle-btn" onclick="copyTelegramId(this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            <span>Copy ID</span>
           </button>
           <button class="pf-toggle-btn" onclick="openSupportChat()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3ZM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3Z"/></svg>
@@ -6712,6 +6712,48 @@ function openSupportChat(){
     tg.openTelegramLink(url);
   } else {
     window.open(url, '_blank');
+  }
+}
+
+// زر Copy ID بنافذة Profile — ينسخ معرّف تيليجرام مباشرة من initDataUnsafe (لا حاجة لانتظار جلب أي بيانات من السيرفر)، ويعرض "Copied!" مؤقتاً داخل نفس الزر بدل نافذة/توست منفصل.
+function copyTelegramIdFallback(text, onDone){
+  try{
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    if (onDone) onDone();
+  }catch(e){ /* لا يوجد أي دعم للنسخ إطلاقاً — نتجاهل بصمت بدل رمي خطأ للمستخدم */ }
+}
+
+function copyTelegramId(btn){
+  var id = null;
+  try{
+    if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user){
+      id = window.Telegram.WebApp.initDataUnsafe.user.id;
+    }
+  }catch(e){}
+  if (!id) return;
+
+  var span = btn.querySelector('span');
+  var originalText = span ? span.textContent : 'Copy ID';
+  var showCopied = function(){
+    if (!span) return;
+    span.textContent = 'Copied!';
+    setTimeout(function(){ span.textContent = originalText; }, 2000);
+  };
+
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(String(id)).then(showCopied).catch(function(){
+      copyTelegramIdFallback(String(id), showCopied);
+    });
+  } else {
+    copyTelegramIdFallback(String(id), showCopied);
   }
 }
 
