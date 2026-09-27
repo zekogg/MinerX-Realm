@@ -3775,13 +3775,13 @@ body.reduce-motion .firefly{
             <div class="pet-info-card__row">
               <div class="pet-card__rate">
                 <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:18px;height:18px;flex-shrink:0;vertical-align:middle;">
-                <span id="duck-rate-text">+114/hr</span>
+                <span id="duck-rate-text">+77/hr</span>
               </div>
               <span class="pet-info-card__divider"></span>
               <div class="pet-card__price" id="pet-card-price" onclick="togglePriceTooltip('price-tooltip')">
                 <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:19px;height:19px;flex-shrink:0;vertical-align:middle;">
-                <span>300K</span>
-                <span class="price-tooltip" id="price-tooltip">300,000 Coins</span>
+                <span>200K</span>
+                <span class="price-tooltip" id="price-tooltip">200,000 Coins</span>
               </div>
             </div>
             <div class="pet-info-card__actions">
@@ -4316,12 +4316,12 @@ body.reduce-motion .firefly{
       <div class="upgrade-speed-row">
         <div class="upgrade-speed-box">
           <span class="upgrade-speed-box__label">Current Speed</span>
-          <span class="upgrade-speed-box__val" id="pet-upgrade-speed-current">114/hr</span>
+          <span class="upgrade-speed-box__val" id="pet-upgrade-speed-current">77/hr</span>
         </div>
         <svg class="upgrade-speed-arrow" viewBox="0 0 24 24" fill="none" stroke="#f0d878" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
         <div class="upgrade-speed-box upgrade-speed-box--new">
           <span class="upgrade-speed-box__label">New Speed</span>
-          <span class="upgrade-speed-box__val" id="pet-upgrade-speed-new">125/hr</span>
+          <span class="upgrade-speed-box__val" id="pet-upgrade-speed-new">85/hr</span>
         </div>
       </div>
       <div class="upgrade-boost-badge">+10% Mining Speed</div>
@@ -4329,7 +4329,7 @@ body.reduce-motion .firefly{
         <span class="upgrade-cost-row__label">Upgrade Cost</span>
         <span class="upgrade-cost-row__val">
           <img draggable="false" loading="lazy" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:16px;height:16px;flex-shrink:0;vertical-align:middle;">
-          <span id="pet-upgrade-cost">30K Coins</span>
+          <span id="pet-upgrade-cost">20K Coins</span>
         </span>
       </div>
       <button class="upgrade-confirm-btn" id="pet-upgrade-confirm-btn" onclick="onPetUpgradeConfirm()">Confirm Upgrade</button>
@@ -4459,7 +4459,7 @@ body.reduce-motion .firefly{
           </div>
           <table class="pg-table">
             <tr><th>Pet</th><th>Price</th><th>Speed (Lv.1)</th></tr>
-            <tr><td>Duck</td><td class="is-gold">300K</td><td>114 /hr</td></tr>
+            <tr><td>Duck</td><td class="is-gold">200K</td><td>77 /hr</td></tr>
             <tr><td>Polar Bear</td><td class="is-gold">500K</td><td>191 /hr</td></tr>
             <tr><td>Scorpion</td><td class="is-gold">1M</td><td>379 /hr</td></tr>
             <tr><td>Penguin</td><td class="is-gold">5M</td><td>1,894 /hr</td></tr>
@@ -5579,7 +5579,7 @@ function runGiftClaimRequest(initData, selectedBox){
 var PET_MAX_LEVEL = 100;
 var PET_UPGRADE_COST_RATIO = 0.10;
 var PET_DEFS = [
-  { id: 'duck',         basespeed: 114,   price: 300000,   name: 'The Duck',       lvId: 'duck-lv-badge',         rateId: 'duck-rate-text',         buyBtnId: 'pet-card-btn',         upgradeBtnId: 'duck-upgrade-btn' },
+  { id: 'duck',         basespeed: 77,    price: 200000,   name: 'The Duck',       lvId: 'duck-lv-badge',         rateId: 'duck-rate-text',         buyBtnId: 'pet-card-btn',         upgradeBtnId: 'duck-upgrade-btn' },
   { id: 'polar_bear',   basespeed: 191,   price: 500000,   name: 'The Polar Bear', lvId: 'bear-lv-badge',         rateId: 'bear-rate-text',         buyBtnId: 'bear-buy-btn',         upgradeBtnId: 'bear-upgrade-btn' },
   { id: 'scorpion',     basespeed: 379,   price: 1000000,  name: 'The Scorpion',   lvId: 'scorpion-lv-badge',     rateId: 'scorpion-rate-text',     buyBtnId: 'scorpion-buy-btn',     upgradeBtnId: 'scorpion-upgrade-btn' },
   { id: 'penguin',      basespeed: 1894,  price: 5000000,  name: 'The Penguin',    lvId: 'penguin-lv-badge',      rateId: 'penguin-rate-text',      buyBtnId: 'penguin-buy-btn',      upgradeBtnId: 'penguin-upgrade-btn' },
@@ -8587,7 +8587,7 @@ function runPromoRedeemRequest(initData, code, input){
 // Deposit
 var DEPOSIT_ADDRESS = '';
 var DEPOSIT_MEMO = '';
-var DEPOSIT_MIN_GRAM = 3;
+var DEPOSIT_MIN_GRAM = 2;
 var depositPollTimer = null;
 var depositCheckBusy = false;
 function openDepositModal(){
