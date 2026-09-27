@@ -150,7 +150,7 @@ button:active{ transform:scale(.97); }
 button.is-claimed{ opacity:.5; }
 ul{ list-style:none; }
 img,svg{ display:block; }
-img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
+img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; pointer-events:none; }
 @media (prefers-reduced-motion: reduce){
   *{ animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; }
 }
@@ -5966,9 +5966,6 @@ fetchUserData();
       Telegram.WebApp.expand();
     }
   }catch(e){   }
-  document.addEventListener('contextmenu', function(e){
-    if (e.target && e.target.tagName === 'IMG') e.preventDefault();
-  });
   var navButtons = document.querySelectorAll('.nav [data-page]');
   var pages = document.querySelectorAll('.page');
   function goTo(pageId){
