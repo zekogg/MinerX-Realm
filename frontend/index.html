@@ -3124,6 +3124,14 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .pf-toggle-btn span{ font-size:8.5px; font-weight:700; }
 .pf-toggle-btn.is-off{ opacity:.4; background:rgba(255,255,255,.04); border-color:var(--stone-border-2); color:var(--ink-faint); }
 
+/* -- زر Animation بنافذة Profile: يوقف فقط الحلقات الزخرفية المستمرة (تعمل دائماً بلا توقف حتى بدون أي تفاعل) لتخفيف الحمل على الأجهزة القديمة. الأنميشنات القصيرة اللحظية (سبينر الأزرار، الاهتزاز، التحويلات اللمسية) تبقى فعّالة لأنها ليست العبء الحقيقي. الكونفيتي (canvas) يُوقَف من JS مباشرة في triggerConfetti(). -- */
+body.reduce-motion .char-slot__outer-ring,
+body.reduce-motion .char-slot__ring,
+body.reduce-motion .realm-label--shine span,
+body.reduce-motion .firefly{
+  animation:none !important;
+}
+
 .pf-lang-selector{
   flex:1; display:flex; flex-direction:row; align-items:center; justify-content:center; gap:5px;
   padding:10px 4px; border-radius:14px;
@@ -4346,7 +4354,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
         <div class="pf-divider"></div>
 
         <div class="pf-toggles">
-          <button class="pf-toggle-btn" onclick="this.classList.toggle('is-off')">
+          <button class="pf-toggle-btn" id="pf-animation-toggle-btn" onclick="toggleAnimationsPref()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 L3 14h7l-1 8 10-12h-7z"/></svg>
             <span>Animation</span>
           </button>
@@ -4964,6 +4972,23 @@ var domCache = {
   domCache.monetixCounter = document.getElementById('monetix-task-counter');
   domCache.monetixAvail = document.getElementById('monetix-task-avail');
 })();
+
+/* /////زر Animation بنافذة Profile: تفضيل عرض بصري بحت (لا علاقة له بأي بيانات اقتصادية)، يُحفظ محلياً على جهاز المستخدم فقط عبر localStorage بلا أي حاجة لعمود D1 أو مزامنة سيرفر. الافتراضي (عند غياب أي تفضيل محفوظ) هو "مفعّل" حفاظاً على نفس الشكل الحالي لكل من لم يضغط الزر بعد///// */
+var ANIMATIONS_PREF_KEY = 'mx_animations_enabled';
+function areAnimationsEnabled(){
+  try{ return localStorage.getItem(ANIMATIONS_PREF_KEY) !== '0'; }catch(e){ return true; }
+}
+function applyAnimationsPref(enabled){
+  document.body.classList.toggle('reduce-motion', !enabled);
+  var btn = document.getElementById('pf-animation-toggle-btn');
+  if (btn) btn.classList.toggle('is-off', !enabled);
+}
+function toggleAnimationsPref(){
+  var next = !areAnimationsEnabled();
+  try{ localStorage.setItem(ANIMATIONS_PREF_KEY, next ? '1' : '0'); }catch(e){}
+  applyAnimationsPref(next);
+}
+applyAnimationsPref(areAnimationsEnabled());
 
 /* /////كود وضع الصيانة — فقط الأدمن (معرّف تيليجرام أدناه) يستطيع الدخول أثناء الصيانة///// */
 var MAINTENANCE_MODE = false;   // غيّرها إلى true لتفعيل وضع الصيانة لكل المستخدمين عدا الأدمن
@@ -5619,7 +5644,7 @@ function confettiStep(){
 
 // دالة واحدة تُستدعى من أي مكان في الكود عند نجاح أي مكافأة/إجراء — تساقط خفيف من الأعلى على كامل الشاشة لمدة ~2 ثانية ثم يختفي تلقائياً.
 function triggerConfetti(){
-  if (!confettiCtx) return;
+  if (!confettiCtx || !areAnimationsEnabled()) return;
   var w = window.innerWidth;
   for (var i = 0; i < 46; i++){
     confettiParticles.push({
