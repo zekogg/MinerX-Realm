@@ -546,15 +546,12 @@ img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; poi
 .pet-trigger__icon{ width:43.66px; height:43.66px; }
 .prizes-trigger__banner, .pet-trigger__banner{
   padding:1.62px 6.46px; border-radius:999px;
-  background:linear-gradient(135deg, rgba(36,26,12,.8), rgba(18,12,6,.88));
-  border:1px solid rgba(227,165,66,.55);
+  background:rgba(28,22,46,.55);
+  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  border:1px solid var(--stone-border-2);
   font-family:var(--font-display); font-size:6.06px; font-weight:800; letter-spacing:.26px; text-transform:uppercase;
-  white-space:nowrap;
-  text-shadow:0 0 6px rgba(227,165,66,.5);
-  box-shadow:0 0 10px rgba(227,165,66,.28), inset 0 1px 0 rgba(255,255,255,.08);
+  white-space:nowrap; color:var(--ink-dim);
 }
-.prizes-trigger__banner{ color:#e3a542; }
-.pet-trigger__banner{ color:#ffe9b8; }
 .earn-rate{
   font-family:var(--font-display);
   font-size:20px;
