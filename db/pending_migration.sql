@@ -216,3 +216,8 @@ UPDATE users SET
 WHERE telegram_id IN (SELECT telegram_id FROM combo_attempts);
 DROP TABLE combo_attempts;
 DROP TABLE transactions;
+
+-- =====================================================================
+-- قيمة شارة The Ambassador (Value ??$). يبقى صف ambassador_grants بعد الاستلام ليحفظ القيمة.
+-- =====================================================================
+ALTER TABLE ambassador_grants ADD COLUMN value_usd REAL;
