@@ -7437,6 +7437,7 @@ function renderCheckinButton(task){
     btn.classList.remove('is-ready');
     return;
   }
+  if (checkinCountdownTimers[task]) return;
   if (checkinState.ready[task]){
     btn.textContent = 'Claim';
     btn.classList.add('is-ready');
@@ -7454,6 +7455,7 @@ function startCheckinCountdown(task){
     remaining--;
     if (remaining <= 0){
       clearInterval(checkinCountdownTimers[task]);
+      checkinCountdownTimers[task] = null;
       checkinState.ready[task] = true;
       renderCheckinButton(task);
       return;
