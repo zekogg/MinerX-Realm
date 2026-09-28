@@ -513,7 +513,7 @@ async function handleRealmStatus(request, env) {
       "SELECT pet_id, level, current_speed, daily_boost_days FROM user_pets WHERE telegram_id = ?"
     ).bind(telegramId).all(),
     env.DB.prepare(
-      "SELECT 1 FROM ambassador_grants WHERE telegram_id = ?"
+      "SELECT value_usd FROM ambassador_grants WHERE telegram_id = ?"
     ).bind(telegramId).first()
   ]);
   if (!row) return jsonResponse({ error: "user_not_found" }, 404);
@@ -532,7 +532,8 @@ async function handleRealmStatus(request, env) {
     happy_dog_claimed: !!pets.happy_dog,
     guardian_claimed: !!pets.guardian,
     ambassador_claimed: !!pets.ambassador,
-    ambassador_available: !!ambassadorGrant,
+    ambassador_available: !!ambassadorGrant && !pets.ambassador,
+    ambassador_value: pets.ambassador && ambassadorGrant ? ambassadorGrant.value_usd : null,
     happy_dog_friends_threshold: HAPPY_DOG_FRIENDS_THRESHOLD,
     guardian_ads_threshold: GUARDIAN_ADS_THRESHOLD,
     lifetime_ads_watched: row.lifetime_ads_watched || 0,
@@ -1583,7 +1584,7 @@ async function handleClaimAmbassador(request, env) {
   ).bind(telegramId).first();
   if (existing) return jsonResponse({ error: "already_claimed" }, 409);
   const grantRow = await env.DB.prepare(
-    "SELECT speed FROM ambassador_grants WHERE telegram_id = ?"
+    "SELECT speed, value_usd FROM ambassador_grants WHERE telegram_id = ?"
   ).bind(telegramId).first();
   if (!grantRow) return jsonResponse({ error: "not_eligible" }, 403);
   const ambassadorSpeed = grantRow.speed;
@@ -1611,10 +1612,7 @@ async function handleClaimAmbassador(request, env) {
     : env.DB.prepare(
         "UPDATE users SET capacity_hours = ?, last_claim_at = ? WHERE telegram_id = ?"
       ).bind(STORAGE_DEFAULT_CAPACITY_HOURS, nowIso, telegramId);
-  const deleteGrantStmt = env.DB.prepare(
-    "DELETE FROM ambassador_grants WHERE telegram_id = ?"
-  ).bind(telegramId);
-  const stmts = [insertPetStmt, speedStmt, storageStmt, deleteGrantStmt];
+  const stmts = [insertPetStmt, speedStmt, storageStmt];
   try {
     await env.DB.batch(stmts);
   } catch (e) {
@@ -1627,6 +1625,7 @@ async function handleClaimAmbassador(request, env) {
     pet_id: "ambassador",
     level: 1,
     speed: ambassadorSpeed,
+    value: grantRow.value_usd,
     total_speed: updatedUser.total_speed,
     coins: updatedUser.coins,
     storage_credited: preClaimAccrued
@@ -1871,8 +1870,15 @@ async function handleAdminAmbassadorGrant(request, env) {
   if (!auth.ok) return auth.response;
   const targetId = parseInt(body.target_id, 10);
   const speed = parseInt(body.speed, 10);
+  const valueGiven = body.value !== undefined && body.value !== null && String(body.value).trim() !== "";
+  const value = valueGiven ? Number(body.value) : null;
   if (!Number.isInteger(targetId)) return jsonResponse({ error: "invalid_target_id" }, 400);
   if (!Number.isInteger(speed) || speed <= 0) return jsonResponse({ error: "invalid_speed" }, 400);
+  if (valueGiven && (!Number.isFinite(value) || value < 0)) return jsonResponse({ error: "invalid_value" }, 400);
+  const upsertGrantStmt = env.DB.prepare(
+    `INSERT INTO ambassador_grants (telegram_id, speed, granted_at, value_usd) VALUES (?, ?, ?, ?)
+     ON CONFLICT(telegram_id) DO UPDATE SET speed = excluded.speed, value_usd = COALESCE(excluded.value_usd, ambassador_grants.value_usd)`
+  ).bind(targetId, speed, Date.now(), value);
   const petRow = await env.DB.prepare(
     `SELECT p.current_speed, u.total_speed, u.capacity_hours, u.last_claim_at
      FROM user_pets p
@@ -1882,10 +1888,12 @@ async function handleAdminAmbassadorGrant(request, env) {
   if (!petRow) {
     const userExists = await env.DB.prepare("SELECT 1 FROM users WHERE telegram_id = ?").bind(targetId).first();
     if (!userExists) return jsonResponse({ error: "user_not_found" }, 404);
-    await env.DB.prepare(
-      "INSERT INTO ambassador_grants (telegram_id, speed, granted_at) VALUES (?, ?, ?) ON CONFLICT(telegram_id) DO UPDATE SET speed = excluded.speed"
-    ).bind(targetId, speed, Date.now()).run();
+    await upsertGrantStmt.run();
     return jsonResponse({ ok: true, mode: "pending", speed });
+  }
+  if (speed === petRow.current_speed) {
+    await upsertGrantStmt.run();
+    return jsonResponse({ ok: true, mode: "updated", speed });
   }
   const speedDelta = speed - petRow.current_speed;
   const capacitySeconds = (petRow.capacity_hours || STORAGE_DEFAULT_CAPACITY_HOURS) * 3600;
@@ -1897,7 +1905,8 @@ async function handleAdminAmbassadorGrant(request, env) {
   const nowIso = new Date().toISOString();
   const stmts = [
     env.DB.prepare("UPDATE user_pets SET current_speed = ? WHERE telegram_id = ? AND pet_id = 'ambassador'").bind(speed, targetId),
-    env.DB.prepare("UPDATE users SET total_speed = total_speed + ?, coins = coins + ? WHERE telegram_id = ?").bind(speedDelta, preChangeAccrued, targetId)
+    env.DB.prepare("UPDATE users SET total_speed = total_speed + ?, coins = coins + ? WHERE telegram_id = ?").bind(speedDelta, preChangeAccrued, targetId),
+    upsertGrantStmt
   ];
   if (petRow.last_claim_at) {
     stmts.push(env.DB.prepare("UPDATE users SET last_claim_at = ? WHERE telegram_id = ?").bind(nowIso, targetId));
@@ -1918,14 +1927,14 @@ async function handleAdminAmbassadorRevoke(request, env) {
   if (!auth.ok) return auth.response;
   const targetId = parseInt(body.target_id, 10);
   if (!Number.isInteger(targetId)) return jsonResponse({ error: "invalid_target_id" }, 400);
-  const pendingGrant = await env.DB.prepare("SELECT 1 FROM ambassador_grants WHERE telegram_id = ?").bind(targetId).first();
+  const grantRow = await env.DB.prepare("SELECT 1 FROM ambassador_grants WHERE telegram_id = ?").bind(targetId).first();
   const petRow = await env.DB.prepare(
     `SELECT p.current_speed, u.total_speed, u.capacity_hours, u.last_claim_at
      FROM user_pets p
      JOIN users u ON u.telegram_id = p.telegram_id
      WHERE p.telegram_id = ? AND p.pet_id = 'ambassador'`
   ).bind(targetId).first();
-  if (!pendingGrant && !petRow) return jsonResponse({ error: "not_found" }, 404);
+  if (!grantRow && !petRow) return jsonResponse({ error: "not_found" }, 404);
   if (!petRow) {
     await env.DB.prepare("DELETE FROM ambassador_grants WHERE telegram_id = ?").bind(targetId).run();
     return jsonResponse({ ok: true, mode: "pending_removed" });
@@ -1944,7 +1953,7 @@ async function handleAdminAmbassadorRevoke(request, env) {
   if (petRow.last_claim_at) {
     stmts.push(env.DB.prepare("UPDATE users SET last_claim_at = ? WHERE telegram_id = ?").bind(nowIso, targetId));
   }
-  if (pendingGrant) {
+  if (grantRow) {
     stmts.push(env.DB.prepare("DELETE FROM ambassador_grants WHERE telegram_id = ?").bind(targetId));
   }
   await env.DB.batch(stmts);
@@ -1962,11 +1971,15 @@ async function handleAdminAmbassadorList(request, env) {
   const auth = await authenticateAdmin(request, env, body);
   if (!auth.ok) return auth.response;
   const result = await env.DB.prepare(
-    `SELECT u.telegram_id AS telegram_id, u.username AS username, g.speed AS speed, 'pending' AS status
-     FROM ambassador_grants g JOIN users u ON u.telegram_id = g.telegram_id
+    `SELECT u.telegram_id AS telegram_id, u.username AS username, COALESCE(p.current_speed, g.speed) AS speed, g.value_usd AS value,
+            CASE WHEN p.telegram_id IS NULL THEN 'pending' ELSE 'claimed' END AS status
+     FROM ambassador_grants g
+     JOIN users u ON u.telegram_id = g.telegram_id
+     LEFT JOIN user_pets p ON p.telegram_id = g.telegram_id AND p.pet_id = 'ambassador'
      UNION ALL
-     SELECT u.telegram_id AS telegram_id, u.username AS username, p.current_speed AS speed, 'claimed' AS status
-     FROM user_pets p JOIN users u ON u.telegram_id = p.telegram_id WHERE p.pet_id = 'ambassador'
+     SELECT u.telegram_id AS telegram_id, u.username AS username, p.current_speed AS speed, NULL AS value, 'claimed' AS status
+     FROM user_pets p JOIN users u ON u.telegram_id = p.telegram_id
+     WHERE p.pet_id = 'ambassador' AND NOT EXISTS (SELECT 1 FROM ambassador_grants g WHERE g.telegram_id = p.telegram_id)
      ORDER BY status ASC, telegram_id ASC`
   ).all();
   return jsonResponse({ ambassadors: result.results || [] });

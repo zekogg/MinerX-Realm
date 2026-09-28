@@ -1698,6 +1698,16 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   color:#3a2c02;
   font-weight:900; font-size:calc(3.71px * var(--s)); letter-spacing:.3px;
 }
+.amb-value-badge{
+  position:absolute; bottom:calc(8px * var(--s)); left:calc(8px * var(--s)); z-index:4;
+  padding:calc(2.5px * var(--s)) calc(7px * var(--s)); border-radius:calc(999px * var(--s));
+  background:rgba(28,22,46,.75);
+  border:1px solid rgba(240,216,120,.6);
+  color:#ffd76a;
+  font-family:var(--font-display); font-weight:800; font-size:calc(7.5px * var(--s)); letter-spacing:.3px;
+  white-space:nowrap;
+  box-shadow:0 0 calc(8px * var(--s)) rgba(240,216,120,.25);
+}
 .amb-right-stack{
   position:absolute; bottom:calc(8px * var(--s)); right:calc(8px * var(--s)); z-index:4;
   display:flex; flex-direction:column; align-items:flex-end; gap:calc(4px * var(--s));
@@ -3990,6 +4000,7 @@ body.reduce-motion .firefly{
               <span class="amb-influencer-badge">The Influencer</span>
               <span class="amb-exclusive-badge">Super Exclusive</span>
             </div>
+            <span class="amb-value-badge" id="amb-value-badge">Value ??$</span>
             <div class="amb-right-stack">
               <div class="amb-speed">
                 <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:calc(11px * var(--s));height:calc(11px * var(--s));flex-shrink:0;vertical-align:middle;">
@@ -4222,6 +4233,8 @@ body.reduce-motion .firefly{
         <input class="ap-input" id="ap-amb-id" placeholder="Telegram ID" inputmode="numeric">
         <label class="ap-label" style="margin-top:calc(10px * var(--s));">Speed (Coins/hr)</label>
         <input class="ap-input" id="ap-amb-speed" inputmode="numeric" placeholder="e.g. 1000">
+        <label class="ap-label" style="margin-top:calc(10px * var(--s));">Value ($)</label>
+        <input class="ap-input" id="ap-amb-value" inputmode="decimal" placeholder="e.g. 50 (empty = unchanged)">
         <div class="ap-row" style="margin-top:calc(12px * var(--s));">
           <button class="ap-btn" style="flex:1;" onclick="adminAmbassadorGrant()">Grant / Update Speed</button>
           <button class="ap-btn-outline" style="flex:1;" onclick="adminAmbassadorRevoke()">Revoke</button>
@@ -5735,7 +5748,8 @@ function applyRealmStatusData(data){
   applyAmbassadorState({
     available: data.ambassador_available,
     claimed: data.ambassador_claimed,
-    speed: data.pets && data.pets.ambassador ? data.pets.ambassador.speed : 0
+    speed: data.pets && data.pets.ambassador ? data.pets.ambassador.speed : 0,
+    value: data.ambassador_value
   });
 }
 function invalidateRealmCache(){
@@ -6653,10 +6667,18 @@ function onClaimGuardianClick(){
 }
 
 // The Ambassador
-var ambassadorState = { available: false, claimed: false, speed: 0, busy: false };
+var ambassadorState = { available: false, claimed: false, speed: 0, value: null, busy: false };
+function formatAmbassadorValue(value){
+  return Number(value).toLocaleString('en-US', { maximumFractionDigits: 2 });
+}
 function renderAmbassadorUI(){
   var speedEl = document.getElementById('amb-speed-value');
   var btn = document.getElementById('amb-claim-btn');
+  var valueEl = document.getElementById('amb-value-badge');
+  if (valueEl){
+    var hasValue = ambassadorState.claimed && ambassadorState.value !== null && ambassadorState.value !== undefined;
+    valueEl.textContent = 'Value ' + (hasValue ? formatAmbassadorValue(ambassadorState.value) : '??') + '$';
+  }
   if (!btn) return;
   if (ambassadorState.claimed){
     setButtonBusy(btn, false);
@@ -6682,6 +6704,7 @@ function applyAmbassadorState(data){
   ambassadorState.available = !!data.available;
   ambassadorState.claimed = !!data.claimed;
   ambassadorState.speed = data.speed || 0;
+  ambassadorState.value = data.value === undefined ? null : data.value;
   renderAmbassadorUI();
 }
 function onClaimAmbassadorClick(){
@@ -6707,6 +6730,7 @@ function onClaimAmbassadorClick(){
     }
     ambassadorState.claimed = true;
     ambassadorState.speed = data.speed || 0;
+    ambassadorState.value = data.value === undefined ? null : data.value;
     if (typeof data.coins === 'number') updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE });
     if (typeof data.total_speed === 'number') applyClaimedPetSpeed(data.total_speed);
     renderAmbassadorUI();
@@ -8029,29 +8053,35 @@ function renderAdminAmbassadorList(ambassadors){
   list.innerHTML = ambassadors.map(function(a){
     var name = a.username ? ('@' + a.username) : ('Player ' + a.telegram_id);
     var statusText = a.status === 'pending' ? 'Pending claim' : 'Claimed';
+    var hasValue = a.value !== null && a.value !== undefined;
+    var valueText = hasValue ? (' · Value ' + formatAmbassadorValue(a.value) + '$') : '';
     return (
-      '<div class="ap-task-row" style="cursor:pointer;" onclick="adminFillAmbassadorFields(' + Number(a.telegram_id) + ', ' + Number(a.speed) + ')">' +
+      '<div class="ap-task-row" style="cursor:pointer;" onclick="adminFillAmbassadorFields(' + Number(a.telegram_id) + ', ' + Number(a.speed) + ', ' + (hasValue ? Number(a.value) : 'null') + ')">' +
         '<div style="flex:1;min-width:0;">' +
           '<div style="font-size:calc(12px * var(--s));font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtmlClient(name) + '</div>' +
-          '<div style="font-size:calc(10px * var(--s));color:var(--ink-dim);">ID: ' + Number(a.telegram_id) + ' · +' + Number(a.speed) + ' Coins/hr · ' + statusText + '</div>' +
+          '<div style="font-size:calc(10px * var(--s));color:var(--ink-dim);">ID: ' + Number(a.telegram_id) + ' · +' + Number(a.speed) + ' Coins/hr' + valueText + ' · ' + statusText + '</div>' +
         '</div>' +
       '</div>'
     );
   }).join('');
 }
-function adminFillAmbassadorFields(telegramId, speed){
+function adminFillAmbassadorFields(telegramId, speed, value){
   document.getElementById('ap-amb-id').value = telegramId;
   document.getElementById('ap-amb-speed').value = speed;
+  document.getElementById('ap-amb-value').value = value === null ? '' : value;
 }
 function adminAmbassadorGrant(){
   var id = parseInt(document.getElementById('ap-amb-id').value, 10);
   var speed = parseInt(document.getElementById('ap-amb-speed').value, 10);
+  var valueRaw = document.getElementById('ap-amb-value').value.trim();
+  var value = valueRaw === '' ? null : Number(valueRaw);
   if (!Number.isInteger(id) || !Number.isInteger(speed) || speed <= 0){ adminToast('Fill Telegram ID and a valid speed'); return; }
-  adminApiPost('/api/admin/ambassador/grant', { target_id: id, speed: speed }, function(data){
+  if (value !== null && (!Number.isFinite(value) || value < 0)){ adminToast('Value must be a number (0 or more)'); return; }
+  adminApiPost('/api/admin/ambassador/grant', { target_id: id, speed: speed, value: value }, function(data){
     adminToast(data.mode === 'pending' ? 'Grant pending — user can claim it now' : 'Ambassador speed updated');
     if (adminPanelState.ambListFetched) adminFetchAmbassadorList();
   }, function(err){
-    adminToast(err.error === 'user_not_found' ? 'User not found' : 'Failed to grant');
+    adminToast(err.error === 'user_not_found' ? 'User not found' : err.error === 'invalid_value' ? 'Invalid value' : 'Failed to grant');
   });
 }
 function adminAmbassadorRevoke(){
