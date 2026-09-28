@@ -6003,6 +6003,8 @@ fetchUserData();
     if (window.Telegram && window.Telegram.WebApp){
       Telegram.WebApp.ready();
       Telegram.WebApp.expand();
+      // A downward swipe should scroll the app, not minimize/close it (Telegram 7.7+; ignored on older versions)
+      if (typeof Telegram.WebApp.disableVerticalSwipes === 'function') Telegram.WebApp.disableVerticalSwipes();
     }
   }catch(e){   }
   var navButtons = document.querySelectorAll('.nav [data-page]');
