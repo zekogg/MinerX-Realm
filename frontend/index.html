@@ -25,6 +25,334 @@
 
 <!-- Telegram WebApp SDK -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script>
+// Languages: every visible text is translated from its English text via /languages.json; the layout never moves
+var I18N_LANGS = [
+  { code: 'en', name: 'English', short: 'En', flag: '🇬🇧' },
+  { code: 'ru', name: 'Русский', short: 'Ru', flag: '🇷🇺' },
+  { code: 'ar', name: 'العربية', short: 'Ar', flag: '🇸🇦' },
+  { code: 'fa', name: 'فارسی', short: 'Fa', flag: '🇮🇷' },
+  { code: 'tr', name: 'Türkçe', short: 'Tr', flag: '🇹🇷' }
+];
+var I18N_MIN_FONT_RATIO = 0.64;
+var i18n = { lang: 'en', dict: null, ready: false, readyCallbacks: [], exact: {}, reverse: {}, patterns: [] };
+// reverse: any translated text (all languages) -> its English source, so re-rendered translated text is still recognised
+(function(){
+  var saved = null;
+  try{ saved = localStorage.getItem('mx_lang'); }catch(e){}
+  var tgLang = '';
+  try{ tgLang = (window.Telegram.WebApp.initDataUnsafe.user.language_code || '').toLowerCase().split('-')[0]; }catch(e){}
+  var wanted = saved || tgLang || 'en';
+  i18n.lang = I18N_LANGS.some(function(l){ return l.code === wanted; }) ? wanted : 'en';
+  document.documentElement.setAttribute('data-lang', i18n.lang);
+  if (i18n.lang === 'en'){ i18nMarkReady(); return; }
+  i18nLoadDict(function(){ i18nMarkReady(); });
+  setTimeout(i18nMarkReady, 2500);
+})();
+function i18nMarkReady(){
+  if (i18n.ready) return;
+  i18n.ready = true;
+  var cbs = i18n.readyCallbacks; i18n.readyCallbacks = [];
+  cbs.forEach(function(cb){ try{ cb(); }catch(e){} });
+}
+function i18nOnReady(cb){ if (i18n.ready) cb(); else i18n.readyCallbacks.push(cb); }
+function i18nLoadDict(done){
+  if (i18n.dict){ done(); return; }
+  fetch('/languages.json').then(function(r){ return r.json(); }).then(function(d){ i18n.dict = d; i18nBuildIndex(); done(); })
+    .catch(function(){ done(); });
+}
+function i18nBuildIndex(){
+  i18n.exact = {}; i18n.reverse = {}; i18n.patterns = [];
+  if (!i18n.dict) return;
+  Object.keys(i18n.dict).forEach(function(src){
+    if (src.indexOf('{0}') !== -1) return;
+    var all = i18n.dict[src] || {};
+    Object.keys(all).forEach(function(l){ if (all[l]) i18n.reverse[all[l]] = src; });
+  });
+  if (i18n.lang === 'en') return;
+  Object.keys(i18n.dict).forEach(function(src){
+    var tr = i18n.dict[src] && i18n.dict[src][i18n.lang];
+    if (!tr) return;
+    if (src.indexOf('{0}') === -1){ i18n.exact[src] = tr; return; }
+    var names = [];
+    var re = src.replace(/[.*+?^$()|[\]\\]/g, '\\$&').replace(/\{(\d)\}/g, function(m, n){ names.push(+n); return '(.+?)'; });
+    i18n.patterns.push({ re: new RegExp('^' + re + '$'), names: names, tr: tr, src: src });
+  });
+  i18n.patterns.sort(function(a, b){ return b.src.replace(/\{\d\}/g, '').length - a.src.replace(/\{\d\}/g, '').length; });
+}
+// Translates one English string (exact text or a "{0}" pattern); returns null when there is nothing to translate
+function i18nTranslate(text){
+  if (i18n.lang === 'en' || !i18n.dict) return null;
+  if (Object.prototype.hasOwnProperty.call(i18n.exact, text)) return i18n.exact[text];
+  for (var i = 0; i < i18n.patterns.length; i++){
+    var p = i18n.patterns[i], m = p.re.exec(text);
+    if (!m) continue;
+    var out = p.tr;
+    p.names.forEach(function(n, k){
+      var val = m[k + 1];
+      var inner = i18nTranslate(val);
+      out = out.split('{' + n + '}').join(inner === null ? val : inner);
+    });
+    return out;
+  }
+  return null;
+}
+// For code that needs a string outside the page (alerts, share text)
+function t(text){ var out = i18nTranslate(text); return out === null ? text : out; }
+function i18nSkip(node){
+  for (var el = node.nodeType === 1 ? node : node.parentElement; el; el = el.parentElement){
+    if (el.hasAttribute && el.hasAttribute('data-no-i18n')) return true;
+    if (el !== node && el.hasAttribute && el.hasAttribute('data-i18n-html')) return true;
+    var tag = el.tagName;
+    if (tag === 'SCRIPT' || tag === 'STYLE') return true;
+  }
+  return false;
+}
+var i18nFitQueue = new Set();
+function i18nTextNode(node, force){
+  var data = node.data, lead, src, tail;
+  if (node.__i18nOut !== undefined && data === node.__i18nOut){
+    if (!force) return;
+    var ms = /^(\s*)([\s\S]*?)(\s*)$/.exec(node.__i18nSrc);
+    lead = ms[1]; src = ms[2]; tail = ms[3];
+  } else {
+    var m = /^(\s*)([\s\S]*?)(\s*)$/.exec(data);
+    var core = m[2].replace(/[ \t\r\n]+/g, ' ');
+    if (!core) return;
+    var known = Object.prototype.hasOwnProperty.call(i18n.reverse, core);
+    if (!known && !/[A-Za-z]/.test(core)){ node.__i18nSrc = undefined; node.__i18nOut = undefined; return; }
+    lead = m[1]; src = known ? i18n.reverse[core] : core; tail = m[3];
+  }
+  var tr = i18nTranslate(src);
+  node.__i18nSrc = lead + src + tail;
+  var out = tr === null ? lead + src + tail : lead + tr + tail;
+  node.__i18nOut = out;
+  if (out !== data) node.data = out;
+  if (node.parentElement) i18nFitQueue.add(node.parentElement);
+}
+function i18nAttrs(el){
+  ['placeholder', 'title'].forEach(function(a){
+    if (!el.hasAttribute(a)) return;
+    var srcKey = '__i18nSrc_' + a, outKey = '__i18nOut_' + a, cur = el.getAttribute(a);
+    if (!(el[outKey] !== undefined && cur === el[outKey])) el[srcKey] = Object.prototype.hasOwnProperty.call(i18n.reverse, cur) ? i18n.reverse[cur] : cur;
+    var tr = i18nTranslate(el[srcKey]);
+    var out = tr === null ? el[srcKey] : tr;
+    el[outKey] = out;
+    if (out !== cur) el.setAttribute(a, out);
+  });
+}
+function i18nHtml(el){
+  if (el.__i18nHtmlSrc === undefined) el.__i18nHtmlSrc = el.innerHTML.trim().replace(/[ \t\r\n]+/g, ' ');
+  var tr = i18nTranslate(el.__i18nHtmlSrc);
+  var out = tr === null ? el.__i18nHtmlSrc : tr;
+  if (el.__i18nHtmlOut !== out){ el.__i18nHtmlOut = out; el.innerHTML = out; }
+  i18nFitQueue.add(el);
+}
+function i18nWalk(root, force){
+  if (i18nSkip(root)) return;
+  if (root.nodeType === 3){ i18nTextNode(root, force); return; }
+  if (root.nodeType !== 1) return;
+  if (root.hasAttribute('data-i18n-html')){ i18nHtml(root); return; }
+  var walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
+    acceptNode: function(n){
+      if (n.nodeType === 1 && (n.hasAttribute('data-no-i18n') || n.tagName === 'SCRIPT' || n.tagName === 'STYLE')) return NodeFilter.FILTER_REJECT;
+      if (n.nodeType === 1 && n.hasAttribute('data-i18n-html')){ i18nHtml(n); return NodeFilter.FILTER_REJECT; }
+      return NodeFilter.FILTER_ACCEPT;
+    }
+  });
+  if (root.nodeType === 1) i18nAttrs(root);
+  for (var n = walker.nextNode(); n; n = walker.nextNode()){
+    if (n.nodeType === 3) i18nTextNode(n, force); else i18nAttrs(n);
+  }
+}
+// Fitting: a translated element may not be bigger than the same element in English; if it is, only its font shrinks
+function i18nSetSources(el, useSource){
+  var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  for (var n = walker.nextNode(); n; n = walker.nextNode()){
+    if (n.__i18nSrc === undefined) continue;
+    var want = useSource ? n.__i18nSrc : n.__i18nOut;
+    if (n.data !== want){ n.__i18nFitting = true; n.data = want; }
+  }
+}
+function i18nHasTranslated(el){
+  var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  for (var n = walker.nextNode(); n; n = walker.nextNode()) if (n.__i18nSrc !== undefined && n.__i18nSrc !== n.__i18nOut) return true;
+  return false;
+}
+function i18nBox(el){ var r = el.getBoundingClientRect(); return { w: r.width, h: r.height, sw: el.scrollWidth, cw: el.clientWidth }; }
+// restores the element's own inline sizes (some elements carry an inline font-size in the page itself)
+function i18nFitReset(el){
+  var o = el.__i18nOrigStyle || ['', '', ''];
+  el.style.fontSize = o[0]; el.style.lineHeight = o[1]; el.style.verticalAlign = o[2]; el.__i18nFitRatio = 0; el.__i18nPinned = false;
+}
+// "line-height: normal" depends on the glyphs' font: Arabic, Bengali, Thai... fall back to taller fonts than the
+// Latin text, so translated text gets the line height the same font has for English (measured once per font)
+var i18nLineCache = {};
+function i18nEnglishLineHeight(cs){
+  var key = cs.fontStyle + '|' + cs.fontWeight + '|' + cs.fontSize + '|' + cs.fontFamily;
+  if (i18nLineCache[key] === undefined){
+    var probe = document.createElement('div');
+    probe.setAttribute('data-no-i18n', '');
+    probe.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden;white-space:nowrap;line-height:normal;padding:0;border:0;' +
+      'font-style:' + cs.fontStyle + ';font-weight:' + cs.fontWeight + ';font-size:' + cs.fontSize + ';font-family:' + cs.fontFamily;
+    probe.textContent = 'Hg';
+    document.body.appendChild(probe);
+    i18nLineCache[key] = probe.getBoundingClientRect().height;
+    probe.remove();
+  }
+  return i18nLineCache[key];
+}
+function i18nSaveStyle(el){ if (!el.__i18nOrigStyle) el.__i18nOrigStyle = [el.style.fontSize, el.style.lineHeight, el.style.verticalAlign]; }
+// The English size is measured with the element's siblings in English too (a title and its subtitle share one width)
+function i18nFitScope(el){
+  var p = el.parentElement;
+  if (!p || p === document.body || el.__i18nHtmlSrc !== undefined || getComputedStyle(p).display !== 'block') return el;
+  var n = 0, w = document.createTreeWalker(p, NodeFilter.SHOW_TEXT);
+  while (w.nextNode()) if (++n > 24) return el;
+  return p;
+}
+function i18nFit(el){
+  if (!el.isConnected || i18nSkip(el)) return;
+  if (el.__i18nFitRatio || el.__i18nPinned) i18nFitReset(el);
+  el.__i18nOverflow = false;
+  if (i18n.lang === 'en') return;
+  if (!el.getClientRects().length) { i18nPending.add(el); return; }
+  if (el.__i18nHtmlSrc === undefined && !i18nHasTranslated(el)) return;
+  var cs = getComputedStyle(el);
+  var normalLine = cs.lineHeight === 'normal';
+  if (normalLine){
+    i18nSaveStyle(el);
+    el.style.lineHeight = i18nEnglishLineHeight(cs).toFixed(2) + 'px';
+    el.__i18nPinned = true;
+  }
+  var tr = i18nBox(el), en;
+  if (el.__i18nHtmlSrc !== undefined){
+    el.innerHTML = el.__i18nHtmlSrc; en = i18nBox(el); el.innerHTML = el.__i18nHtmlOut;
+  } else {
+    var scope = i18nFitScope(el), shrunk = [];
+    if (scope !== el) scope.querySelectorAll('[style*="font-size"]').forEach(function(s){ if (s.__i18nFitRatio){ shrunk.push([s, s.__i18nFitRatio, s.style.fontSize, s.style.lineHeight, s.style.verticalAlign]); i18nFitReset(s); } });
+    i18nSetSources(scope, true); en = i18nBox(el); i18nSetSources(scope, false);
+    shrunk.forEach(function(s){ s[0].__i18nFitRatio = s[1]; s[0].style.fontSize = s[2]; s[0].style.lineHeight = s[3]; s[0].style.verticalAlign = s[4]; });
+  }
+  var fits = function(b){ return b.w <= en.w + 0.5 && b.h <= en.h + 0.5 && b.sw <= Math.max(b.cw, en.sw) + 0.5; };
+  if (fits(tr)) return;
+  var base = parseFloat(cs.fontSize);
+  // keep the English line height so the element's height never changes; only the letters get smaller
+  var lineHeight = normalLine ? el.style.lineHeight : cs.lineHeight;
+  // a smaller inline text sits on the parent's baseline and would make its line taller; top-align keeps the line height
+  var inline = cs.display === 'inline';
+  i18nSaveStyle(el);
+  for (var k = 0.96; k >= I18N_MIN_FONT_RATIO - 0.001; k -= 0.04){
+    el.style.fontSize = (base * k).toFixed(2) + 'px';
+    el.style.lineHeight = lineHeight;
+    if (inline) el.style.verticalAlign = 'top';
+    el.__i18nFitRatio = k;
+    if (fits(i18nBox(el))) return;
+  }
+  el.__i18nOverflow = true;
+}
+var i18nPending = new Set();
+var i18nFitScheduled = false;
+function i18nScheduleFit(){
+  if (i18nFitScheduled) return;
+  i18nFitScheduled = true;
+  requestAnimationFrame(function(){
+    i18nFitScheduled = false;
+    var list = Array.from(i18nFitQueue); i18nFitQueue.clear();
+    list.forEach(i18nFit);
+    // siblings shrunk after an element was measured can leave it smaller (or bigger) than needed: settle once more
+    for (var pass = 0; pass < 2; pass++){
+      var again = list.filter(function(el){ return el.__i18nFitRatio || el.__i18nOverflow; });
+      if (!again.length) break;
+      again.forEach(i18nFit);
+    }
+  });
+}
+function i18nRefitPending(){
+  if (!i18nPending.size) return;
+  var list = Array.from(i18nPending); i18nPending.clear();
+  list.forEach(function(el){ i18nFitQueue.add(el); });
+  i18nScheduleFit();
+}
+function i18nApplyAll(){
+  i18nWalk(document.body, true);
+  document.querySelectorAll('[style]').forEach(function(el){ if (el.__i18nFitRatio || el.__i18nPinned) i18nFitReset(el); });
+  i18nScheduleFit();
+  i18nRenderSelector();
+}
+function i18nStartObserver(){
+  new MutationObserver(function(muts){
+    var layoutChanged = false;
+    muts.forEach(function(m){
+      if (m.type === 'characterData'){
+        if (m.target.__i18nFitting){ m.target.__i18nFitting = false; return; }
+        if (!i18nSkip(m.target)) i18nTextNode(m.target);
+      } else if (m.type === 'attributes'){
+        if (m.attributeName === 'class') layoutChanged = true;
+        else if (m.target.nodeType === 1 && !i18nSkip(m.target)) i18nAttrs(m.target);
+      } else {
+        layoutChanged = true;
+        m.addedNodes.forEach(function(n){ i18nWalk(n); });
+      }
+    });
+    i18nScheduleFit();
+    if (layoutChanged) i18nRefitPending();
+  }).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['placeholder', 'title', 'class'] });
+  document.addEventListener('click', function(){ setTimeout(i18nRefitPending, 60); }, true);
+  var refitAll = function(){
+    if (i18n.lang === 'en') return;
+    i18nLineCache = {};
+    var w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (var n = w.nextNode(); n; n = w.nextNode()) if (n.__i18nSrc !== undefined && n.__i18nSrc !== n.__i18nOut && n.parentElement) i18nFitQueue.add(n.parentElement);
+    document.querySelectorAll('[data-i18n-html]').forEach(function(el){ i18nFitQueue.add(el); });
+    i18nScheduleFit();
+  };
+  window.addEventListener('resize', refitAll);
+  // web fonts arrive after the first fit and change text sizes
+  if (document.fonts){ document.fonts.addEventListener('loadingdone', refitAll); document.fonts.ready.then(refitAll); }
+}
+function i18nSetLanguage(code){
+  if (!I18N_LANGS.some(function(l){ return l.code === code; })) return;
+  try{ localStorage.setItem('mx_lang', code); }catch(e){}
+  i18n.lang = code;
+  document.documentElement.setAttribute('data-lang', code);
+  i18nLoadDict(function(){ i18nBuildIndex(); i18nApplyAll(); });
+}
+function i18nRenderSelector(){
+  var cur = I18N_LANGS.filter(function(l){ return l.code === i18n.lang; })[0] || I18N_LANGS[0];
+  var flag = document.querySelector('.lang-selector__flag');
+  var text = document.querySelector('.lang-selector__text');
+  if (flag) flag.textContent = cur.flag;
+  if (text) text.textContent = cur.short;
+  document.querySelectorAll('.lang-menu__item').forEach(function(item){ item.classList.toggle('is-active', item.getAttribute('data-lang') === i18n.lang); });
+}
+function i18nToggleMenu(ev){
+  if (ev) ev.stopPropagation();
+  var menu = document.getElementById('lang-menu');
+  if (menu) menu.classList.toggle('is-open');
+}
+document.addEventListener('DOMContentLoaded', function(){
+  var menu = document.getElementById('lang-menu');
+  if (menu){
+    menu.innerHTML = I18N_LANGS.map(function(l){
+      return '<button class="lang-menu__item" data-lang="' + l.code + '" onclick="i18nPick(event, \'' + l.code + '\')">' +
+        '<span class="lang-menu__flag">' + l.flag + '</span><span class="lang-menu__name">' + l.name + '</span><span class="lang-menu__code">' + l.short + '</span></button>';
+    }).join('');
+  }
+  document.addEventListener('click', function(e){
+    var m = document.getElementById('lang-menu');
+    if (m && m.classList.contains('is-open') && !m.contains(e.target)) m.classList.remove('is-open');
+  });
+  i18nRenderSelector();
+  i18nOnReady(function(){ i18nBuildIndex(); i18nWalk(document.body); i18nScheduleFit(); i18nStartObserver(); });
+});
+function i18nPick(ev, code){
+  ev.stopPropagation();
+  var menu = document.getElementById('lang-menu');
+  if (menu) menu.classList.remove('is-open');
+  if (code !== i18n.lang) i18nSetLanguage(code);
+}
+</script>
 
 <!-- Adsgram SDK -->
 <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
@@ -421,12 +749,38 @@ img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; poi
   color:var(--c-topbar-badge-text);
 }
 .lang-selector{
+  position:relative; cursor:pointer;
   display:flex; align-items:center; gap:calc(3px * var(--s));
   color:var(--ink-dim); font-family:var(--font-display); font-weight:700; font-size:calc(11px * var(--s));
   flex-shrink:0;
 }
 .lang-selector__flag{ font-size:calc(14px * var(--s)); line-height:1; }
 .lang-selector__arrow{ width:calc(11px * var(--s)); height:calc(11px * var(--s)); flex-shrink:0; }
+.lang-menu{
+  position:absolute; top:calc(100% + calc(8px * var(--s))); right:0; z-index:900;
+  width:calc(150px * var(--s)); max-height:calc(7 * calc(30px * var(--s)) + calc(8px * var(--s)));
+  overflow-y:auto; overscroll-behavior:contain;
+  padding:calc(4px * var(--s));
+  background:rgba(22,17,36,.97); border:1px solid var(--stone-border-2); border-radius:calc(12px * var(--s));
+  box-shadow:var(--shadow-deep);
+  display:none;
+}
+.lang-menu.is-open{ display:block; }
+.lang-menu::-webkit-scrollbar{ width:calc(3px * var(--s)); }
+.lang-menu::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.18); border-radius:calc(3px * var(--s)); }
+.lang-menu__item{
+  width:100%; height:calc(30px * var(--s));
+  display:flex; align-items:center; gap:calc(8px * var(--s));
+  padding:0 calc(8px * var(--s)); border-radius:calc(8px * var(--s));
+  color:var(--ink); font-family:var(--font-body); font-weight:700; font-size:calc(11px * var(--s));
+  text-align:left;
+}
+.lang-menu__item.is-active{ background:rgba(227,165,66,.16); color:#f0d878; }
+.lang-menu__flag{ font-size:calc(14px * var(--s)); line-height:1; flex-shrink:0; }
+.lang-menu__name{ flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.lang-menu__code{ color:var(--ink-faint); font-size:calc(9.5px * var(--s)); font-family:var(--font-display); flex-shrink:0; }
+/* Arabic/Persian text stays in the left-to-right layout; bold values are isolated so "Fee: 5%" is not reordered */
+html[data-lang="ar"] b, html[data-lang="ar"] strong, html[data-lang="fa"] b, html[data-lang="fa"] strong{ unicode-bidi:isolate; }
 
 /* Page Frame */
 .pages{ position:relative; flex:1; overflow:hidden; }
@@ -2705,7 +3059,10 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .pg-section__body + .pg-section__body{ margin-top:calc(8px * var(--s)); }
 .pg-section__body b{ color:#f0d878; font-weight:800; }
 .pg-section__body .is-purple{ color:#d8b4fe; font-weight:800; }
-.pg-table{ width:100%; border-collapse:collapse; margin-top:calc(6px * var(--s)); font-size:calc(10.5px * var(--s)); }
+.pg-table{ width:100%; border-collapse:collapse; margin-top:calc(6px * var(--s)); font-size:calc(10.5px * var(--s)); table-layout:fixed; }
+.pg-table th:nth-child(1){ width:40.7%; }
+.pg-table th:nth-child(2){ width:19.7%; }
+.pg-table th:nth-child(3){ width:39.6%; }
 .pg-table th{ text-align:left; padding:calc(6px * var(--s)) calc(5px * var(--s)); color:#a3acb8; font-weight:700; border-bottom:1px solid rgba(255,255,255,.14); }
 .pg-table td{ padding:calc(6px * var(--s)) calc(5px * var(--s)); border-bottom:1px solid rgba(255,255,255,.05); color:#e6e9ef; }
 .pg-table tr:last-child td{ border-bottom:none; }
@@ -3059,10 +3416,11 @@ body.reduce-motion .firefly{
         </div>
         <span class="topbar-badge__num" id="display-gram-topbar">0.00</span>
       </div>
-      <div class="lang-selector">
+      <div class="lang-selector" onclick="i18nToggleMenu(event)" data-no-i18n>
         <span class="lang-selector__flag">🇬🇧</span>
         <span class="lang-selector__text">En</span>
         <svg class="lang-selector__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+        <div class="lang-menu" id="lang-menu" onclick="event.stopPropagation()"></div>
       </div>
     </div>
   </header>
@@ -3621,7 +3979,7 @@ body.reduce-motion .firefly{
         </div>
         <div class="reward-note">
           <span class="reward-note__icon">i</span>
-          <div class="reward-note__text">A friend counts as <b>active</b> once they have watched <b>10</b> ads.</div>
+          <div class="reward-note__text" data-i18n-html>A friend counts as <b>active</b> once they have watched <b>10</b> ads.</div>
         </div>
         <div class="milestone-title">Milestone Missions</div>
         <div id="milestone-missions-skeleton" style="display:none;"></div>
@@ -4069,7 +4427,7 @@ body.reduce-motion .firefly{
       <div class="fp-pet-slot">
         <img draggable="false" loading="lazy" src="/Happy%20Dog%20(100%20Reward)%20.svg" alt="Happy Dog" style="width:100%;height:100%;object-fit:contain;">
       </div>
-      <div class="fp-desc">Invite <b>100</b> Active Friends And Get Happy Dog — Free, Forever, Mining Right Away At <b>Full Speed</b></div>
+      <div class="fp-desc" data-i18n-html>Invite <b>100</b> Active Friends And Get Happy Dog — Free, Forever, Mining Right Away At <b>Full Speed</b></div>
       <div class="fp-progress-label">Active Friends (<span id="fp-progress-num">0</span>/100)</div>
       <div class="fp-progress-track"><div class="fp-progress-fill" id="fp-progress-fill" style="width:0%"></div></div>
       <button class="fp-claim-btn" id="fp-claim-btn" onclick="onClaimHappyDogClick()">Claim</button>
@@ -4110,8 +4468,8 @@ body.reduce-motion .firefly{
             <span id="pf-avatar-emoji">👤</span>
           </div>
         </div>
-        <div class="pf-name" id="pf-name">Name</div>
-        <div class="pf-username" id="pf-username">@Username</div>
+        <div class="pf-name" id="pf-name" data-no-i18n>Name</div>
+        <div class="pf-username" id="pf-username" data-no-i18n>@Username</div>
         <div class="pf-divider"></div>
         <div class="pf-toggles">
           <button class="pf-toggle-btn" id="pf-animation-toggle-btn" onclick="toggleAnimationsPref()">
@@ -4145,7 +4503,7 @@ body.reduce-motion .firefly{
   </div>
 
   <!-- Admin Panel -->
-  <div class="modal-overlay" id="modal-admin">
+  <div class="modal-overlay" id="modal-admin" data-no-i18n>
     <div class="ap-wrap">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:calc(16px * var(--s));">
         <button class="ap-btn-outline" onclick="closeModal('modal-admin')">← Back</button>
@@ -4246,7 +4604,7 @@ body.reduce-motion .firefly{
   </div>
 
   <!-- Admin Task Editor Modal -->
-  <div class="modal-overlay" id="modal-admin-task" style="z-index:210;">
+  <div class="modal-overlay" id="modal-admin-task" style="z-index:210;" data-no-i18n>
     <div class="ap-card" style="width:100%;max-width:calc(360px * var(--s));max-height:88vh;overflow-y:auto;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:calc(10px * var(--s));">
         <div class="ap-title" id="ap-task-modal-title" style="margin:0;">Add A Task</div>
@@ -4375,7 +4733,7 @@ body.reduce-motion .firefly{
         </div>
         <button class="modal-close" onclick="closeModal('modal-quick-free-pet')">✕</button>
       </div>
-      <div class="qfp-desc">Each task below rewards <b>1 Exclusive Pet Card</b> once completed.</div>
+      <div class="qfp-desc" data-i18n-html>Each task below rewards <b>1 Exclusive Pet Card</b> once completed.</div>
       <div class="qfp-task">
         <div class="qfp-task__icon">🎁</div>
         <div class="qfp-task__body">
@@ -4460,23 +4818,23 @@ body.reduce-motion .firefly{
             <span class="pg-section__icon">💰</span>
             <span class="pg-section__title">Passive Mining</span>
           </div>
-          <div class="pg-section__body">Every pet you buy adds its <b>Speed</b> to your <b>Total Speed</b> (shown as Coins/hr at the top of this page). That speed accrues automatically into your <span class="is-purple">Storage</span> every second — even while you're away from the app.</div>
-          <div class="pg-section__body">When you buy any pet, it starts at <b>Level 1</b> and begins mining immediately — right after the purchase, with no extra step needed.</div>
+          <div class="pg-section__body" data-i18n-html>Every pet you buy adds its <b>Speed</b> to your <b>Total Speed</b> (shown as Coins/hr at the top of this page). That speed accrues automatically into your <span class="is-purple">Storage</span> every second — even while you're away from the app.</div>
+          <div class="pg-section__body" data-i18n-html>When you buy any pet, it starts at <b>Level 1</b> and begins mining immediately — right after the purchase, with no extra step needed.</div>
         </div>
         <div class="pg-section">
           <div class="pg-section__head">
             <span class="pg-section__icon">⬆️</span>
             <span class="pg-section__title">Upgrading Pets</span>
           </div>
-          <div class="pg-section__body">Each pet can be upgraded up to <b>Level 100</b>. Every level permanently adds <b>+10%</b> of that pet's base Speed. Each upgrade costs <b>10% of the pet's original purchase price</b> — the same cost at every single level.</div>
+          <div class="pg-section__body" data-i18n-html>Each pet can be upgraded up to <b>Level 100</b>. Every level permanently adds <b>+10%</b> of that pet's base Speed. Each upgrade costs <b>10% of the pet's original purchase price</b> — the same cost at every single level.</div>
         </div>
         <div class="pg-section">
           <div class="pg-section__head">
             <span class="pg-section__icon">📦</span>
             <span class="pg-section__title">Storage</span>
           </div>
-          <div class="pg-section__body">Storage has a limited capacity that caps how long coins can accrue before you claim them: <b>6h → 8h → 12h → 16h → 24h</b> (5 levels). Upgrading Storage costs a flat <b>300,000 Coins</b> per level.</div>
-          <div class="pg-section__body">Claim regularly — coins earned beyond your Storage capacity are lost if you wait too long to claim.</div>
+          <div class="pg-section__body" data-i18n-html>Storage has a limited capacity that caps how long coins can accrue before you claim them: <b>6h → 8h → 12h → 16h → 24h</b> (5 levels). Upgrading Storage costs a flat <b>300,000 Coins</b> per level.</div>
+          <div class="pg-section__body" data-i18n-html>Claim regularly — coins earned beyond your Storage capacity are lost if you wait too long to claim.</div>
         </div>
         <div class="pg-section">
           <div class="pg-section__head">
@@ -4498,12 +4856,12 @@ body.reduce-motion .firefly{
             <span class="pg-section__icon">✨</span>
             <span class="pg-section__title">Exclusive Card Details</span>
           </div>
-          <div class="pg-section__body"><b>Dancing Bear</b> gains an extra <b>+0.5%</b> of its base Speed automatically every day at <b>00:00 UTC</b>, up to a maximum of <b>+10%</b> total (20 days) — completely free, no action needed.</div>
-          <div class="pg-section__body"><b>The Cat</b> gains an extra <b>+1%</b> of its base Speed automatically every day at <b>00:00 UTC</b>, up to a maximum of <b>+10%</b> total (10 days) — completely free, no action needed.</div>
-          <div class="pg-section__body">How to unlock the free exclusive pets:</div>
-          <div class="pg-section__body">• <b>Happy Dog</b> — invite 100 active friends.</div>
-          <div class="pg-section__body">• <span class="is-purple">The Guardian</span> — watch 4,000 ads in total (any ad watched anywhere in the bot counts toward this).</div>
-          <div class="pg-section__body">• <span class="is-purple">The Ambassador</span> — reserved only for users with active channels who have collaborated with us. Contact support for more information.</div>
+          <div class="pg-section__body" data-i18n-html><b>Dancing Bear</b> gains an extra <b>+0.5%</b> of its base Speed automatically every day at <b>00:00 UTC</b>, up to a maximum of <b>+10%</b> total (20 days) — completely free, no action needed.</div>
+          <div class="pg-section__body" data-i18n-html><b>The Cat</b> gains an extra <b>+1%</b> of its base Speed automatically every day at <b>00:00 UTC</b>, up to a maximum of <b>+10%</b> total (10 days) — completely free, no action needed.</div>
+          <div class="pg-section__body" data-i18n-html>How to unlock the free exclusive pets:</div>
+          <div class="pg-section__body" data-i18n-html>• <b>Happy Dog</b> — invite 100 active friends.</div>
+          <div class="pg-section__body" data-i18n-html>• <span class="is-purple">The Guardian</span> — watch 4,000 ads in total (any ad watched anywhere in the bot counts toward this).</div>
+          <div class="pg-section__body" data-i18n-html>• <span class="is-purple">The Ambassador</span> — reserved only for users with active channels who have collaborated with us. Contact support for more information.</div>
         </div>
         <div class="pg-section">
           <div class="pg-section__head">
@@ -4772,6 +5130,7 @@ var SPLASH_MAX_WAIT_MS = 8000;
 var splashHidden = false;
 function hideSplashScreen(){
   if (splashHidden) return;
+  if (!i18n.ready){ i18nOnReady(hideSplashScreen); return; }
   splashHidden = true;
   var screen = document.getElementById('loading-screen');
   if (!screen) return;
@@ -5079,7 +5438,7 @@ function renderMiningIdleButton(){
 function callMiningApi(path){
   var initData = getTelegramInitData();
   if (!initData){
-    alert('Open this app from Telegram to mine.');
+    alert(t('Open this app from Telegram to mine.'));
     return Promise.reject(new Error('no_init_data'));
   }
   var sentAt = Date.now();
@@ -5208,7 +5567,7 @@ function onStreakClaimClick(){
   if (streakBusy || streakState.claimedToday) return;
   var initData = getTelegramInitData();
   if (!initData){
-    alert('Open this app from Telegram to claim.');
+    alert(t('Open this app from Telegram to claim.'));
     return;
   }
   streakBusy = true;
@@ -5418,7 +5777,7 @@ function onSpinButtonClick(){
   }
   var initData = getTelegramInitData();
   if (!initData){
-    alert('Open this app from Telegram to spin.');
+    alert(t('Open this app from Telegram to spin.'));
     return;
   }
   var btn = document.getElementById('btn-spin');
@@ -5490,7 +5849,7 @@ function onChestOpenClick(){
   }
   var initData = getTelegramInitData();
   if (!initData){
-    alert('Open this app from Telegram to open the chest.');
+    alert(t('Open this app from Telegram to open the chest.'));
     return;
   }
   chestBusy = true;
@@ -5570,7 +5929,7 @@ function onGiftOpenClick(){
   }
   var initData = getTelegramInitData();
   if (!initData){
-    alert('Open this app from Telegram to open a gift.');
+    alert(t('Open this app from Telegram to open a gift.'));
     return;
   }
   giftPickBusy = true;
@@ -5769,7 +6128,7 @@ function onPetBuyClick(petId, btn){
   if (!def || petBuyBusy[petId] || state.level > 0) return;
   var initData = getTelegramInitData();
   if (!initData){
-    alert('Open this app from Telegram to buy pets.');
+    alert(t('Open this app from Telegram to buy pets.'));
     return;
   }
   petBuyBusy[petId] = true;
@@ -5821,7 +6180,7 @@ function onPetUpgradeConfirm(){
   if (!def || petUpgradeBusy) return;
   var initData = getTelegramInitData();
   if (!initData){
-    alert('Open this app from Telegram to upgrade pets.');
+    alert(t('Open this app from Telegram to upgrade pets.'));
     return;
   }
   petUpgradeBusy = true;
@@ -5969,7 +6328,7 @@ function onStorageClaimClick(){
   if (storageClaimBusy || !storageState.hasPet) return;
   var initData = getTelegramInitData();
   if (!initData){
-    alert('Open this app from Telegram to claim storage.');
+    alert(t('Open this app from Telegram to claim storage.'));
     return;
   }
   storageClaimBusy = true;
@@ -6159,7 +6518,7 @@ function renderLeaderboardPanel(type, entries){
           lbAvatarInner(entry) +
           '<span class="lb-podium__rank-badge ' + slot.badge + '">' + entry.rank + '</span>' +
         '</div>' +
-        '<div class="lb-podium__name">' + escapeHtmlClient(entry.name) + '</div>' +
+        '<div class="lb-podium__name" data-no-i18n>' + escapeHtmlClient(entry.name) + '</div>' +
         '<div class="lb-podium__meta">' + LB_METRIC_LABEL[type] + ': ' + entry.value + '</div>' +
         '<div class="lb-podium__coins">' + lbCoinsHtml(entry.prize, 19) + '</div>' +
         '<div class="lb-podium__base lb-podium__base--' + slot.place + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M7 5H4a1 1 0 0 0-1 1v1a4 4 0 0 0 4 4"/><path d="M17 5h3a1 1 0 0 1 1 1v1a4 4 0 0 1-4 4"/></svg></div>' +
@@ -6173,7 +6532,7 @@ function renderLeaderboardPanel(type, entries){
         '<div class="lb-row__rank">' + entry.rank + '</div>' +
         '<div class="lb-avatar lb-avatar--sm">' + lbAvatarInner(entry) + '</div>' +
         '<div class="lb-row__info">' +
-          '<div class="lb-row__name">' + escapeHtmlClient(entry.name) + '</div>' +
+          '<div class="lb-row__name" data-no-i18n>' + escapeHtmlClient(entry.name) + '</div>' +
           '<div class="lb-row__meta">' + LB_METRIC_LABEL[type] + ': ' + entry.value + '</div>' +
         '</div>' +
         (entry.prize > 0 ? '<div class="lb-row__coins">' + lbCoinsHtml(entry.prize, 20) + '</div>' : '') +
@@ -6451,7 +6810,7 @@ function onStorageUpgradeConfirm(){
   if (storageUpgradeBusy) return;
   var initData = getTelegramInitData();
   if (!initData){
-    alert('Open this app from Telegram to upgrade storage.');
+    alert(t('Open this app from Telegram to upgrade storage.'));
     return;
   }
   storageUpgradeBusy = true;
@@ -6550,7 +6909,7 @@ function onClaimHappyDogClick(){
   if (happyDogState.activeFriends < happyDogState.threshold) return;
   var initData = getTelegramInitData();
   if (!initData){
-    alert('Open this app from Telegram to claim.');
+    alert(t('Open this app from Telegram to claim.'));
     return;
   }
   happyDogState.busy = true;
@@ -6635,7 +6994,7 @@ function onClaimGuardianClick(){
   if (guardianState.adsWatched < guardianState.threshold) return;
   var initData = getTelegramInitData();
   if (!initData){
-    alert('Open this app from Telegram to claim.');
+    alert(t('Open this app from Telegram to claim.'));
     return;
   }
   guardianState.busy = true;
@@ -6711,7 +7070,7 @@ function onClaimAmbassadorClick(){
   if (ambassadorState.claimed || ambassadorState.busy || !ambassadorState.available) return;
   var initData = getTelegramInitData();
   if (!initData){
-    alert('Open this app from Telegram to claim.');
+    alert(t('Open this app from Telegram to claim.'));
     return;
   }
   ambassadorState.busy = true;
@@ -6867,7 +7226,7 @@ function onComboCheckClick(){
   if (!order) return;
   var initData = getTelegramInitData();
   if (!initData){
-    alert('Open this app from Telegram to play Daily Combo.');
+    alert(t('Open this app from Telegram to play Daily Combo.'));
     return;
   }
   comboState.busy = true;
@@ -7524,7 +7883,7 @@ function onCheckinShareClick(task){
   }
   var linkEl = document.getElementById('invite-link-text');
   var link = linkEl ? linkEl.textContent : 'https://t.me/MinerXRealmBot/app';
-  var shareUrl = 'https://t.me/share/url?url=' + encodeURIComponent(link) + '&text=' + encodeURIComponent('Join MinerX Realm and start mining!');
+  var shareUrl = 'https://t.me/share/url?url=' + encodeURIComponent(link) + '&text=' + encodeURIComponent(t('Join MinerX Realm and start mining!'));
   var tg = window.Telegram && window.Telegram.WebApp;
   if (tg && tg.openTelegramLink){
     tg.openTelegramLink(shareUrl);
@@ -8117,7 +8476,7 @@ function setupInviteLink(telegramId){
   if (shareBtn && !shareBtn._wired){
     shareBtn._wired = true;
     shareBtn.addEventListener('click', function(){
-      var shareUrl = 'https://t.me/share/url?url=' + encodeURIComponent(link) + '&text=' + encodeURIComponent('Join MinerX Realm and start mining!');
+      var shareUrl = 'https://t.me/share/url?url=' + encodeURIComponent(link) + '&text=' + encodeURIComponent(t('Join MinerX Realm and start mining!'));
       var tg = window.Telegram && window.Telegram.WebApp;
       if (tg && tg.openTelegramLink){
         tg.openTelegramLink(shareUrl);
@@ -8369,7 +8728,7 @@ function renderFriendsList(){
     return (
       '<div class="card friend-row">' +
         '<div class="friend-row__avatar">' + escapeHtmlClient(initials) + '</div>' +
-        '<div class="friend-row__name">' + safeName + '</div>' +
+        '<div class="friend-row__name" data-no-i18n>' + safeName + '</div>' +
         metaHtml +
         '<div class="friend-row__earn">+' + formatFriendsAmount(f.earned_coins) + ' Coins</div>' +
       '</div>'
@@ -8450,7 +8809,7 @@ function onExchangeConfirm(){
   if (amount < EXCHANGE_MIN_COINS || amount > CURRENT_COINS_BALANCE) return;
   var initData = getTelegramInitData();
   if (!initData){
-    alert('Open this app from Telegram to exchange.');
+    alert(t('Open this app from Telegram to exchange.'));
     return;
   }
   exchangeBusy = true;
@@ -8504,7 +8863,7 @@ function onPromoRedeemClick(){
   }
   var initData = getTelegramInitData();
   if (!initData){
-    alert('Open this app from Telegram to redeem codes.');
+    alert(t('Open this app from Telegram to redeem codes.'));
     return;
   }
   var promoBtn = document.getElementById('promo-redeem-btn');
@@ -8624,7 +8983,7 @@ function checkDepositStatus(){
   if (depositCheckBusy) return;
   var initData = getTelegramInitData();
   if (!initData){
-    alert('Open this app from Telegram to check your deposit.');
+    alert(t('Open this app from Telegram to check your deposit.'));
     return;
   }
   depositCheckBusy = true;
@@ -8773,7 +9132,7 @@ function submitWithdrawRequest(){
   }
   var initData = getTelegramInitData();
   if (!initData){
-    alert('Open this app from Telegram to withdraw.');
+    alert(t('Open this app from Telegram to withdraw.'));
     return;
   }
   withdrawBusy = true;
