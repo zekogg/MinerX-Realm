@@ -1460,16 +1460,21 @@ async function bumpLifetimeAdsWatched(env, telegramId) {
     "UPDATE users SET lifetime_ads_watched = ?, weekly_ads_watched = weekly_ads_watched + 1 WHERE telegram_id = ? AND lifetime_ads_watched = ?"
   ).bind(newTotal, telegramId, previous).run();
   if (!updateResult.meta || updateResult.meta.changes === 0) return;
-  if (row.referred_by && newTotal >= ACTIVE_FRIEND_ADS_THRESHOLD) {
+  await activateReferralOnLifetimeAds(env, telegramId, row.referred_by, newTotal);
+}
+
+// Referral becomes active once the invited user reaches ACTIVE_FRIEND_ADS_THRESHOLD lifetime ads
+async function activateReferralOnLifetimeAds(env, telegramId, referredBy, lifetimeAds) {
+  if (referredBy && lifetimeAds >= ACTIVE_FRIEND_ADS_THRESHOLD) {
     const activateResult = await env.DB.prepare(
       `UPDATE referrals SET is_active = 1, earned_coins = earned_coins + ?
        WHERE referrer_id = ? AND referred_id = ? AND is_active = 0`
-    ).bind(REFERRAL_ACTIVE_BONUS_COINS, row.referred_by, telegramId).run();
+    ).bind(REFERRAL_ACTIVE_BONUS_COINS, referredBy, telegramId).run();
     if (activateResult.meta && activateResult.meta.changes > 0) {
       await env.DB.prepare(
         `UPDATE users SET referral_pending_earnings = referral_pending_earnings + ?, active_referrals_count = active_referrals_count + 1, weekly_active_referrals = weekly_active_referrals + 1
          WHERE telegram_id = ?`
-      ).bind(REFERRAL_ACTIVE_BONUS_COINS, row.referred_by).run();
+      ).bind(REFERRAL_ACTIVE_BONUS_COINS, referredBy).run();
     }
   }
 }
@@ -2126,12 +2131,15 @@ async function handleGigapubPostback(url, env) {
     return new Response("limit reached", { status: 200 });
   }
   const newCount = countToday + 1;
-  const updateStmt = env.DB.prepare(
-    `UPDATE users SET coins = coins + ?, gigapub_task_count = ?, gigapub_task_date = ?
-     WHERE telegram_id = ? AND (gigapub_task_date IS NULL OR gigapub_task_date <> ? OR gigapub_task_count = ?)`
-  ).bind(GIGAPUB_REWARD_COINS, newCount, today, telegramId, today, countToday);
-  await updateStmt.run();
-  await bumpLifetimeAdsWatched(env, telegramId);
+  // reward and ad counters in one write; RETURNING gives the new lifetime count without a second read
+  const updated = await env.DB.prepare(
+    `UPDATE users SET coins = coins + ?, gigapub_task_count = ?, gigapub_task_date = ?, lifetime_ads_watched = COALESCE(lifetime_ads_watched, 0) + 1, weekly_ads_watched = weekly_ads_watched + 1
+     WHERE telegram_id = ? AND (gigapub_task_date IS NULL OR gigapub_task_date <> ? OR gigapub_task_count = ?)
+     RETURNING lifetime_ads_watched, referred_by`
+  ).bind(GIGAPUB_REWARD_COINS, newCount, today, telegramId, today, countToday).first();
+  if (updated) {
+    await activateReferralOnLifetimeAds(env, telegramId, updated.referred_by, updated.lifetime_ads_watched);
+  }
   return new Response("OK", { status: 200 });
 }
 
@@ -2150,15 +2158,16 @@ async function handleMonetixReward(request, env) {
     return jsonResponse({ error: "daily_limit_reached", watched_today: countToday, daily_limit: MONETIX_DAILY_LIMIT }, 409);
   }
   const newCount = countToday + 1;
-  const updateStmt = env.DB.prepare(
-    `UPDATE users SET coins = coins + ?, monetix_task_count = ?, monetix_task_date = ?
-     WHERE telegram_id = ? AND (monetix_task_date IS NULL OR monetix_task_date <> ? OR monetix_task_count = ?)`
-  ).bind(MONETIX_REWARD_COINS, newCount, today, telegramId, today, countToday);
-  const updateResult = await updateStmt.run();
-  if (!updateResult.meta || updateResult.meta.changes === 0) {
+  // reward and ad counters in one write; RETURNING gives the new lifetime count without a second read
+  const updated = await env.DB.prepare(
+    `UPDATE users SET coins = coins + ?, monetix_task_count = ?, monetix_task_date = ?, lifetime_ads_watched = COALESCE(lifetime_ads_watched, 0) + 1, weekly_ads_watched = weekly_ads_watched + 1
+     WHERE telegram_id = ? AND (monetix_task_date IS NULL OR monetix_task_date <> ? OR monetix_task_count = ?)
+     RETURNING lifetime_ads_watched, referred_by`
+  ).bind(MONETIX_REWARD_COINS, newCount, today, telegramId, today, countToday).first();
+  if (!updated) {
     return jsonResponse({ error: "daily_limit_reached", watched_today: countToday, daily_limit: MONETIX_DAILY_LIMIT }, 409);
   }
-  await bumpLifetimeAdsWatched(env, telegramId);
+  await activateReferralOnLifetimeAds(env, telegramId, updated.referred_by, updated.lifetime_ads_watched);
   return jsonResponse({
     watched_today: newCount,
     daily_limit: MONETIX_DAILY_LIMIT,
@@ -2182,15 +2191,16 @@ async function handleOnclickaReward(request, env) {
     return jsonResponse({ error: "daily_limit_reached", watched_today: countToday, daily_limit: ONCLICKA_DAILY_LIMIT }, 409);
   }
   const newCount = countToday + 1;
-  const updateStmt = env.DB.prepare(
-    `UPDATE users SET coins = coins + ?, onclicka_task_count = ?, onclicka_task_date = ?
-     WHERE telegram_id = ? AND (onclicka_task_date IS NULL OR onclicka_task_date <> ? OR onclicka_task_count = ?)`
-  ).bind(ONCLICKA_REWARD_COINS, newCount, today, telegramId, today, countToday);
-  const updateResult = await updateStmt.run();
-  if (!updateResult.meta || updateResult.meta.changes === 0) {
+  // reward and ad counters in one write; RETURNING gives the new lifetime count without a second read
+  const updated = await env.DB.prepare(
+    `UPDATE users SET coins = coins + ?, onclicka_task_count = ?, onclicka_task_date = ?, lifetime_ads_watched = COALESCE(lifetime_ads_watched, 0) + 1, weekly_ads_watched = weekly_ads_watched + 1
+     WHERE telegram_id = ? AND (onclicka_task_date IS NULL OR onclicka_task_date <> ? OR onclicka_task_count = ?)
+     RETURNING lifetime_ads_watched, referred_by`
+  ).bind(ONCLICKA_REWARD_COINS, newCount, today, telegramId, today, countToday).first();
+  if (!updated) {
     return jsonResponse({ error: "daily_limit_reached", watched_today: countToday, daily_limit: ONCLICKA_DAILY_LIMIT }, 409);
   }
-  await bumpLifetimeAdsWatched(env, telegramId);
+  await activateReferralOnLifetimeAds(env, telegramId, updated.referred_by, updated.lifetime_ads_watched);
   return jsonResponse({
     watched_today: newCount,
     daily_limit: ONCLICKA_DAILY_LIMIT,
@@ -2333,7 +2343,7 @@ async function handleFriendsList(request, env) {
   const page = Math.max(0, parseInt(body.page, 10) || 0);
   const offset = page * 10;
   const result = await env.DB.prepare(
-    `SELECT u.telegram_id, u.username, u.ads_task_total, r.earned_coins, r.is_active
+    `SELECT u.telegram_id, u.username, u.ads_task_total, u.lifetime_ads_watched, r.earned_coins, r.is_active
      FROM referrals r
      JOIN users u ON u.telegram_id = r.referred_id
      WHERE r.referrer_id = ?
@@ -2344,7 +2354,8 @@ async function handleFriendsList(request, env) {
   const hasMore = rows.length > 10;
   const friends = rows.slice(0, 10).map((r) => ({
     name: r.username || ("User " + r.telegram_id),
-    ads_watched: r.ads_task_total || 0,
+    // lifetime_ads_watched counts GigaPub, Monetix and OnClicka ads; ads_task_total counts Adsgram
+    ads_watched: (r.lifetime_ads_watched || 0) + (r.ads_task_total || 0),
     earned_coins: r.earned_coins || 0,
     active: !!r.is_active
   }));
