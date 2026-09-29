@@ -221,3 +221,7 @@ DROP TABLE transactions;
 -- قيمة شارة The Ambassador (Value ??$). يبقى صف ambassador_grants بعد الاستلام ليحفظ القيمة.
 -- =====================================================================
 ALTER TABLE ambassador_grants ADD COLUMN value_usd REAL;
+
+-- Watch OnClicka Ads: عدّاد يومي، المنح عبر endpoint محمي بـinitData (لا Postback) — نفس طريقة Monetix.
+ALTER TABLE users ADD COLUMN onclicka_task_count INTEGER DEFAULT 0;
+ALTER TABLE users ADD COLUMN onclicka_task_date TEXT;

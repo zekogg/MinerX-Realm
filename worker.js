@@ -90,6 +90,10 @@ const GIGAPUB_DAILY_LIMIT = 8;
 const MONETIX_REWARD_COINS = 15;
 const MONETIX_DAILY_LIMIT = 10;
 
+// Watch OnClicka Ads config
+const ONCLICKA_REWARD_COINS = 15;
+const ONCLICKA_DAILY_LIMIT = 10;
+
 // Realm pets & Storage config
 const PETS = {
   duck:         { basespeed: 77,    price: 200000 },
@@ -352,6 +356,9 @@ async function routeRequest(request, env, url) {
     if (url.pathname === "/api/monetix/reward" && request.method === "POST") {
       return handleMonetixReward(request, env);
     }
+    if (url.pathname === "/api/onclicka/reward" && request.method === "POST") {
+      return handleOnclickaReward(request, env);
+    }
     if (url.pathname === "/api/ads/gate-watched" && request.method === "POST") {
       return handleAdsGateWatched(request, env);
     }
@@ -424,7 +431,7 @@ async function handleGetUser(request, env) {
            u.checkin1_claimed_date, u.checkin2_claimed_date, u.checkin3_claimed_date, u.checkin4_claimed_date,
            u.bonus_ad_count_today, u.bonus_ad_date, u.bonus_ad_last_watched_at,
            u.gigapub_task_count, u.gigapub_task_date, u.photo_url,
-           u.monetix_task_count, u.monetix_task_date, u.lifetime_ads_watched,
+           u.monetix_task_count, u.monetix_task_date, u.onclicka_task_count, u.onclicka_task_date, u.lifetime_ads_watched,
            u.combo_date, u.combo_attempts_used, u.combo_solved
     FROM users u
     WHERE u.telegram_id = ?
@@ -494,6 +501,9 @@ async function handleGetUser(request, env) {
   view.monetix_watched_today = user.monetix_task_date === today ? (user.monetix_task_count || 0) : 0;
   view.monetix_daily_limit = MONETIX_DAILY_LIMIT;
   view.monetix_reward_coins = MONETIX_REWARD_COINS;
+  view.onclicka_watched_today = user.onclicka_task_date === today ? (user.onclicka_task_count || 0) : 0;
+  view.onclicka_daily_limit = ONCLICKA_DAILY_LIMIT;
+  view.onclicka_reward_coins = ONCLICKA_REWARD_COINS;
   return jsonResponse({ user: view });
 }
 
@@ -2154,6 +2164,38 @@ async function handleMonetixReward(request, env) {
     daily_limit: MONETIX_DAILY_LIMIT,
     reward_coins: MONETIX_REWARD_COINS,
     coins: row.coins + MONETIX_REWARD_COINS
+  });
+}
+
+// /api/onclicka/reward
+async function handleOnclickaReward(request, env) {
+  const auth = await authenticateRequest(request, env);
+  if (!auth.ok) return auth.response;
+  const { telegramId } = auth;
+  const row = await env.DB.prepare(
+    "SELECT coins, onclicka_task_count, onclicka_task_date FROM users WHERE telegram_id = ?"
+  ).bind(telegramId).first();
+  if (!row) return jsonResponse({ error: "user_not_found" }, 404);
+  const today = todayUTC();
+  const countToday = row.onclicka_task_date === today ? (row.onclicka_task_count || 0) : 0;
+  if (countToday >= ONCLICKA_DAILY_LIMIT) {
+    return jsonResponse({ error: "daily_limit_reached", watched_today: countToday, daily_limit: ONCLICKA_DAILY_LIMIT }, 409);
+  }
+  const newCount = countToday + 1;
+  const updateStmt = env.DB.prepare(
+    `UPDATE users SET coins = coins + ?, onclicka_task_count = ?, onclicka_task_date = ?
+     WHERE telegram_id = ? AND (onclicka_task_date IS NULL OR onclicka_task_date <> ? OR onclicka_task_count = ?)`
+  ).bind(ONCLICKA_REWARD_COINS, newCount, today, telegramId, today, countToday);
+  const updateResult = await updateStmt.run();
+  if (!updateResult.meta || updateResult.meta.changes === 0) {
+    return jsonResponse({ error: "daily_limit_reached", watched_today: countToday, daily_limit: ONCLICKA_DAILY_LIMIT }, 409);
+  }
+  await bumpLifetimeAdsWatched(env, telegramId);
+  return jsonResponse({
+    watched_today: newCount,
+    daily_limit: ONCLICKA_DAILY_LIMIT,
+    reward_coins: ONCLICKA_REWARD_COINS,
+    coins: row.coins + ONCLICKA_REWARD_COINS
   });
 }
 
