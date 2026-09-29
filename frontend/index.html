@@ -50,11 +50,17 @@ var I18N_LANGS = [
   { code: 'ru', name: 'Русский', short: 'Ru', flag: '🇷🇺' },
   { code: 'ar', name: 'العربية', short: 'Ar', flag: '🇸🇦' },
   { code: 'fa', name: 'فارسی', short: 'Fa', flag: '🇮🇷' },
-  { code: 'tr', name: 'Türkçe', short: 'Tr', flag: '🇹🇷' }
+  { code: 'tr', name: 'Türkçe', short: 'Tr', flag: '🇹🇷' },
+  { code: 'uk', name: 'Українська', short: 'Uk', flag: '🇺🇦' },
+  { code: 'es', name: 'Español', short: 'Es', flag: '🇪🇸' },
+  { code: 'id', name: 'Bahasa Indonesia', short: 'Id', flag: '🇮🇩' },
+  { code: 'vi', name: 'Tiếng Việt', short: 'Vi', flag: '🇻🇳' }
 ];
-// a text that does not fit gets a smaller font, but not below the smallest text of the design (6px at 390px wide,
+// a text that does not fit gets a smaller font, but not below a readable size for its script (px at 390px wide,
 // scaled with the screen) nor below 60% of its own size; any text may still shrink by 22%
 var I18N_MIN_FONT_PX = 6, I18N_MIN_FONT_RATIO = 0.6, I18N_ALWAYS_RATIO = 0.78;
+// scripts with accents, dots or stacked marks become unreadable sooner than plain Latin/Cyrillic
+var I18N_MIN_FONT_BY_LANG = { vi: 6.5, ar: 6.5, fa: 6.5, hi: 7.5, bn: 7.5, th: 7.5, my: 7.5, zh: 8 };
 var i18n = { lang: 'en', dict: null, ready: false, readyCallbacks: [], exact: {}, reverse: {}, patterns: [] };
 // reverse: any translated text (all languages) -> its English source, so re-rendered translated text is still recognised
 (function(){
@@ -371,7 +377,7 @@ function i18nFitMeasure(items){
     m.lineHeight = m.p.line ? el.style.lineHeight : cs.lineHeight;
     // a smaller inline text sits on the parent's baseline and would make its line taller; top-align keeps the line height
     m.inline = cs.display === 'inline';
-    var minPx = Math.min(m.base * I18N_ALWAYS_RATIO, Math.max(I18N_MIN_FONT_PX * scale, m.base * I18N_MIN_FONT_RATIO));
+    var minPx = Math.min(m.base * I18N_ALWAYS_RATIO, Math.max((I18N_MIN_FONT_BY_LANG[i18n.lang] || I18N_MIN_FONT_PX) * scale, m.base * I18N_MIN_FONT_RATIO));
     m.lo = minPx / m.base; m.hi = 1;
     if (m.lo >= 1){ el.__i18nOverflow = true; return; }
     i18nSaveStyle(el);
@@ -918,7 +924,7 @@ img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; poi
 .lang-selector__arrow{ width:calc(11px * var(--s)); height:calc(11px * var(--s)); flex-shrink:0; }
 .lang-menu{
   position:absolute; top:calc(100% + calc(8px * var(--s))); right:0; z-index:900;
-  width:calc(150px * var(--s)); max-height:calc(7 * calc(30px * var(--s)) + calc(8px * var(--s)));
+  width:calc(168px * var(--s)); max-height:calc(7 * calc(30px * var(--s)) + calc(8px * var(--s)));
   overflow-y:auto; overscroll-behavior:contain;
   padding:calc(4px * var(--s));
   background:rgba(22,17,36,.97); border:1px solid var(--stone-border-2); border-radius:calc(12px * var(--s));
@@ -3980,9 +3986,9 @@ body.reduce-motion .firefly{
         </div>
         <div class="card ad-task">
           <div class="ad-task__icon">
-            <img loading="lazy" draggable="false" src="/adexium%20icon.webp" alt="adexium" style="width:100%;height:100%;object-fit:cover;border-radius:calc(10px * var(--s));">
+            <img loading="lazy" draggable="false" src="/OnClicka%20Ads%20icon.webp" alt="OnClicka" style="width:100%;height:100%;object-fit:cover;border-radius:calc(10px * var(--s));">
           </div>
-          <div class="ad-task__title">Watch adexium ads</div>
+          <div class="ad-task__title">Watch OnClicka Ads</div>
           <div class="ad-task__meta">
             <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:calc(18px * var(--s));height:calc(18px * var(--s));flex-shrink:0;vertical-align:middle;">
             <span class="ad-task__reward">+15 / Ad</span>
