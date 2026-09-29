@@ -8065,12 +8065,44 @@ function creditMonetixReward(){
 // The SDK hands back a show() function once it is ready; show() resolves when the ad was watched to the end
 var ONCLICKA_SPOT_ID = '466532';
 var ONCLICKA_MAX_WAIT_MS = 90000;
+var ONCLICKA_READY_WAIT_MS = 12000;
 var onclickaShow = null;
-if (typeof window.initCdTma === 'function'){
-  window.initCdTma({ id: ONCLICKA_SPOT_ID })
-    .then(function(show){ onclickaShow = show; })
-    .catch(function(e){ console.log('onclicka init failed:', e); });
+var onclickaInitPromise = null;
+// Starts the SDK once (again after a failure); resolves with show() or rejects with the reason.
+// The SDK script may still be loading, so it is waited for instead of skipped.
+function onclickaEnsureReady(){
+  if (typeof onclickaShow === 'function') return Promise.resolve(onclickaShow);
+  if (onclickaInitPromise) return onclickaInitPromise;
+  var startedAt = Date.now();
+  onclickaInitPromise = new Promise(function(resolve, reject){
+    (function waitForSdk(){
+      if (typeof window.initCdTma === 'function'){
+        console.log('[onclicka] SDK loaded, initialising spot ' + ONCLICKA_SPOT_ID);
+        var initTimer = setTimeout(function(){ reject(new Error('initCdTma did not answer within ' + (ONCLICKA_READY_WAIT_MS / 1000) + 's')); }, ONCLICKA_READY_WAIT_MS);
+        window.initCdTma({ id: ONCLICKA_SPOT_ID }).then(function(show){
+          clearTimeout(initTimer);
+          if (typeof show !== 'function') throw new Error('initCdTma returned no show() function: ' + String(show));
+          console.log('[onclicka] ready');
+          onclickaShow = show;
+          resolve(show);
+        }).catch(function(e){ clearTimeout(initTimer); reject(e); });
+        return;
+      }
+      if (Date.now() - startedAt > ONCLICKA_READY_WAIT_MS){
+        reject(new Error('SDK script not loaded (window.initCdTma is ' + typeof window.initCdTma + ')'));
+        return;
+      }
+      setTimeout(waitForSdk, 250);
+    })();
+  }).catch(function(e){
+    console.log('[onclicka] init failed:', e && e.message ? e.message : e);
+    onclickaInitPromise = null;
+    throw e;
+  });
+  return onclickaInitPromise;
 }
+// warm up in the background so the first Watch press is instant
+onclickaEnsureReady().catch(function(){});
 var onclickaState = { watchedToday: 0, dailyLimit: 10, rewardCoins: 15, busy: false, cooldownUntil: 0 };
 var onclickaTaskCooldownTimer = null;
 function applyOnclickaState(data){
@@ -8116,40 +8148,35 @@ function onWatchOnclickaClick(){
     showComeBackTomorrowToast();
     return;
   }
-  if (typeof onclickaShow !== 'function'){
-    showBuyErrorToast('Ad not available right now', { title: 'Watch OnClicka Ads' });
-    return;
-  }
   onclickaState.busy = true;
   renderOnclickaButton();
   showAdLoadingOverlay();
   setAdLoadingOverlayVia('OnClicka');
   var settled = false;
+  var finishWithError = function(message, detail){
+    if (settled) return;
+    settled = true;
+    clearTimeout(safetyTimer);
+    if (detail !== undefined) console.log('[onclicka] ' + message + ':', detail && detail.message ? detail.message : detail);
+    hideAdLoadingOverlay();
+    onclickaState.busy = false;
+    renderOnclickaButton();
+    showBuyErrorToast(message, { title: 'Watch OnClicka Ads' });
+  };
   // show() only settles when the ad ends, so the safety timer covers a whole video, not just loading
-  var safetyTimer = setTimeout(function(){
+  var safetyTimer = setTimeout(function(){ finishWithError('No ad available right now', 'no answer from the SDK'); }, ONCLICKA_MAX_WAIT_MS);
+  onclickaEnsureReady().then(function(show){
     if (settled) return;
-    settled = true;
-    hideAdLoadingOverlay();
-    onclickaState.busy = false;
-    renderOnclickaButton();
-    showBuyErrorToast('No ad available right now', { title: 'Watch OnClicka Ads' });
-  }, ONCLICKA_MAX_WAIT_MS);
-  Promise.resolve().then(function(){ return onclickaShow(); }).then(function(){
-    if (settled) return;
-    settled = true;
-    clearTimeout(safetyTimer);
-    setAdLoadingOverlayVerifying();
-    creditOnclickaReward();
-  }).catch(function(e){
-    if (settled) return;
-    settled = true;
-    clearTimeout(safetyTimer);
-    console.log('onclicka ad not completed:', e);
-    hideAdLoadingOverlay();
-    onclickaState.busy = false;
-    renderOnclickaButton();
-    showBuyErrorToast('Ad was not completed', { title: 'Watch OnClicka Ads' });
-  });
+    console.log('[onclicka] show()');
+    return Promise.resolve().then(function(){ return show(); }).then(function(result){
+      if (settled) return;
+      settled = true;
+      clearTimeout(safetyTimer);
+      console.log('[onclicka] ad completed', result);
+      setAdLoadingOverlayVerifying();
+      creditOnclickaReward();
+    }, function(e){ finishWithError('Ad was not completed', e); });
+  }, function(e){ finishWithError('Ad not available right now', e); });
 }
 function creditOnclickaReward(){
   var initData = getTelegramInitData();
