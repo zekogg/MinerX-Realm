@@ -8063,7 +8063,8 @@ function creditMonetixReward(){
 
 // Watch OnClicka Ads
 // The SDK hands back a show() function once it is ready; show() resolves when the ad was watched to the end
-var ONCLICKA_SPOT_ID = '466532';
+// a number, as in the OnClicka guide ({ id: Spot ID }); initCdTma answers null for an id it does not accept
+var ONCLICKA_SPOT_ID = 466532;
 var ONCLICKA_MAX_WAIT_MS = 90000;
 var ONCLICKA_READY_WAIT_MS = 12000;
 var onclickaShow = null;
@@ -8081,7 +8082,7 @@ function onclickaEnsureReady(){
         var initTimer = setTimeout(function(){ reject(new Error('initCdTma did not answer within ' + (ONCLICKA_READY_WAIT_MS / 1000) + 's')); }, ONCLICKA_READY_WAIT_MS);
         window.initCdTma({ id: ONCLICKA_SPOT_ID }).then(function(show){
           clearTimeout(initTimer);
-          if (typeof show !== 'function') throw new Error('initCdTma returned no show() function: ' + String(show));
+          if (typeof show !== 'function') throw new Error('initCdTma returned no show() function: ' + String(show) + ' (spot ' + ONCLICKA_SPOT_ID + ', ' + typeof ONCLICKA_SPOT_ID + ')');
           console.log('[onclicka] ready');
           onclickaShow = show;
           resolve(show);
