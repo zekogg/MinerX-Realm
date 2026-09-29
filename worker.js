@@ -1450,17 +1450,14 @@ async function handleAdsReward(url, env) {
 
 // Lifetime ads counter
 async function bumpLifetimeAdsWatched(env, telegramId) {
-  const row = await env.DB.prepare(
-    "SELECT lifetime_ads_watched, referred_by FROM users WHERE telegram_id = ?"
+  // one write; RETURNING gives the new lifetime count without a separate read
+  const updated = await env.DB.prepare(
+    `UPDATE users SET lifetime_ads_watched = COALESCE(lifetime_ads_watched, 0) + 1, weekly_ads_watched = weekly_ads_watched + 1
+     WHERE telegram_id = ?
+     RETURNING lifetime_ads_watched, referred_by`
   ).bind(telegramId).first();
-  if (!row) return;
-  const previous = row.lifetime_ads_watched || 0;
-  const newTotal = previous + 1;
-  const updateResult = await env.DB.prepare(
-    "UPDATE users SET lifetime_ads_watched = ?, weekly_ads_watched = weekly_ads_watched + 1 WHERE telegram_id = ? AND lifetime_ads_watched = ?"
-  ).bind(newTotal, telegramId, previous).run();
-  if (!updateResult.meta || updateResult.meta.changes === 0) return;
-  await activateReferralOnLifetimeAds(env, telegramId, row.referred_by, newTotal);
+  if (!updated) return;
+  await activateReferralOnLifetimeAds(env, telegramId, updated.referred_by, updated.lifetime_ads_watched);
 }
 
 // Referral becomes active once the invited user reaches ACTIVE_FRIEND_ADS_THRESHOLD lifetime ads
