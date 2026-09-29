@@ -7895,11 +7895,37 @@ function runAdGate(onSuccess, onFail){
       triggerConfetti();
       onSuccess();
     }).catch(function(){
-      runAdGateMonetixFallback(onSuccess, onFail);
+      runAdGateOnclickaFallback(onSuccess, onFail);
     });
     return;
   }
-  runAdGateMonetixFallback(onSuccess, onFail);
+  runAdGateOnclickaFallback(onSuccess, onFail);
+}
+// Second choice after GigaPub; counted like the Monetix gate (lifetime ads only), never against the OnClicka daily task
+function runAdGateOnclickaFallback(onSuccess, onFail){
+  setAdLoadingOverlayVia('OnClicka');
+  var settled = false;
+  var fallBack = function(detail){
+    if (settled) return;
+    settled = true;
+    clearTimeout(safetyTimer);
+    console.log('[onclicka] gate ad not shown:', detail && detail.message ? detail.message : detail);
+    runAdGateMonetixFallback(onSuccess, onFail);
+  };
+  // show() only settles when the ad ends, so the safety timer covers a whole video
+  var safetyTimer = setTimeout(function(){ fallBack('no answer from the SDK'); }, ONCLICKA_MAX_WAIT_MS);
+  onclickaEnsureReady().then(function(show){
+    if (settled) return;
+    return Promise.resolve().then(function(){ return show(); }).then(function(){
+      if (settled) return;
+      settled = true;
+      clearTimeout(safetyTimer);
+      setAdLoadingOverlayVerifying();
+      reportGateAdWatched();
+      triggerConfetti();
+      onSuccess();
+    }, fallBack);
+  }, fallBack);
 }
 function runAdGateMonetixFallback(onSuccess, onFail){
   setAdLoadingOverlayVia('Monetix');
