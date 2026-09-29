@@ -945,8 +945,8 @@ img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; poi
 .lang-menu__flag{ font-size:calc(14px * var(--s)); line-height:1; flex-shrink:0; }
 .lang-menu__name{ flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .lang-menu__code{ color:var(--ink-faint); font-size:calc(9.5px * var(--s)); font-family:var(--font-display); flex-shrink:0; }
-/* Arabic/Persian text stays in the left-to-right layout; bold values are isolated so "Fee: 5%" is not reordered */
-html[data-lang="ar"] b, html[data-lang="ar"] strong, html[data-lang="fa"] b, html[data-lang="fa"] strong{ unicode-bidi:isolate; }
+/* Arabic/Persian: each bold part is isolated and reads in the direction of its own first letter ("5%" stays as is, an Arabic phrase keeps its right-to-left order) */
+html[data-lang="ar"] b, html[data-lang="ar"] strong, html[data-lang="fa"] b, html[data-lang="fa"] strong{ unicode-bidi:plaintext; }
 
 /* Page Frame */
 .pages{ position:relative; flex:1; overflow:hidden; }
