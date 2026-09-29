@@ -45,28 +45,29 @@
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script>
 // Languages: every visible text is translated from its English text via /languages.json; the layout never moves
+// Order: English, then the CIS languages, then by how active each audience is in earning bots
 var I18N_LANGS = [
   { code: 'en', name: 'English', short: 'En', flag: '🇬🇧' },
   { code: 'ru', name: 'Русский', short: 'Ru', flag: '🇷🇺' },
-  { code: 'ar', name: 'العربية', short: 'Ar', flag: '🇸🇦' },
-  { code: 'fa', name: 'فارسی', short: 'Fa', flag: '🇮🇷' },
-  { code: 'tr', name: 'Türkçe', short: 'Tr', flag: '🇹🇷' },
   { code: 'uk', name: 'Українська', short: 'Uk', flag: '🇺🇦' },
-  { code: 'es', name: 'Español', short: 'Es', flag: '🇪🇸' },
+  { code: 'uz', name: "O'zbekcha", short: 'Uz', flag: '🇺🇿' },
   { code: 'id', name: 'Bahasa Indonesia', short: 'Id', flag: '🇮🇩' },
   { code: 'vi', name: 'Tiếng Việt', short: 'Vi', flag: '🇻🇳' },
-  { code: 'fr', name: 'Français', short: 'Fr', flag: '🇫🇷' },
-  { code: 'de', name: 'Deutsch', short: 'De', flag: '🇩🇪' },
-  { code: 'pt', name: 'Português', short: 'Pt', flag: '🇧🇷' },
-  { code: 'it', name: 'Italiano', short: 'It', flag: '🇮🇹' },
-  { code: 'pl', name: 'Polski', short: 'Pl', flag: '🇵🇱' },
-  { code: 'uz', name: "O'zbekcha", short: 'Uz', flag: '🇺🇿' },
-  { code: 'fil', name: 'Filipino', short: 'Fil', flag: '🇵🇭' },
   { code: 'hi', name: 'हिन्दी', short: 'Hi', flag: '🇮🇳' },
+  { code: 'tr', name: 'Türkçe', short: 'Tr', flag: '🇹🇷' },
+  { code: 'pt', name: 'Português', short: 'Pt', flag: '🇧🇷' },
+  { code: 'es', name: 'Español', short: 'Es', flag: '🇪🇸' },
+  { code: 'fil', name: 'Filipino', short: 'Fil', flag: '🇵🇭' },
   { code: 'bn', name: 'বাংলা', short: 'Bn', flag: '🇧🇩' },
   { code: 'th', name: 'ไทย', short: 'Th', flag: '🇹🇭' },
   { code: 'my', name: 'မြန်မာ', short: 'My', flag: '🇲🇲' },
-  { code: 'zh', name: '中文', short: 'Zh', flag: '🇨🇳' }
+  { code: 'fr', name: 'Français', short: 'Fr', flag: '🇫🇷' },
+  { code: 'zh', name: '中文', short: 'Zh', flag: '🇨🇳' },
+  { code: 'de', name: 'Deutsch', short: 'De', flag: '🇩🇪' },
+  { code: 'pl', name: 'Polski', short: 'Pl', flag: '🇵🇱' },
+  { code: 'it', name: 'Italiano', short: 'It', flag: '🇮🇹' },
+  { code: 'fa', name: 'فارسی', short: 'Fa', flag: '🇮🇷' },
+  { code: 'ar', name: 'العربية', short: 'Ar', flag: '🇸🇦' }
 ];
 // Telegram language codes that belong to one of the languages above
 var I18N_ALIASES = { tl: 'fil' };
@@ -506,30 +507,51 @@ function i18nRenderSelector(){
   if (text) text.textContent = cur.short;
   document.querySelectorAll('.lang-menu__item').forEach(function(item){ item.classList.toggle('is-active', item.getAttribute('data-lang') === i18n.lang); });
 }
+function i18nMenuOpen(open){
+  var menu = document.getElementById('lang-menu');
+  if (!menu) return;
+  menu.classList.toggle('is-open', open);
+  var selector = menu.closest('.lang-selector');
+  if (selector) selector.classList.toggle('is-open', open);
+  if (open) i18nMenuThumb();
+}
+// size and place the purple bar from the list's scroll position
+function i18nMenuThumb(){
+  var list = document.querySelector('.lang-menu__list');
+  var track = document.querySelector('.lang-menu__track');
+  var thumb = document.querySelector('.lang-menu__thumb');
+  if (!list || !track || !thumb) return;
+  var trackH = track.clientHeight, scrollable = list.scrollHeight - list.clientHeight;
+  track.style.display = scrollable > 1 ? '' : 'none';
+  if (scrollable <= 1) return;
+  var thumbH = Math.max(trackH * list.clientHeight / list.scrollHeight, trackH * 0.15);
+  thumb.style.height = thumbH + 'px';
+  thumb.style.transform = 'translateY(' + ((trackH - thumbH) * list.scrollTop / scrollable) + 'px)';
+}
 function i18nToggleMenu(ev){
   if (ev) ev.stopPropagation();
   var menu = document.getElementById('lang-menu');
-  if (menu) menu.classList.toggle('is-open');
+  if (menu) i18nMenuOpen(!menu.classList.contains('is-open'));
 }
 document.addEventListener('DOMContentLoaded', function(){
   var menu = document.getElementById('lang-menu');
   if (menu){
-    menu.innerHTML = I18N_LANGS.map(function(l){
+    menu.innerHTML = '<div class="lang-menu__list">' + I18N_LANGS.map(function(l){
       return '<button class="lang-menu__item" data-lang="' + l.code + '" onclick="i18nPick(event, \'' + l.code + '\')">' +
         '<span class="lang-menu__flag">' + l.flag + '</span><span class="lang-menu__name">' + l.name + '</span><span class="lang-menu__code">' + l.short + '</span></button>';
-    }).join('');
+    }).join('') + '</div><div class="lang-menu__track"><div class="lang-menu__thumb"></div></div>';
+    menu.querySelector('.lang-menu__list').addEventListener('scroll', i18nMenuThumb, { passive: true });
   }
   document.addEventListener('click', function(e){
     var m = document.getElementById('lang-menu');
-    if (m && m.classList.contains('is-open') && !m.contains(e.target)) m.classList.remove('is-open');
+    if (m && m.classList.contains('is-open') && !m.contains(e.target)) i18nMenuOpen(false);
   });
   i18nRenderSelector();
   i18nOnReady(function(){ i18nBuildIndex(); i18nWalk(document.body); i18nScheduleFit(); i18nStartObserver(); });
 });
 function i18nPick(ev, code){
   ev.stopPropagation();
-  var menu = document.getElementById('lang-menu');
-  if (menu) menu.classList.remove('is-open');
+  i18nMenuOpen(false);
   if (code !== i18n.lang) i18nSetLanguage(code);
 }
 </script>
@@ -935,19 +957,37 @@ img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; poi
   flex-shrink:0;
 }
 .lang-selector__flag{ font-size:calc(14px * var(--s)); line-height:1; }
-.lang-selector__arrow{ width:calc(11px * var(--s)); height:calc(11px * var(--s)); flex-shrink:0; }
+.lang-selector__arrow{ width:calc(11px * var(--s)); height:calc(11px * var(--s)); flex-shrink:0; transform:rotate(90deg); }
+.lang-selector.is-open .lang-selector__arrow{ transform:none; }
 .lang-menu{
   position:absolute; top:calc(100% + calc(8px * var(--s))); right:0; z-index:900;
-  width:calc(168px * var(--s)); max-height:calc(7 * calc(30px * var(--s)) + calc(8px * var(--s)));
-  overflow-y:auto; overscroll-behavior:contain;
-  padding:calc(4px * var(--s));
-  background:rgba(22,17,36,.97); border:1px solid var(--stone-border-2); border-radius:calc(12px * var(--s));
-  box-shadow:var(--shadow-deep);
+  width:calc(180px * var(--s));
+  background:rgba(22,17,36,.97);
+  border:calc(1.5px * var(--s)) solid rgba(167,139,250,.7); border-radius:calc(12px * var(--s));
+  box-shadow:0 0 0 1px rgba(139,92,246,.18), 0 0 calc(14px * var(--s)) rgba(139,92,246,.45), var(--shadow-deep);
   display:none;
 }
 .lang-menu.is-open{ display:block; }
-.lang-menu::-webkit-scrollbar{ width:calc(3px * var(--s)); }
-.lang-menu::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.18); border-radius:calc(3px * var(--s)); }
+/* the list scrolls with its own (hidden) scrollbar; a drawn purple bar shows the position on every phone */
+.lang-menu__list{
+  max-height:calc(7 * calc(30px * var(--s)) + calc(8px * var(--s)));
+  overflow-y:auto; overscroll-behavior:contain;
+  padding:calc(4px * var(--s)) calc(12px * var(--s)) calc(4px * var(--s)) calc(4px * var(--s));
+  scrollbar-width:none;
+}
+.lang-menu__list::-webkit-scrollbar{ display:none; }
+.lang-menu__track{
+  position:absolute; top:calc(8px * var(--s)); bottom:calc(8px * var(--s)); right:calc(4px * var(--s));
+  width:calc(4px * var(--s)); border-radius:calc(4px * var(--s));
+  background:rgba(139,92,246,.18);
+  pointer-events:none;
+}
+.lang-menu__thumb{
+  position:absolute; left:0; right:0; top:0;
+  border-radius:calc(4px * var(--s));
+  background:linear-gradient(180deg, #e9d5ff, #a78bfa 45%, #7c3aed);
+  box-shadow:0 0 calc(6px * var(--s)) rgba(167,139,250,.9), inset 0 0 calc(2px * var(--s)) rgba(255,255,255,.6);
+}
 .lang-menu__item{
   width:100%; height:calc(30px * var(--s));
   display:flex; align-items:center; gap:calc(8px * var(--s));
