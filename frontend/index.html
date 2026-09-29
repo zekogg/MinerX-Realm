@@ -561,6 +561,9 @@ function i18nPick(ev, code){
 
 <!-- MonetixAds SDK -->
 <script src="https://www.monetixads.online/ads.js" data-mxid="MX-00DFB0A3"></script>
+
+<!-- OnClicka SDK (Telegram Mini App rewarded video) -->
+<script src="https://js.onclckvd.com/in-stream-ad-admanager/tma.js"></script>
 <style>
 
 /* Theme Variables */
@@ -4046,12 +4049,12 @@ body.reduce-motion .firefly{
           <div class="ad-task__meta">
             <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:calc(18px * var(--s));height:calc(18px * var(--s));flex-shrink:0;vertical-align:middle;">
             <span class="ad-task__reward">+15 / Ad</span>
-            <span class="ad-task__avail">Coming Soon</span>
+            <span class="ad-task__avail" id="onclicka-task-avail">Available</span>
           </div>
           <div class="ad-task__divider"></div>
           <div class="ad-task__footer">
-            <button class="ad-task__watch is-claimed">Soon</button>
-            <span class="ad-task__counter">0 / 10</span>
+            <button class="ad-task__watch" id="onclicka-task-watch-btn" onclick="onWatchOnclickaClick()">Watch</button>
+            <span class="ad-task__counter" id="onclicka-task-counter">0 / 10</span>
           </div>
         </div>
       </div>
@@ -5250,7 +5253,8 @@ var domCache = {
   adsTaskBtn: null, adsTaskCounter: null, adsTaskAvail: null,
   gigapubBtn: null, gigapubCounter: null, gigapubAvail: null,
   bonusAdBtn: null, bonusAdCounter: null, bonusAdAvail: null,
-  monetixBtn: null, monetixCounter: null, monetixAvail: null
+  monetixBtn: null, monetixCounter: null, monetixAvail: null,
+  onclickaBtn: null, onclickaCounter: null, onclickaAvail: null
 };
 (function(){
   domCache.miningBtn = document.getElementById('btn-start-mining');
@@ -5274,6 +5278,9 @@ var domCache = {
   domCache.monetixBtn = document.getElementById('monetix-task-watch-btn');
   domCache.monetixCounter = document.getElementById('monetix-task-counter');
   domCache.monetixAvail = document.getElementById('monetix-task-avail');
+  domCache.onclickaBtn = document.getElementById('onclicka-task-watch-btn');
+  domCache.onclickaCounter = document.getElementById('onclicka-task-counter');
+  domCache.onclickaAvail = document.getElementById('onclicka-task-avail');
 })();
 
 // Animation Toggle
@@ -5579,6 +5586,11 @@ function fetchUserData(){
       watched_today: data.user.monetix_watched_today,
       daily_limit: data.user.monetix_daily_limit,
       reward_coins: data.user.monetix_reward_coins
+    });
+    applyOnclickaState({
+      watched_today: data.user.onclicka_watched_today,
+      daily_limit: data.user.onclicka_daily_limit,
+      reward_coins: data.user.onclicka_reward_coins
     });
     setupInviteLink(data.user.telegram_id);
     applyFriendsState({
@@ -8045,6 +8057,136 @@ function creditMonetixReward(){
     console.error('monetix reward request failed:', err);
     monetixState.busy = false;
     renderMonetixButton();
+    hideAdLoadingOverlay();
+  });
+}
+
+// Watch OnClicka Ads
+// The SDK hands back a show() function once it is ready; show() resolves when the ad was watched to the end
+var ONCLICKA_SPOT_ID = '466532';
+var ONCLICKA_MAX_WAIT_MS = 90000;
+var onclickaShow = null;
+if (typeof window.initCdTma === 'function'){
+  window.initCdTma({ id: ONCLICKA_SPOT_ID })
+    .then(function(show){ onclickaShow = show; })
+    .catch(function(e){ console.log('onclicka init failed:', e); });
+}
+var onclickaState = { watchedToday: 0, dailyLimit: 10, rewardCoins: 15, busy: false, cooldownUntil: 0 };
+var onclickaTaskCooldownTimer = null;
+function applyOnclickaState(data){
+  onclickaState.watchedToday = data.watched_today || 0;
+  onclickaState.dailyLimit = data.daily_limit || 10;
+  onclickaState.rewardCoins = data.reward_coins || 15;
+  renderOnclickaButton();
+}
+function renderOnclickaButton(){
+  var btn = domCache.onclickaBtn;
+  var counter = domCache.onclickaCounter;
+  var avail = domCache.onclickaAvail;
+  if (counter) counter.textContent = onclickaState.watchedToday + ' / ' + onclickaState.dailyLimit;
+  var dailyDone = onclickaState.watchedToday >= onclickaState.dailyLimit;
+  if (avail) avail.textContent = dailyDone ? 'Come Back Tomorrow' : 'Available';
+  var cooldownRemaining = Math.ceil((onclickaState.cooldownUntil - Date.now()) / 1000);
+  var inCooldown = cooldownRemaining > 0;
+  if (btn){
+    if (onclickaState.busy){
+      setButtonBusy(btn, true);
+    } else {
+      setButtonBusy(btn, false);
+      btn.disabled = false;
+      btn.textContent = inCooldown ? String(cooldownRemaining) : 'Watch';
+      btn.classList.toggle('is-claimed', dailyDone || inCooldown);
+    }
+  }
+}
+function startOnclickaTaskCooldown(){
+  onclickaState.cooldownUntil = Date.now() + 10000;
+  clearInterval(onclickaTaskCooldownTimer);
+  renderOnclickaButton();
+  onclickaTaskCooldownTimer = setInterval(function(){
+    if (Date.now() >= onclickaState.cooldownUntil){
+      clearInterval(onclickaTaskCooldownTimer);
+    }
+    renderOnclickaButton();
+  }, 1000);
+}
+function onWatchOnclickaClick(){
+  if (onclickaState.busy || Date.now() < onclickaState.cooldownUntil) return;
+  if (onclickaState.watchedToday >= onclickaState.dailyLimit){
+    showComeBackTomorrowToast();
+    return;
+  }
+  if (typeof onclickaShow !== 'function'){
+    showBuyErrorToast('Ad not available right now', { title: 'Watch OnClicka Ads' });
+    return;
+  }
+  onclickaState.busy = true;
+  renderOnclickaButton();
+  showAdLoadingOverlay();
+  setAdLoadingOverlayVia('OnClicka');
+  var settled = false;
+  // show() only settles when the ad ends, so the safety timer covers a whole video, not just loading
+  var safetyTimer = setTimeout(function(){
+    if (settled) return;
+    settled = true;
+    hideAdLoadingOverlay();
+    onclickaState.busy = false;
+    renderOnclickaButton();
+    showBuyErrorToast('No ad available right now', { title: 'Watch OnClicka Ads' });
+  }, ONCLICKA_MAX_WAIT_MS);
+  Promise.resolve().then(function(){ return onclickaShow(); }).then(function(){
+    if (settled) return;
+    settled = true;
+    clearTimeout(safetyTimer);
+    setAdLoadingOverlayVerifying();
+    creditOnclickaReward();
+  }).catch(function(e){
+    if (settled) return;
+    settled = true;
+    clearTimeout(safetyTimer);
+    console.log('onclicka ad not completed:', e);
+    hideAdLoadingOverlay();
+    onclickaState.busy = false;
+    renderOnclickaButton();
+    showBuyErrorToast('Ad was not completed', { title: 'Watch OnClicka Ads' });
+  });
+}
+function creditOnclickaReward(){
+  var initData = getTelegramInitData();
+  if (!initData){
+    onclickaState.busy = false;
+    renderOnclickaButton();
+    hideAdLoadingOverlay();
+    return;
+  }
+  fetch('/api/onclicka/reward', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: initData })
+  })
+  .then(function(res){ return res.json(); })
+  .then(function(data){
+    if (data.error){
+      if (data.error === 'daily_limit_reached'){
+        applyOnclickaState({ watched_today: data.watched_today, daily_limit: data.daily_limit });
+      }
+      onclickaState.busy = false;
+      renderOnclickaButton();
+      hideAdLoadingOverlay();
+      return;
+    }
+    updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE });
+    applyOnclickaState({ watched_today: data.watched_today, daily_limit: data.daily_limit, reward_coins: data.reward_coins });
+    showAppToast({ title: 'Watch OnClicka Ads', icon: PRIZE_ICON_URLS.coins, amount: '+' + onclickaState.rewardCoins + ' Coins' });
+    triggerConfetti();
+    onclickaState.busy = false;
+    startOnclickaTaskCooldown();
+    hideAdLoadingOverlay();
+  })
+  .catch(function(err){
+    console.error('onclicka reward request failed:', err);
+    onclickaState.busy = false;
+    renderOnclickaButton();
     hideAdLoadingOverlay();
   });
 }
