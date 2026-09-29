@@ -8,12 +8,30 @@
 (function(){
   var DESIGN_WIDTH = 390, MAX_WIDTH = 460;
   var root = document.documentElement;
+  var lastScale = '';
   function applyUiScale(){
     var width = Math.min(window.innerWidth || root.clientWidth || DESIGN_WIDTH, MAX_WIDTH);
-    root.style.setProperty('--s', String(Math.round(width / DESIGN_WIDTH * 10000) / 10000));
+    var scale = String(Math.round(width / DESIGN_WIDTH * 10000) / 10000);
+    if (scale !== lastScale){ lastScale = scale; root.style.setProperty('--s', scale); }
+  }
+  // App height: fixed to the screen height, so the keyboard covers the bottom bar instead of pushing
+  // the whole app up (which moved the bar and re-laid out every page on each keyboard open/close)
+  var appWidth = 0, appHeight = 0;
+  function isTyping(){
+    var el = document.activeElement;
+    return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+  }
+  function applyAppHeight(){
+    var w = window.innerWidth, h = window.innerHeight;
+    if (!w || !h) return;
+    if (w !== appWidth || h > appHeight || (h < appHeight && !isTyping())){
+      appWidth = w; appHeight = h;
+      root.style.setProperty('--app-h', h + 'px');
+    }
   }
   applyUiScale();
-  window.addEventListener('resize', applyUiScale);
+  applyAppHeight();
+  window.addEventListener('resize', function(){ applyUiScale(); applyAppHeight(); });
 })();
 </script>
 <title>MinerX Realm — Mining Mini App</title>
@@ -34,7 +52,9 @@ var I18N_LANGS = [
   { code: 'fa', name: 'فارسی', short: 'Fa', flag: '🇮🇷' },
   { code: 'tr', name: 'Türkçe', short: 'Tr', flag: '🇹🇷' }
 ];
-var I18N_MIN_FONT_RATIO = 0.64;
+// a text that does not fit gets a smaller font, but not below the smallest text of the design (6px at 390px wide,
+// scaled with the screen) nor below 60% of its own size; any text may still shrink by 22%
+var I18N_MIN_FONT_PX = 6, I18N_MIN_FONT_RATIO = 0.6, I18N_ALWAYS_RATIO = 0.78;
 var i18n = { lang: 'en', dict: null, ready: false, readyCallbacks: [], exact: {}, reverse: {}, patterns: [] };
 // reverse: any translated text (all languages) -> its English source, so re-rendered translated text is still recognised
 (function(){
@@ -62,7 +82,7 @@ function i18nLoadDict(done){
     .catch(function(){ done(); });
 }
 function i18nBuildIndex(){
-  i18n.exact = {}; i18n.reverse = {}; i18n.patterns = [];
+  i18n.exact = {}; i18n.reverse = {}; i18n.patterns = []; i18nCache.clear();
   if (!i18n.dict) return;
   Object.keys(i18n.dict).forEach(function(src){
     if (src.indexOf('{0}') !== -1) return;
@@ -81,9 +101,17 @@ function i18nBuildIndex(){
   i18n.patterns.sort(function(a, b){ return b.src.replace(/\{\d\}/g, '').length - a.src.replace(/\{\d\}/g, '').length; });
 }
 // Translates one English string (exact text or a "{0}" pattern); returns null when there is nothing to translate
+var i18nCache = new Map();
 function i18nTranslate(text){
   if (i18n.lang === 'en' || !i18n.dict) return null;
   if (Object.prototype.hasOwnProperty.call(i18n.exact, text)) return i18n.exact[text];
+  if (i18nCache.has(text)) return i18nCache.get(text);
+  var out = i18nTranslatePattern(text);
+  if (i18nCache.size > 3000) i18nCache.clear();
+  i18nCache.set(text, out);
+  return out;
+}
+function i18nTranslatePattern(text){
   for (var i = 0; i < i18n.patterns.length; i++){
     var p = i18n.patterns[i], m = p.re.exec(text);
     if (!m) continue;
@@ -109,6 +137,45 @@ function i18nSkip(node){
   return false;
 }
 var i18nFitQueue = new Set();
+// Arabic/Persian: the layout stays left-to-right, but the words of each translated text keep their right-to-left
+// order (an isolate around the text, and a right-to-left paragraph for sentences made of several parts)
+var I18N_RTL = { ar: 1, fa: 1 };
+var I18N_RTL_CHARS = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/;
+// inside it, every run of Latin words and numbers ("00:00 UTC", "+15", "Happy Dog") stays left-to-right as one piece
+var I18N_LTR_RUN = /[A-Za-z0-9+\-\u2212][A-Za-z0-9 :.,%+\-\u2212\/]*[A-Za-z0-9%]|[A-Za-z0-9]/g;
+function i18nRtlWrap(tr, html){
+  if (tr === null || !I18N_RTL[i18n.lang] || !I18N_RTL_CHARS.test(tr)) return tr;
+  var ltr = function(seg){ return seg.replace(I18N_LTR_RUN, function(m){ return '\u2066' + m + '\u2069'; }); };
+  var body = html ? tr.split(/(<[^>]*>|&[A-Za-z0-9#]+;)/).map(function(seg, i){ return i % 2 ? seg : ltr(seg); }).join('') : ltr(tr);
+  return '\u2067' + body + '\u2069';
+}
+function i18nDirReset(el){
+  if (!el.__i18nDirOrig) return;
+  el.style.direction = el.__i18nDirOrig[0]; el.style.textAlign = el.__i18nDirOrig[1];
+  el.__i18nDirOrig = null;
+}
+var I18N_BLOCKS = { block: 1, 'inline-block': 1, 'list-item': 1, 'table-cell': 1, 'flow-root': 1 };
+// returns the paragraph that should read right-to-left (reads only), or null
+function i18nDirPlan(el){
+  var box = el;
+  while (box.parentElement && box !== document.body && getComputedStyle(box).display === 'inline') box = box.parentElement;
+  if (box.__i18nDirOrig){ if (!I18N_RTL_CHARS.test(box.textContent)){ i18nDirReset(box); i18nDirBoxes.delete(box); } return null; }
+  if (!I18N_RTL[i18n.lang] || box === document.body || box.__i18nHtmlSrc !== undefined || !box.firstElementChild) return null;
+  var cs = getComputedStyle(box);
+  if (!I18N_BLOCKS[cs.display] || !I18N_RTL_CHARS.test(box.textContent)) return null;
+  if (box.querySelector('img,svg,video,canvas,input,button,select,textarea,[data-no-i18n]')) return null;
+  for (var c = box.firstElementChild; c; c = c.nextElementSibling) if (getComputedStyle(c).display !== 'inline') return null;
+  return { box: box, align: cs.textAlign === 'start' ? 'left' : cs.textAlign === 'end' ? 'right' : cs.textAlign };
+}
+function i18nDirApply(plan){
+  var box = plan.box;
+  if (box.__i18nDirOrig) return;
+  box.__i18nDirOrig = [box.style.direction, box.style.textAlign];
+  box.style.textAlign = plan.align;
+  box.style.direction = 'rtl';
+  i18nDirBoxes.add(box);
+}
+var i18nDirBoxes = new Set();
 function i18nTextNode(node, force){
   var data = node.data, lead, src, tail;
   if (node.__i18nOut !== undefined && data === node.__i18nOut){
@@ -117,13 +184,13 @@ function i18nTextNode(node, force){
     lead = ms[1]; src = ms[2]; tail = ms[3];
   } else {
     var m = /^(\s*)([\s\S]*?)(\s*)$/.exec(data);
-    var core = m[2].replace(/[ \t\r\n]+/g, ' ');
+    var core = m[2].replace(/[\u2066-\u2069]/g, '').replace(/[ \t\r\n]+/g, ' ');
     if (!core) return;
     var known = Object.prototype.hasOwnProperty.call(i18n.reverse, core);
     if (!known && !/[A-Za-z]/.test(core)){ node.__i18nSrc = undefined; node.__i18nOut = undefined; return; }
     lead = m[1]; src = known ? i18n.reverse[core] : core; tail = m[3];
   }
-  var tr = i18nTranslate(src);
+  var tr = i18nRtlWrap(i18nTranslate(src));
   node.__i18nSrc = lead + src + tail;
   var out = tr === null ? lead + src + tail : lead + tr + tail;
   node.__i18nOut = out;
@@ -143,7 +210,7 @@ function i18nAttrs(el){
 }
 function i18nHtml(el){
   if (el.__i18nHtmlSrc === undefined) el.__i18nHtmlSrc = el.innerHTML.trim().replace(/[ \t\r\n]+/g, ' ');
-  var tr = i18nTranslate(el.__i18nHtmlSrc);
+  var tr = i18nRtlWrap(i18nTranslate(el.__i18nHtmlSrc), true);
   var out = tr === null ? el.__i18nHtmlSrc : tr;
   if (el.__i18nHtmlOut !== out){ el.__i18nHtmlOut = out; el.innerHTML = out; }
   i18nFitQueue.add(el);
@@ -179,6 +246,19 @@ function i18nHasTranslated(el){
   for (var n = walker.nextNode(); n; n = walker.nextNode()) if (n.__i18nSrc !== undefined && n.__i18nSrc !== n.__i18nOut) return true;
   return false;
 }
+var i18nCanvas = null;
+function i18nClearlyShorter(el, cs){
+  if (!i18nCanvas) i18nCanvas = document.createElement('canvas').getContext('2d');
+  i18nCanvas.font = cs.fontStyle + ' ' + cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+  var up = cs.textTransform === 'uppercase', en = '', tr = '';
+  var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  for (var n = walker.nextNode(); n; n = walker.nextNode()){
+    if (n.__i18nSrc === undefined) continue;
+    en += n.__i18nSrc; tr += n.__i18nOut.replace(/[\u2066-\u2069]/g, '');
+  }
+  if (up){ en = en.toUpperCase(); tr = tr.toUpperCase(); }
+  return i18nCanvas.measureText(tr).width <= i18nCanvas.measureText(en).width * 0.97;
+}
 function i18nBox(el){ var r = el.getBoundingClientRect(); return { w: r.width, h: r.height, sw: el.scrollWidth, cw: el.clientWidth }; }
 // restores the element's own inline sizes (some elements carry an inline font-size in the page itself)
 function i18nFitReset(el){
@@ -211,45 +291,111 @@ function i18nFitScope(el){
   while (w.nextNode()) if (++n > 24) return el;
   return p;
 }
-function i18nFit(el){
-  if (!el.isConnected || i18nSkip(el)) return;
+// an element is measured again only when its text (digits aside: timers tick every second), the language,
+// the screen width or the fonts changed
+var i18nFitGen = 0;
+// Fitting runs in three steps for a whole batch, so the page is laid out a few times instead of once per text:
+// 1. read what every text needs, 2. write line heights and directions, 3. measure only texts that may be too big
+function i18nFitPrepare(el, force){
+  if (!el.isConnected || i18nSkip(el)) return null;
+  if (i18n.lang === 'en'){ if (el.__i18nFitRatio || el.__i18nPinned) i18nFitReset(el); el.__i18nFitKey = null; return null; }
+  var key = i18nFitGen + '|' + i18n.lang + '|' + window.innerWidth + '|' + el.textContent.replace(/[0-9]/g, '0');
+  if (!force && el.__i18nFitKey === key) return null;
+  // pages that are not shown are measured when they are opened
+  var page = el.closest('.page');
+  if (page && !page.classList.contains('is-active')) { i18nPending.add(el); return null; }
+  if (!el.getClientRects().length) { i18nPending.add(el); return null; }
   if (el.__i18nFitRatio || el.__i18nPinned) i18nFitReset(el);
+  el.__i18nFitKey = key;
   el.__i18nOverflow = false;
-  if (i18n.lang === 'en') return;
-  if (!el.getClientRects().length) { i18nPending.add(el); return; }
-  if (el.__i18nHtmlSrc === undefined && !i18nHasTranslated(el)) return;
+  if (el.__i18nHtmlSrc === undefined && !i18nHasTranslated(el)) return null;
   var cs = getComputedStyle(el);
-  var normalLine = cs.lineHeight === 'normal';
-  if (normalLine){
+  return {
+    el: el, cs: cs,
+    line: cs.lineHeight === 'normal' ? i18nEnglishLineHeight(cs) : 0,
+    dir: i18nDirPlan(el),
+    // quick estimate without layout: a translation clearly narrower than the English text cannot make anything bigger
+    measure: el.__i18nHtmlSrc !== undefined || !i18nClearlyShorter(el, cs)
+  };
+}
+function i18nFitApply(p){
+  if (p.dir) i18nDirApply(p.dir);
+  if (p.line){ i18nSaveStyle(p.el); p.el.style.lineHeight = p.line.toFixed(2) + 'px'; p.el.__i18nPinned = true; }
+}
+function i18nFit(el, force){
+  var p = i18nFitPrepare(el, force);
+  if (!p) return;
+  i18nFitApply(p);
+  if (p.measure) i18nFitMeasure(i18nMeasureBatch([p]));
+}
+// an inline text (a word inside a line) only matters through the box of its line: that box must not change
+function i18nLineBox(el){
+  var box = el;
+  while (box.parentElement && box !== document.body && getComputedStyle(box).display === 'inline') box = box.parentElement;
+  return box;
+}
+// the translated and English sizes of a batch of texts: the whole batch is switched to English at once
+function i18nMeasureBatch(plans){
+  var items = plans.map(function(p){
+    var html = p.el.__i18nHtmlSrc !== undefined;
+    return { p: p, box: i18nLineBox(p.el), html: html, scope: html ? p.el : i18nFitScope(p.el) };
+  });
+  items.forEach(function(it){ it.tr = i18nBox(it.box); });
+  var shrunk = [];
+  items.forEach(function(it){
+    if (it.html || it.scope === it.p.el) return;
+    it.scope.querySelectorAll('[style*="font-size"]').forEach(function(s){
+      if (!s.__i18nFitRatio || s.__i18nHeld) return;
+      s.__i18nHeld = true;
+      shrunk.push([s, s.__i18nFitRatio, s.style.fontSize, s.style.lineHeight, s.style.verticalAlign]);
+      i18nFitReset(s);
+    });
+  });
+  items.forEach(function(it){ if (it.html) it.p.el.innerHTML = it.p.el.__i18nHtmlSrc; else i18nSetSources(it.scope, true); });
+  items.forEach(function(it){ it.en = i18nBox(it.box); });
+  items.forEach(function(it){ if (it.html) it.p.el.innerHTML = it.p.el.__i18nHtmlOut; else i18nSetSources(it.scope, false); });
+  shrunk.forEach(function(s){ s[0].__i18nHeld = false; s[0].__i18nFitRatio = s[1]; s[0].style.fontSize = s[2]; s[0].style.lineHeight = s[3]; s[0].style.verticalAlign = s[4]; });
+  return items;
+}
+// Shrinks every text of a batch that is bigger than its English size, all together: each step sets the fonts of
+// all of them and then reads all sizes, so a batch costs a few layouts whatever its length
+function i18nFitMeasure(items){
+  var scale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--s')) || 1;
+  var work = [];
+  items.forEach(function(m){
+    var el = m.p.el, cs = m.p.cs, en = m.en;
+    m.fits = function(b){ return b.w <= en.w + 0.5 && b.h <= en.h + 0.5 && b.sw <= Math.max(b.cw, en.sw) + 0.5; };
+    if (m.fits(m.tr)) return;
+    m.base = parseFloat(cs.fontSize);
+    // keep the English line height so the element's height never changes; only the letters get smaller
+    m.lineHeight = m.p.line ? el.style.lineHeight : cs.lineHeight;
+    // a smaller inline text sits on the parent's baseline and would make its line taller; top-align keeps the line height
+    m.inline = cs.display === 'inline';
+    var minPx = Math.min(m.base * I18N_ALWAYS_RATIO, Math.max(I18N_MIN_FONT_PX * scale, m.base * I18N_MIN_FONT_RATIO));
+    m.lo = minPx / m.base; m.hi = 1;
+    if (m.lo >= 1){ el.__i18nOverflow = true; return; }
     i18nSaveStyle(el);
-    el.style.lineHeight = i18nEnglishLineHeight(cs).toFixed(2) + 'px';
-    el.__i18nPinned = true;
-  }
-  var tr = i18nBox(el), en;
-  if (el.__i18nHtmlSrc !== undefined){
-    el.innerHTML = el.__i18nHtmlSrc; en = i18nBox(el); el.innerHTML = el.__i18nHtmlOut;
-  } else {
-    var scope = i18nFitScope(el), shrunk = [];
-    if (scope !== el) scope.querySelectorAll('[style*="font-size"]').forEach(function(s){ if (s.__i18nFitRatio){ shrunk.push([s, s.__i18nFitRatio, s.style.fontSize, s.style.lineHeight, s.style.verticalAlign]); i18nFitReset(s); } });
-    i18nSetSources(scope, true); en = i18nBox(el); i18nSetSources(scope, false);
-    shrunk.forEach(function(s){ s[0].__i18nFitRatio = s[1]; s[0].style.fontSize = s[2]; s[0].style.lineHeight = s[3]; s[0].style.verticalAlign = s[4]; });
-  }
-  var fits = function(b){ return b.w <= en.w + 0.5 && b.h <= en.h + 0.5 && b.sw <= Math.max(b.cw, en.sw) + 0.5; };
-  if (fits(tr)) return;
-  var base = parseFloat(cs.fontSize);
-  // keep the English line height so the element's height never changes; only the letters get smaller
-  var lineHeight = normalLine ? el.style.lineHeight : cs.lineHeight;
-  // a smaller inline text sits on the parent's baseline and would make its line taller; top-align keeps the line height
-  var inline = cs.display === 'inline';
-  i18nSaveStyle(el);
-  for (var k = 0.96; k >= I18N_MIN_FONT_RATIO - 0.001; k -= 0.04){
-    el.style.fontSize = (base * k).toFixed(2) + 'px';
-    el.style.lineHeight = lineHeight;
-    if (inline) el.style.verticalAlign = 'top';
+    work.push(m);
+  });
+  var set = function(m, k){
+    var el = m.p.el;
+    el.style.fontSize = (m.base * k).toFixed(2) + 'px';
+    el.style.lineHeight = m.lineHeight;
+    if (m.inline) el.style.verticalAlign = 'top';
     el.__i18nFitRatio = k;
-    if (fits(i18nBox(el))) return;
+  };
+  // first step: the smallest allowed size (a text that does not fit even then stays at it)
+  work.forEach(function(m){ set(m, m.lo); });
+  work.forEach(function(m){ m.ok = m.fits(i18nBox(m.box)); });
+  work = work.filter(function(m){ if (!m.ok) m.p.el.__i18nOverflow = true; return m.ok; });
+  // then halve the range until every text has the biggest size that fits
+  while (work.length){
+    var active = work.filter(function(m){ return m.hi - m.lo > 0.015; });
+    if (!active.length) break;
+    active.forEach(function(m){ m.mid = (m.lo + m.hi) / 2; set(m, m.mid); });
+    active.forEach(function(m){ if (m.fits(i18nBox(m.box))) m.lo = m.mid; else m.hi = m.mid; });
   }
-  el.__i18nOverflow = true;
+  work.forEach(function(m){ set(m, m.lo); });
 }
 var i18nPending = new Set();
 var i18nFitScheduled = false;
@@ -259,12 +405,19 @@ function i18nScheduleFit(){
   requestAnimationFrame(function(){
     i18nFitScheduled = false;
     var list = Array.from(i18nFitQueue); i18nFitQueue.clear();
-    list.forEach(i18nFit);
-    // siblings shrunk after an element was measured can leave it smaller (or bigger) than needed: settle once more
+    var plans = list.map(function(el){ return i18nFitPrepare(el); }).filter(Boolean);
+    plans.forEach(i18nFitApply);
+    i18nFitMeasure(i18nMeasureBatch(plans.filter(function(p){ return p.measure; })));
+    // texts sharing a box with another shrunk text (a title and its subtitle) can end up smaller or bigger than
+    // needed once the other one shrank: settle those once more
+    var shrunkParents = new Map();
+    list.forEach(function(el){ if ((el.__i18nFitRatio || el.__i18nOverflow) && el.parentElement) shrunkParents.set(el.parentElement, (shrunkParents.get(el.parentElement) || 0) + 1); });
     for (var pass = 0; pass < 2; pass++){
-      var again = list.filter(function(el){ return el.__i18nFitRatio || el.__i18nOverflow; });
+      var again = list.filter(function(el){ return (el.__i18nFitRatio || el.__i18nOverflow) && shrunkParents.get(el.parentElement) > 1; });
       if (!again.length) break;
-      again.forEach(i18nFit);
+      var againPlans = again.map(function(el){ return i18nFitPrepare(el, true); }).filter(Boolean);
+      againPlans.forEach(i18nFitApply);
+      i18nFitMeasure(i18nMeasureBatch(againPlans.filter(function(p){ return p.measure; })));
     }
   });
 }
@@ -277,6 +430,8 @@ function i18nRefitPending(){
 function i18nApplyAll(){
   i18nWalk(document.body, true);
   document.querySelectorAll('[style]').forEach(function(el){ if (el.__i18nFitRatio || el.__i18nPinned) i18nFitReset(el); });
+  i18nDirBoxes.forEach(i18nDirReset); i18nDirBoxes.clear();
+  i18nFitGen++;
   i18nScheduleFit();
   i18nRenderSelector();
 }
@@ -302,14 +457,19 @@ function i18nStartObserver(){
   var refitAll = function(){
     if (i18n.lang === 'en') return;
     i18nLineCache = {};
+    i18nFitGen++;
     var w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     for (var n = w.nextNode(); n; n = w.nextNode()) if (n.__i18nSrc !== undefined && n.__i18nSrc !== n.__i18nOut && n.parentElement) i18nFitQueue.add(n.parentElement);
     document.querySelectorAll('[data-i18n-html]').forEach(function(el){ i18nFitQueue.add(el); });
     i18nScheduleFit();
   };
-  window.addEventListener('resize', refitAll);
+  // only a width change can change text fitting (a keyboard changes the height only)
+  var fitWidth = window.innerWidth;
+  window.addEventListener('resize', function(){ if (window.innerWidth === fitWidth) return; fitWidth = window.innerWidth; refitAll(); });
   // web fonts arrive after the first fit and change text sizes
-  if (document.fonts){ document.fonts.addEventListener('loadingdone', refitAll); document.fonts.ready.then(refitAll); }
+  var fontTimer = null;
+  var refitAfterFonts = function(){ clearTimeout(fontTimer); fontTimer = setTimeout(refitAll, 150); };
+  if (document.fonts){ document.fonts.addEventListener('loadingdone', refitAfterFonts); document.fonts.ready.then(refitAfterFonts); }
 }
 function i18nSetLanguage(code){
   if (!I18N_LANGS.some(function(l){ return l.code === code; })) return;
@@ -502,7 +662,7 @@ img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; poi
   position:relative;
   max-width:460px;
   margin:0 auto;
-  min-height:100dvh;
+  min-height:var(--app-h, 100dvh);
   overflow:hidden;
   background:
     radial-gradient(calc(600px * var(--s)) calc(380px * var(--s)) at 15% -6%, var(--bg-glow-1), transparent 60%),
@@ -1845,6 +2005,12 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   border-top:calc(4px * var(--s)) solid rgba(227,165,66,.55); border-bottom:none;
 }
 .tc-growth-badge > span:not(.price-tooltip){ color:#ffd76a; font-size:calc(3.34px * var(--s)); }
+/* Lv badge above the Upgrade button: one stack, so a bigger phone font can never make them touch */
+.tc-bottom-left{
+  position:absolute; left:calc(8px * var(--s)); bottom:calc(8px * var(--s)); z-index:10;
+  display:flex; flex-direction:column; align-items:flex-start; gap:calc(6.6px * var(--s));
+}
+.tc-bottom-left > .tc-lv-badge, .tc-bottom-left > .tc-action-btn{ position:static; }
 .tc-lv-badge{
   position:absolute; bottom:calc(36px * var(--s)); left:calc(8px * var(--s)); z-index:4;
   padding:calc(1.35px * var(--s)) calc(4.5px * var(--s)); border-radius:calc(999px * var(--s));
@@ -2132,6 +2298,12 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   border-top:calc(4px * var(--s)) solid rgba(227,165,66,.55); border-bottom:none;
 }
 .db-growth-badge > span:not(.price-tooltip){ color:#ffd76a; font-size:calc(3.34px * var(--s)); }
+/* Lv badge above the Upgrade button: one stack, so a bigger phone font can never make them touch */
+.db-bottom-left{
+  position:absolute; left:calc(8px * var(--s)); bottom:calc(8px * var(--s)); z-index:10;
+  display:flex; flex-direction:column; align-items:flex-start; gap:calc(6.6px * var(--s));
+}
+.db-bottom-left > .db-lv-badge, .db-bottom-left > .db-action-btn{ position:static; }
 .db-lv-badge{
   position:absolute; bottom:calc(36px * var(--s)); left:calc(8px * var(--s)); z-index:4;
   padding:calc(1.35px * var(--s)) calc(4.5px * var(--s)); border-radius:calc(999px * var(--s));
@@ -4252,11 +4424,13 @@ body.reduce-motion .firefly{
             <span class="db-growth-badge" onclick="toggleGrowthTooltip()">
               <span id="dancing_bear-growth-text">+0.5%/Day</span>
             </span>
-            <span class="db-lv-badge" id="dancing_bear-lv-badge">Lv.0</span>
-            <button class="db-action-btn db-action-btn--upgrade" id="dancing_bear-upgrade-btn" onclick="openUpgradePetModal('dancing_bear')" disabled>
-              <span>Upgrade</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/><path d="M6 20l6-6 6 6"/></svg>
-            </button>
+            <div class="db-bottom-left">
+              <span class="db-lv-badge" id="dancing_bear-lv-badge">Lv.0</span>
+              <button class="db-action-btn db-action-btn--upgrade" id="dancing_bear-upgrade-btn" onclick="openUpgradePetModal('dancing_bear')" disabled>
+                <span>Upgrade</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/><path d="M6 20l6-6 6 6"/></svg>
+              </button>
+            </div>
             <div class="db-right-stack">
               <div class="db-speed">
                 <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:calc(11px * var(--s));height:calc(11px * var(--s));flex-shrink:0;vertical-align:middle;">
@@ -4284,11 +4458,13 @@ body.reduce-motion .firefly{
             <span class="tc-growth-badge" onclick="toggleGrowthTooltipTC()">
               <span id="the_cat-growth-text">+1%/Day</span>
             </span>
-            <span class="tc-lv-badge" id="the_cat-lv-badge">Lv.0</span>
-            <button class="tc-action-btn tc-action-btn--upgrade" id="the_cat-upgrade-btn" onclick="openUpgradePetModal('the_cat')" disabled>
-              <span>Upgrade</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/><path d="M6 20l6-6 6 6"/></svg>
-            </button>
+            <div class="tc-bottom-left">
+              <span class="tc-lv-badge" id="the_cat-lv-badge">Lv.0</span>
+              <button class="tc-action-btn tc-action-btn--upgrade" id="the_cat-upgrade-btn" onclick="openUpgradePetModal('the_cat')" disabled>
+                <span>Upgrade</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/><path d="M6 20l6-6 6 6"/></svg>
+              </button>
+            </div>
             <div class="tc-right-stack">
               <div class="tc-speed">
                 <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:calc(11px * var(--s));height:calc(11px * var(--s));flex-shrink:0;vertical-align:middle;">
@@ -5126,7 +5302,10 @@ var MAINTENANCE_ADMIN_ID = 1018495986;
 })();
 
 // Splash Screen
+// The bar runs quickly at first and slows down while loading (never stops before 90%);
+// when loading ends it fills to 100% and only then the screen fades out
 var SPLASH_MAX_WAIT_MS = 8000;
+var SPLASH_FINISH_MS = 300;
 var splashHidden = false;
 function hideSplashScreen(){
   if (splashHidden) return;
@@ -5134,16 +5313,24 @@ function hideSplashScreen(){
   splashHidden = true;
   var screen = document.getElementById('loading-screen');
   if (!screen) return;
-  screen.classList.add('is-hidden');
-  setTimeout(function(){ screen.style.display = 'none'; }, 400);
+  var fill = document.getElementById('loading-screen-fill');
+  if (fill){
+    fill.style.width = getComputedStyle(fill).width;
+    void fill.offsetWidth;
+    fill.style.transition = 'width ' + SPLASH_FINISH_MS + 'ms ease-out';
+    fill.style.width = '100%';
+  }
+  setTimeout(function(){
+    screen.classList.add('is-hidden');
+    setTimeout(function(){ screen.style.display = 'none'; }, 400);
+  }, fill ? SPLASH_FINISH_MS + 60 : 0);
 }
 (function(){
   var fill = document.getElementById('loading-screen-fill');
   if (fill){
-    requestAnimationFrame(function(){
-      fill.style.transition = 'width ' + SPLASH_MAX_WAIT_MS + 'ms linear';
-      fill.style.width = '100%';
-    });
+    void fill.offsetWidth;
+    fill.style.transition = 'width ' + SPLASH_MAX_WAIT_MS + 'ms cubic-bezier(.15,.7,.35,1)';
+    fill.style.width = '90%';
   }
   setTimeout(hideSplashScreen, SPLASH_MAX_WAIT_MS);
 })();
