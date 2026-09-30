@@ -1305,10 +1305,12 @@ async function handleWithdrawRequest(request, env) {
      WHERE telegram_id = ? AND gram >= ?
        AND (last_withdraw_request_at IS NULL OR last_withdraw_request_at <= ?)`
   ).bind(amountGram, now, telegramId, amountGram, cooldownCutoff);
+  // changes() is the row count of reserveStmt just before it in the batch, so a refused request records nothing
   const insertStmt = env.DB.prepare(
     `INSERT INTO withdrawals
        (telegram_id, raw_username, first_name, amount_gram, fee_gram, net_gram, address, status, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)`
+     SELECT ?, ?, ?, ?, ?, ?, ?, 'pending', ?
+     WHERE changes() = 1`
   ).bind(telegramId, rawUsername, firstName, amountGram, feeGram, netGram, address, now);
   let batchResults;
   try {
@@ -1329,6 +1331,14 @@ async function handleWithdrawRequest(request, env) {
       }, 400);
     }
     return jsonResponse({ error: "insufficient_funds" }, 400);
+  }
+  if (!insertResult.meta || insertResult.meta.changes === 0) {
+    // balance was reserved but no request row was written: give it back and clear the cooldown
+    console.error("withdraw request row not written after reserve; refunding");
+    await env.DB.prepare(
+      "UPDATE users SET gram = gram + ?, last_withdraw_request_at = NULL WHERE telegram_id = ? AND last_withdraw_request_at = ?"
+    ).bind(amountGram, telegramId, now).run();
+    return jsonResponse({ error: "server_error" }, 500);
   }
   const withdrawalId = insertResult.meta.last_row_id;
   try {
