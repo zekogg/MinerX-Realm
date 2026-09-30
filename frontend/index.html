@@ -6518,6 +6518,7 @@ function applyClaimedPetSpeed(newTotalSpeed){
   }
 }
 function applyStorageState(data){
+  storageState.synced = true;
   storageState.hasPet = !!data.storage_has_pet;
   storageState.totalSpeed = data.total_speed || 0;
   storageState.level = data.storage_level || 1;
@@ -6970,10 +6971,19 @@ function skeletonRowsHtml(count, variant){
 }
 
 // Profile
+// The cached profile can be up to LOCAL_CACHE_TTL_MS old, so balances and speed come from what the page shows now
+function withLiveProfileBalances(cached){
+  var data = {};
+  for (var k in cached) data[k] = cached[k];
+  data.coins = CURRENT_COINS_BALANCE;
+  data.gram = CURRENT_GRAM_BALANCE;
+  if (storageState.synced) data.total_speed = storageState.totalSpeed;
+  return data;
+}
 function openProfileModal(){
   openModal('modal-profile');
   var cached = localCacheGet('profile');
-  if (cached){ applyProfileData(cached); return; }
+  if (cached){ applyProfileData(withLiveProfileBalances(cached)); return; }
   var initData = getTelegramInitData();
   if (!initData) return;
   var pfStats = document.getElementById('pf-stats');
