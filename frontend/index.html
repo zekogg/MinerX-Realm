@@ -5821,7 +5821,7 @@ function callMiningApi(path){
   return fetch(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData: initData })
+    body: JSON.stringify({ initData: initData, gate_ad: takeGateAd() })
   }).then(function(res){
     syncServerClock(res, sentAt);
     return res.json().then(function(data){ return { status: res.status, data: data }; });
@@ -5959,7 +5959,7 @@ function runStreakClaimRequest(initData){
   fetch('/api/streak/claim', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData: initData })
+    body: JSON.stringify({ initData: initData, gate_ad: takeGateAd() })
   })
   .then(function(res){ return res.json().then(function(data){ return { status: res.status, data: data }; }); })
   .then(function(result){
@@ -6169,7 +6169,7 @@ function runSpinClaimRequest(initData, btn){
   fetch('/api/spin/claim', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData: initData })
+    body: JSON.stringify({ initData: initData, gate_ad: takeGateAd() })
   })
   .then(function(res){ return res.json().then(function(data){ return { status: res.status, data: data }; }); })
   .then(function(result){
@@ -6244,7 +6244,7 @@ function runChestClaimRequest(initData){
   fetch('/api/chest/claim', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData: initData })
+    body: JSON.stringify({ initData: initData, gate_ad: takeGateAd() })
   })
   .then(function(res){ return res.json().then(function(data){ return { status: res.status, data: data }; }); })
   .then(function(result){
@@ -6322,7 +6322,7 @@ function runGiftClaimRequest(initData, selectedBox){
   fetch('/api/giftpick/claim', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData: initData })
+    body: JSON.stringify({ initData: initData, gate_ad: takeGateAd() })
   })
   .then(function(res){ return res.json().then(function(data){ return { status: res.status, data: data }; }); })
   .then(function(result){
@@ -8088,14 +8088,15 @@ function runAdGateMonetixFallback(onSuccess, onFail){
     }
   });
 }
+// The gate ad is sent as gate_ad: true on the action request that follows it (no request of its own)
+var pendingGateAd = false;
 function reportGateAdWatched(){
-  var initData = getTelegramInitData();
-  if (!initData) return;
-  fetch('/api/ads/gate-watched', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData: initData })
-  }).catch(function(err){ console.error('gate ad watched report failed:', err); });
+  pendingGateAd = true;
+}
+function takeGateAd(){
+  var watched = pendingGateAd;
+  pendingGateAd = false;
+  return watched;
 }
 
 // Watch MonetixAds
@@ -9541,7 +9542,7 @@ function runPromoRedeemRequest(initData, code, input){
   fetch('/api/promo/redeem', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData: initData, code: code })
+    body: JSON.stringify({ initData: initData, code: code, gate_ad: takeGateAd() })
   })
   .then(function(res){ return res.json().then(function(data){ return { status: res.status, data: data }; }); })
   .then(function(result){

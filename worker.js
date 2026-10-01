@@ -274,22 +274,22 @@ async function routeRequest(request, env, url) {
       return handleRealmStatus(request, env);
     }
     if (url.pathname === "/api/mine/start" && request.method === "POST") {
-      return handleMineStart(request, env);
+      return withGateAd(request, env, handleMineStart);
     }
     if (url.pathname === "/api/mine/claim" && request.method === "POST") {
-      return handleMineClaim(request, env);
+      return withGateAd(request, env, handleMineClaim);
     }
     if (url.pathname === "/api/streak/claim" && request.method === "POST") {
-      return handleStreakClaim(request, env);
+      return withGateAd(request, env, handleStreakClaim);
     }
     if (url.pathname === "/api/spin/claim" && request.method === "POST") {
-      return handleSpinClaim(request, env);
+      return withGateAd(request, env, handleSpinClaim);
     }
     if (url.pathname === "/api/chest/claim" && request.method === "POST") {
-      return handleChestClaim(request, env);
+      return withGateAd(request, env, handleChestClaim);
     }
     if (url.pathname === "/api/giftpick/claim" && request.method === "POST") {
-      return handleGiftPickClaim(request, env);
+      return withGateAd(request, env, handleGiftPickClaim);
     }
     const petMatch = request.method === "POST" && url.pathname.match(/^\/api\/pet\/([a-z_]+)\/(buy|upgrade)$/);
     if (petMatch) {
@@ -304,7 +304,7 @@ async function routeRequest(request, env, url) {
       return handleStorageUpgrade(request, env);
     }
     if (url.pathname === "/api/promo/redeem" && request.method === "POST") {
-      return handlePromoRedeem(request, env);
+      return withGateAd(request, env, handlePromoRedeem);
     }
     if (url.pathname === "/api/exchange" && request.method === "POST") {
       return handleExchange(request, env);
@@ -359,9 +359,6 @@ async function routeRequest(request, env, url) {
     }
     if (url.pathname === "/api/onclicka/reward" && request.method === "POST") {
       return handleOnclickaReward(request, env);
-    }
-    if (url.pathname === "/api/ads/gate-watched" && request.method === "POST") {
-      return handleAdsGateWatched(request, env);
     }
     if (url.pathname === "/api/pets/claim_happy_dog" && request.method === "POST") {
       return handleClaimHappyDog(request, env);
@@ -2322,12 +2319,30 @@ async function handleOnclickaReward(request, env) {
   });
 }
 
-// /api/ads/gate-watched
-async function handleAdsGateWatched(request, env) {
-  const auth = await authenticateRequest(request, env);
-  if (!auth.ok) return auth.response;
-  await bumpLifetimeAdsWatched(env, auth.telegramId);
-  return jsonResponse({ ok: true });
+// A Monetix/OnClicka ad shown before a gated action comes as gate_ad: true on the action's own request and is
+// counted only when the action succeeds, so each count is tied to an action that has its own daily limit
+async function withGateAd(request, env, handler) {
+  let gateAd = false;
+  let initData = null;
+  try {
+    const body = await request.clone().json();
+    gateAd = body.gate_ad === true;
+    initData = body.initData;
+  } catch (e) {   }
+  const response = await handler(request, env);
+  if (!gateAd || !response.ok) return response;
+  let data = null;
+  try {
+    data = await response.clone().json();
+  } catch (e) {   }
+  if (!data || data.error) return response;
+  // the handler already validated this initData, so the id can be read from it directly
+  let telegramId = null;
+  try {
+    telegramId = JSON.parse(new URLSearchParams(initData).get("user")).id;
+  } catch (e) {   }
+  if (Number.isInteger(telegramId)) await bumpLifetimeAdsWatched(env, telegramId);
+  return response;
 }
 
 // /api/profile
