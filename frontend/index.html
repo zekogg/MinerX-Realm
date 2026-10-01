@@ -533,7 +533,11 @@ function i18nToggleMenu(ev){
   var menu = document.getElementById('lang-menu');
   if (menu) i18nMenuOpen(!menu.classList.contains('is-open'));
 }
-document.addEventListener('DOMContentLoaded', function(){
+// Runs from the end of <body>, as soon as the page is parsed: DOMContentLoaded also waits for the deferred ad SDKs
+var i18nDomInitDone = false;
+function i18nDomInit(){
+  if (i18nDomInitDone) return;
+  i18nDomInitDone = true;
   var menu = document.getElementById('lang-menu');
   if (menu){
     menu.innerHTML = '<div class="lang-menu__list">' + I18N_LANGS.map(function(l){
@@ -548,7 +552,8 @@ document.addEventListener('DOMContentLoaded', function(){
   });
   i18nRenderSelector();
   i18nOnReady(function(){ i18nBuildIndex(); i18nWalk(document.body); i18nScheduleFit(); i18nStartObserver(); });
-});
+}
+document.addEventListener('DOMContentLoaded', i18nDomInit);
 function i18nPick(ev, code){
   ev.stopPropagation();
   i18nMenuOpen(false);
@@ -557,13 +562,13 @@ function i18nPick(ev, code){
 </script>
 
 <!-- Adsgram SDK -->
-<script src="https://sad.adsgram.ai/js/sad.min.js"></script>
+<script defer src="https://sad.adsgram.ai/js/sad.min.js"></script>
 
 <!-- MonetixAds SDK -->
-<script src="https://www.monetixads.online/ads.js" data-mxid="MX-00DFB0A3"></script>
+<script defer src="https://www.monetixads.online/ads.js" data-mxid="MX-00DFB0A3"></script>
 
 <!-- OnClicka SDK (Telegram Mini App rewarded video) -->
-<script src="https://js.onclckvd.com/in-stream-ad-admanager/tma.js"></script>
+<script defer src="https://js.onclckvd.com/in-stream-ad-admanager/tma.js"></script>
 <style>
 
 /* Theme Variables */
@@ -5716,6 +5721,8 @@ function fetchUserData(){
       pending_earnings: data.user.friends_pending_earnings,
       min_claim: data.user.friends_min_claim
     });
+    reapplyPendingClientAds();
+    if (hasPendingClientAds() && !clientAdsTimer) sendClientAdRewards(false);
     hideSplashScreen();
   })
   .catch(function(err){
@@ -5821,7 +5828,7 @@ function callMiningApi(path){
   return fetch(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData: initData })
+    body: JSON.stringify({ initData: initData, gate_ad: takeGateAd() })
   }).then(function(res){
     syncServerClock(res, sentAt);
     return res.json().then(function(data){ return { status: res.status, data: data }; });
@@ -5959,7 +5966,7 @@ function runStreakClaimRequest(initData){
   fetch('/api/streak/claim', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData: initData })
+    body: JSON.stringify({ initData: initData, gate_ad: takeGateAd() })
   })
   .then(function(res){ return res.json().then(function(data){ return { status: res.status, data: data }; }); })
   .then(function(result){
@@ -6169,7 +6176,7 @@ function runSpinClaimRequest(initData, btn){
   fetch('/api/spin/claim', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData: initData })
+    body: JSON.stringify({ initData: initData, gate_ad: takeGateAd() })
   })
   .then(function(res){ return res.json().then(function(data){ return { status: res.status, data: data }; }); })
   .then(function(result){
@@ -6244,7 +6251,7 @@ function runChestClaimRequest(initData){
   fetch('/api/chest/claim', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData: initData })
+    body: JSON.stringify({ initData: initData, gate_ad: takeGateAd() })
   })
   .then(function(res){ return res.json().then(function(data){ return { status: res.status, data: data }; }); })
   .then(function(result){
@@ -6322,7 +6329,7 @@ function runGiftClaimRequest(initData, selectedBox){
   fetch('/api/giftpick/claim', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData: initData })
+    body: JSON.stringify({ initData: initData, gate_ad: takeGateAd() })
   })
   .then(function(res){ return res.json().then(function(data){ return { status: res.status, data: data }; }); })
   .then(function(result){
@@ -7697,6 +7704,21 @@ function onUserDataRefreshed(requestedAt){
     pauseAdVerification();
   }
 }
+// The ad SDKs load with defer; a tap that comes before one has arrived waits for it instead of failing at once
+var AD_SDK_WAIT_MS = 8000;
+function waitForAdSdk(isReady){
+  return new Promise(function(resolve){
+    var startedAt = Date.now();
+    (function poll(){
+      if (isReady()) return resolve(true);
+      if (Date.now() - startedAt >= AD_SDK_WAIT_MS) return resolve(false);
+      setTimeout(poll, 200);
+    })();
+  });
+}
+function isMonetixSdkReady(){
+  return typeof window.showRewardAd === 'function';
+}
 function creditAdRewardOptimistically(amount){
   updateBalanceDisplay({ coins: CURRENT_COINS_BALANCE + amount, gram: CURRENT_GRAM_BALANCE });
 }
@@ -7755,7 +7777,14 @@ function onWatchAdsgramClick(){
     return;
   }
   if (!adsgramController){
-    showBuyErrorToast('Ad not available right now', { title: 'Watch Ad' });
+    adsTaskState.busy = true;
+    renderAdsTaskButton();
+    waitForAdSdk(function(){ initAdsgramController(); return !!adsgramController; }).then(function(ready){
+      adsTaskState.busy = false;
+      renderAdsTaskButton();
+      if (ready) onWatchAdsgramClick();
+      else showBuyErrorToast('Ad not available right now', { title: 'Watch Ad' });
+    });
     return;
   }
   adsTaskState.busy = true;
@@ -7796,6 +7825,12 @@ function initBonusAdsgramController(){
   }
 }
 initBonusAdsgramController();
+// deferred SDKs have run by DOMContentLoaded
+document.addEventListener('DOMContentLoaded', function(){
+  initAdsgramController();
+  initBonusAdsgramController();
+  renderBonusAdButton();
+});
 function applyBonusAdState(data){
   bonusAdState.watchedToday = data.watched_today || 0;
   bonusAdState.dailyLimit = data.daily_limit || 5;
@@ -7844,7 +7879,17 @@ function startBonusAdCountdown(){
 }
 function onWatchBonusAdClick(){
   if (!bonusAdsgramController){
-    showBuyErrorToast('Coming Soon', { title: 'Bonus Ad' });
+    if (!isValidAdsgramBlockId(BONUS_AD_BLOCK_ID) || bonusAdState.busy){
+      if (!bonusAdState.busy) showBuyErrorToast('Coming Soon', { title: 'Bonus Ad' });
+      return;
+    }
+    bonusAdState.busy = true;
+    waitForAdSdk(function(){ initBonusAdsgramController(); return !!bonusAdsgramController; }).then(function(ready){
+      bonusAdState.busy = false;
+      renderBonusAdButton();
+      if (ready) onWatchBonusAdClick();
+      else showBuyErrorToast('Ad not available right now', { title: 'Bonus Ad' });
+    });
     return;
   }
   if (bonusAdState.busy) return;
@@ -8058,6 +8103,15 @@ function runAdGateOnclickaFallback(onSuccess, onFail){
 }
 function runAdGateMonetixFallback(onSuccess, onFail){
   setAdLoadingOverlayVia('Monetix');
+  if (!isMonetixSdkReady()){
+    waitForAdSdk(isMonetixSdkReady).then(function(ready){
+      if (ready){ runAdGateMonetixFallback(onSuccess, onFail); return; }
+      hideAdLoadingOverlay();
+      showBuyErrorToast('Ad not available right now', { title: 'Ad Required' });
+      if (onFail) onFail();
+    });
+    return;
+  }
   if (typeof window.showRewardAd !== 'function'){
     hideAdLoadingOverlay();
     showBuyErrorToast('Ad not available right now', { title: 'Ad Required' });
@@ -8088,14 +8142,15 @@ function runAdGateMonetixFallback(onSuccess, onFail){
     }
   });
 }
+// The gate ad is sent as gate_ad: true on the action request that follows it (no request of its own)
+var pendingGateAd = false;
 function reportGateAdWatched(){
-  var initData = getTelegramInitData();
-  if (!initData) return;
-  fetch('/api/ads/gate-watched', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData: initData })
-  }).catch(function(err){ console.error('gate ad watched report failed:', err); });
+  pendingGateAd = true;
+}
+function takeGateAd(){
+  var watched = pendingGateAd;
+  pendingGateAd = false;
+  return watched;
 }
 
 // Watch MonetixAds
@@ -8144,8 +8199,15 @@ function onWatchMonetixClick(){
     showComeBackTomorrowToast();
     return;
   }
-  if (typeof window.showRewardAd !== 'function'){
-    showBuyErrorToast('Ad not available right now', { title: 'Watch MonetixAds' });
+  if (!isMonetixSdkReady()){
+    monetixState.busy = true;
+    renderMonetixButton();
+    waitForAdSdk(isMonetixSdkReady).then(function(ready){
+      monetixState.busy = false;
+      renderMonetixButton();
+      if (ready) onWatchMonetixClick();
+      else showBuyErrorToast('Ad not available right now', { title: 'Watch MonetixAds' });
+    });
     return;
   }
   monetixState.busy = true;
@@ -8177,43 +8239,14 @@ function onWatchMonetixClick(){
   });
 }
 function creditMonetixReward(){
-  var initData = getTelegramInitData();
-  if (!initData){
-    monetixState.busy = false;
-    renderMonetixButton();
-    hideAdLoadingOverlay();
-    return;
-  }
-  fetch('/api/monetix/reward', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData: initData })
-  })
-  .then(function(res){ return res.json(); })
-  .then(function(data){
-    if (data.error){
-      if (data.error === 'daily_limit_reached'){
-        applyMonetixState({ watched_today: data.watched_today, daily_limit: data.daily_limit });
-      }
-      monetixState.busy = false;
-      renderMonetixButton();
-      hideAdLoadingOverlay();
-      return;
-    }
-    updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE });
-    applyMonetixState({ watched_today: data.watched_today, daily_limit: data.daily_limit, reward_coins: data.reward_coins });
-    showAppToast({ title: 'Watch MonetixAds', icon: PRIZE_ICON_URLS.coins, amount: '+' + monetixState.rewardCoins + ' Coins' });
-    triggerConfetti();
-    monetixState.busy = false;
-    startMonetixTaskCooldown();
-    hideAdLoadingOverlay();
-  })
-  .catch(function(err){
-    console.error('monetix reward request failed:', err);
-    monetixState.busy = false;
-    renderMonetixButton();
-    hideAdLoadingOverlay();
-  });
+  monetixState.watchedToday++;
+  creditAdRewardOptimistically(monetixState.rewardCoins);
+  showAppToast({ title: 'Watch MonetixAds', icon: PRIZE_ICON_URLS.coins, amount: '+' + monetixState.rewardCoins + ' Coins' });
+  triggerConfetti();
+  monetixState.busy = false;
+  startMonetixTaskCooldown();
+  hideAdLoadingOverlay();
+  queueClientAdReward('monetix');
 }
 
 // Watch OnClicka Ads
@@ -8335,44 +8368,105 @@ function onWatchOnclickaClick(){
   }, function(e){ finishWithError('Ad not available right now', e); });
 }
 function creditOnclickaReward(){
+  onclickaState.watchedToday++;
+  creditAdRewardOptimistically(onclickaState.rewardCoins);
+  showAppToast({ title: 'Watch OnClicka Ads', icon: PRIZE_ICON_URLS.coins, amount: '+' + onclickaState.rewardCoins + ' Coins' });
+  triggerConfetti();
+  onclickaState.busy = false;
+  startOnclickaTaskCooldown();
+  hideAdLoadingOverlay();
+  queueClientAdReward('onclicka');
+}
+
+// Monetix and OnClicka have no postback: their rewards show at once and are sent together in one
+// /api/ads/client-rewards request a minute after the last ad. Unsent counts are kept in localStorage
+// and sent when the app is hidden or opened again. A batch leaves the saved queue the moment it is sent
+// and comes back only if the request fails, so a request still in flight when the app closes is never
+// sent a second time on the next open.
+var CLIENT_ADS_KEY = 'mx_pending_client_ads';
+var clientAdsQueue = (function(){
+  try{
+    var saved = JSON.parse(localStorage.getItem(CLIENT_ADS_KEY) || 'null');
+    if (saved) return { monetix: Math.max(0, saved.monetix | 0), onclicka: Math.max(0, saved.onclicka | 0) };
+  }catch(e){}
+  return { monetix: 0, onclicka: 0 };
+})();
+var clientAdsTimer = null;
+var clientAdsSending = false;
+function saveClientAdsQueue(){
+  try{ localStorage.setItem(CLIENT_ADS_KEY, JSON.stringify(clientAdsQueue)); }catch(e){}
+}
+function hasPendingClientAds(){
+  return clientAdsQueue.monetix > 0 || clientAdsQueue.onclicka > 0;
+}
+function scheduleClientAdRewards(){
+  clearTimeout(clientAdsTimer);
+  clientAdsTimer = setTimeout(function(){ sendClientAdRewards(false); }, AD_VERIFY_DELAY_MS);
+}
+function queueClientAdReward(network){
+  clientAdsQueue[network]++;
+  saveClientAdsQueue();
+  scheduleClientAdRewards();
+}
+// Server data does not include ads still waiting to be sent, so they are added back on top of it
+function reapplyPendingClientAds(){
+  if (!hasPendingClientAds()) return;
+  creditAdRewardOptimistically(clientAdsQueue.monetix * monetixState.rewardCoins + clientAdsQueue.onclicka * onclickaState.rewardCoins);
+  monetixState.watchedToday += clientAdsQueue.monetix;
+  onclickaState.watchedToday += clientAdsQueue.onclicka;
+  renderMonetixButton();
+  renderOnclickaButton();
+}
+function sendClientAdRewards(keepalive){
+  clearTimeout(clientAdsTimer);
+  clientAdsTimer = null;
+  if (clientAdsSending || !hasPendingClientAds()) return;
   var initData = getTelegramInitData();
-  if (!initData){
-    onclickaState.busy = false;
-    renderOnclickaButton();
-    hideAdLoadingOverlay();
-    return;
-  }
-  fetch('/api/onclicka/reward', {
+  if (!initData) return;
+  var batch = { monetix: clientAdsQueue.monetix, onclicka: clientAdsQueue.onclicka };
+  clientAdsQueue.monetix = 0;
+  clientAdsQueue.onclicka = 0;
+  saveClientAdsQueue();
+  var putBack = function(){
+    clientAdsQueue.monetix += batch.monetix;
+    clientAdsQueue.onclicka += batch.onclicka;
+    saveClientAdsQueue();
+    scheduleClientAdRewards();
+  };
+  clientAdsSending = true;
+  fetch('/api/ads/client-rewards', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData: initData })
+    keepalive: !!keepalive,
+    body: JSON.stringify({ initData: initData, monetix: batch.monetix, onclicka: batch.onclicka })
   })
-  .then(function(res){ return res.json(); })
-  .then(function(data){
-    if (data.error){
-      if (data.error === 'daily_limit_reached'){
-        applyOnclickaState({ watched_today: data.watched_today, daily_limit: data.daily_limit });
-      }
-      onclickaState.busy = false;
-      renderOnclickaButton();
-      hideAdLoadingOverlay();
+  .then(function(res){ return res.json().then(function(data){ return { ok: res.ok, status: res.status, data: data }; }); })
+  .then(function(r){
+    clientAdsSending = false;
+    if (!r.ok || r.data.error){
+      console.error('client ad rewards refused:', r.data && r.data.error);
+      // only a malformed request or an unknown user is dropped; anything else is sent again later
+      if (r.status !== 400 && r.status !== 404) putBack();
       return;
     }
-    updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE });
-    applyOnclickaState({ watched_today: data.watched_today, daily_limit: data.daily_limit, reward_coins: data.reward_coins });
-    showAppToast({ title: 'Watch OnClicka Ads', icon: PRIZE_ICON_URLS.coins, amount: '+' + onclickaState.rewardCoins + ' Coins' });
-    triggerConfetti();
-    onclickaState.busy = false;
-    startOnclickaTaskCooldown();
-    hideAdLoadingOverlay();
+    // ads watched while the request was on its way are still in the queue and are added back on top
+    updateBalanceDisplay({ coins: r.data.coins, gram: CURRENT_GRAM_BALANCE });
+    applyMonetixState(r.data.monetix);
+    applyOnclickaState(r.data.onclicka);
+    localCacheClear('profile');
+    reapplyPendingClientAds();
+    if (hasPendingClientAds()) scheduleClientAdRewards();
   })
   .catch(function(err){
-    console.error('onclicka reward request failed:', err);
-    onclickaState.busy = false;
-    renderOnclickaButton();
-    hideAdLoadingOverlay();
+    clientAdsSending = false;
+    console.error('client ad rewards request failed:', err);
+    putBack();
   });
 }
+document.addEventListener('visibilitychange', function(){
+  if (document.visibilityState === 'hidden') sendClientAdRewards(true);
+});
+window.addEventListener('pagehide', function(){ sendClientAdRewards(true); });
 
 // Check-in
 var checkinState = {
@@ -9541,7 +9635,7 @@ function runPromoRedeemRequest(initData, code, input){
   fetch('/api/promo/redeem', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData: initData, code: code })
+    body: JSON.stringify({ initData: initData, code: code, gate_ad: takeGateAd() })
   })
   .then(function(res){ return res.json().then(function(data){ return { status: res.status, data: data }; }); })
   .then(function(result){
@@ -9948,5 +10042,6 @@ function copyText(elId){
   }
 }
 </script>
+<script>i18nDomInit();</script>
 </body>
 </html>
