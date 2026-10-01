@@ -72,7 +72,6 @@ ALTER TABLE users ADD COLUMN ads_task_count INTEGER DEFAULT 0;
 ALTER TABLE users ADD COLUMN ads_task_date TEXT;
 
 -- Friends / Referrals: عدّادات الإحالة والأرباح المعلّقة وأعلام Milestone Missions.
-ALTER TABLE users ADD COLUMN ads_task_total INTEGER DEFAULT 0;
 ALTER TABLE users ADD COLUMN referral_pending_earnings REAL DEFAULT 0;
 ALTER TABLE users ADD COLUMN invites_count INTEGER DEFAULT 0;
 ALTER TABLE users ADD COLUMN active_referrals_count INTEGER DEFAULT 0;

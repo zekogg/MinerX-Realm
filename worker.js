@@ -1426,7 +1426,7 @@ async function handleAdsReward(url, env) {
     return handleBonusAdReward(telegramId, env);
   }
   const row = await env.DB.prepare(
-    "SELECT ads_task_count, ads_task_date, ads_task_total, referred_by FROM users WHERE telegram_id = ?"
+    "SELECT ads_task_count, ads_task_date FROM users WHERE telegram_id = ?"
   ).bind(telegramId).first();
   if (!row) {
     return new Response("user not found", { status: 404 });
@@ -1437,23 +1437,14 @@ async function handleAdsReward(url, env) {
     return new Response("limit reached", { status: 200 });
   }
   const newCount = countToday + 1;
-  const newTotal = (row.ads_task_total || 0) + 1;
-  const updateStmt = env.DB.prepare(
-    `UPDATE users SET coins = coins + ?, ads_task_count = ?, ads_task_date = ?, ads_task_total = ?
-     WHERE telegram_id = ? AND (ads_task_date IS NULL OR ads_task_date <> ? OR ads_task_count = ?)`
-  ).bind(ADS_TASK_REWARD_COINS, newCount, today, newTotal, telegramId, today, countToday);
-  const updateResult = await updateStmt.run();
-  if (updateResult.meta && updateResult.meta.changes > 0 && row.referred_by && newTotal >= ACTIVE_FRIEND_ADS_THRESHOLD) {
-    const activateResult = await env.DB.prepare(
-      `UPDATE referrals SET is_active = 1, earned_coins = earned_coins + ?
-       WHERE referrer_id = ? AND referred_id = ? AND is_active = 0`
-    ).bind(REFERRAL_ACTIVE_BONUS_COINS, row.referred_by, telegramId).run();
-    if (activateResult.meta && activateResult.meta.changes > 0) {
-      await env.DB.prepare(
-        `UPDATE users SET referral_pending_earnings = referral_pending_earnings + ?, active_referrals_count = active_referrals_count + 1
-         WHERE telegram_id = ?`
-      ).bind(REFERRAL_ACTIVE_BONUS_COINS, row.referred_by).run();
-    }
+  // reward and ad counters in one write; RETURNING gives the new lifetime count without a second read
+  const updated = await env.DB.prepare(
+    `UPDATE users SET coins = coins + ?, ads_task_count = ?, ads_task_date = ?, lifetime_ads_watched = COALESCE(lifetime_ads_watched, 0) + 1, weekly_ads_watched = weekly_ads_watched + 1
+     WHERE telegram_id = ? AND (ads_task_date IS NULL OR ads_task_date <> ? OR ads_task_count = ?)
+     RETURNING lifetime_ads_watched, referred_by`
+  ).bind(ADS_TASK_REWARD_COINS, newCount, today, telegramId, today, countToday).first();
+  if (updated) {
+    await activateReferralOnLifetimeAds(env, telegramId, updated.referred_by, updated.lifetime_ads_watched);
   }
   return new Response("OK", { status: 200 });
 }
@@ -2102,13 +2093,17 @@ async function handleBonusAdReward(telegramId, env) {
     return new Response("cooldown active", { status: 200 });
   }
   const newCount = countToday + 1;
-  const updateStmt = env.DB.prepare(
-    `UPDATE users SET coins = coins + ?, bonus_ad_count_today = ?, bonus_ad_date = ?, bonus_ad_last_watched_at = ?
+  // reward and ad counters in one write; RETURNING gives the new lifetime count without a second read
+  const updated = await env.DB.prepare(
+    `UPDATE users SET coins = coins + ?, bonus_ad_count_today = ?, bonus_ad_date = ?, bonus_ad_last_watched_at = ?, lifetime_ads_watched = COALESCE(lifetime_ads_watched, 0) + 1, weekly_ads_watched = weekly_ads_watched + 1
      WHERE telegram_id = ?
        AND (bonus_ad_last_watched_at IS NULL OR bonus_ad_last_watched_at = ?)
-       AND (bonus_ad_date IS NULL OR bonus_ad_date <> ? OR bonus_ad_count_today = ?)`
-  ).bind(BONUS_AD_REWARD_COINS, newCount, today, now, telegramId, oldLastWatchedAt, today, countToday);
-  await updateStmt.run();
+       AND (bonus_ad_date IS NULL OR bonus_ad_date <> ? OR bonus_ad_count_today = ?)
+     RETURNING lifetime_ads_watched, referred_by`
+  ).bind(BONUS_AD_REWARD_COINS, newCount, today, now, telegramId, oldLastWatchedAt, today, countToday).first();
+  if (updated) {
+    await activateReferralOnLifetimeAds(env, telegramId, updated.referred_by, updated.lifetime_ads_watched);
+  }
   return new Response("OK", { status: 200 });
 }
 
@@ -2350,7 +2345,7 @@ async function handleFriendsList(request, env) {
   const page = Math.max(0, parseInt(body.page, 10) || 0);
   const offset = page * 10;
   const result = await env.DB.prepare(
-    `SELECT u.telegram_id, u.username, u.ads_task_total, u.lifetime_ads_watched, r.earned_coins, r.is_active
+    `SELECT u.telegram_id, u.username, u.lifetime_ads_watched, r.earned_coins, r.is_active
      FROM referrals r
      JOIN users u ON u.telegram_id = r.referred_id
      WHERE r.referrer_id = ?
@@ -2361,8 +2356,8 @@ async function handleFriendsList(request, env) {
   const hasMore = rows.length > 10;
   const friends = rows.slice(0, 10).map((r) => ({
     name: r.username || ("User " + r.telegram_id),
-    // lifetime_ads_watched counts GigaPub, Monetix and OnClicka ads; ads_task_total counts Adsgram
-    ads_watched: (r.lifetime_ads_watched || 0) + (r.ads_task_total || 0),
+    // lifetime_ads_watched counts every ad network, the Bonus Ad and the ad gates
+    ads_watched: r.lifetime_ads_watched || 0,
     earned_coins: r.earned_coins || 0,
     active: !!r.is_active
   }));
