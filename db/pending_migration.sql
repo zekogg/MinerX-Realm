@@ -68,11 +68,10 @@ CREATE TABLE IF NOT EXISTS combo_attempts (
 );
 
 -- Watch Adsgram Ad: عدّاد/تاريخ مهمة الإعلانات اليومية (حد 10/يوم).
-ALTER TABLE users ADD COLUMN ads_task_count INTEGER DEFAULT 0;
-ALTER TABLE users ADD COLUMN ads_task_date TEXT;
+ALTER TABLE users ADD COLUMN adsgram_task_count INTEGER DEFAULT 0;
+ALTER TABLE users ADD COLUMN adsgram_task_date TEXT;
 
 -- Friends / Referrals: عدّادات الإحالة والأرباح المعلّقة وأعلام Milestone Missions.
-ALTER TABLE users ADD COLUMN ads_task_total INTEGER DEFAULT 0;
 ALTER TABLE users ADD COLUMN referral_pending_earnings REAL DEFAULT 0;
 ALTER TABLE users ADD COLUMN invites_count INTEGER DEFAULT 0;
 ALTER TABLE users ADD COLUMN active_referrals_count INTEGER DEFAULT 0;

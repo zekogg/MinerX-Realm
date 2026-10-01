@@ -4727,6 +4727,7 @@ body.reduce-motion .firefly{
         <div class="pf-stats" id="pf-stats">
           <div class="section-skeleton-overlay" id="pf-stats-skeleton" style="display:none;"></div>
           <div class="pf-stat-row"><span class="pf-stat-label">ID</span><span class="pf-stat-val" id="pf-stat-id">000000</span></div>
+          <div class="pf-stat-row"><span class="pf-stat-label">Ads Watched</span><span class="pf-stat-val" id="pf-stat-ads">0</span></div>
           <div class="pf-stat-row"><span class="pf-stat-label">Registered Date</span><span class="pf-stat-val" id="pf-stat-registered">01-01-2026</span></div>
           <div class="pf-stat-row"><span class="pf-stat-label">Referrals</span><span class="pf-stat-val" id="pf-stat-referrals">0</span></div>
           <div class="pf-stat-row"><span class="pf-stat-label">Active Referrals</span><span class="pf-stat-val" id="pf-stat-active-referrals">0</span></div>
@@ -4774,6 +4775,7 @@ body.reduce-motion .firefly{
           <button class="ap-btn" style="width:100%;margin-top:calc(10px * var(--s));box-sizing:border-box;" onclick="adminSaveBalance()">Save Balance</button>
           <div style="margin-top:calc(14px * var(--s));">
             <div class="ap-info-row"><span>Registered</span><span id="ap-find-registered">—</span></div>
+            <div class="ap-info-row"><span>Ads Watched</span><span id="ap-find-ads">0</span></div>
             <div class="ap-info-row"><span>Invites</span><span id="ap-find-invites">0</span></div>
             <div class="ap-info-row"><span>Active Invites</span><span id="ap-find-active-invites">0</span></div>
             <div class="ap-info-row"><span>Referrals Commission</span><span id="ap-find-referral-commission">0</span></div>
@@ -7016,6 +7018,8 @@ function applyProfileData(data){
   if (usernameEl) usernameEl.textContent = data.username ? ('@' + data.username) : 'No username';
   var idEl = document.getElementById('pf-stat-id');
   if (idEl) idEl.textContent = data.telegram_id;
+  var adsEl = document.getElementById('pf-stat-ads');
+  if (adsEl) adsEl.textContent = Number(data.ads_watched || 0).toLocaleString('en-US');
   var registeredEl = document.getElementById('pf-stat-registered');
   if (registeredEl) registeredEl.textContent = data.registered_date;
   var referralsEl = document.getElementById('pf-stat-referrals');
@@ -8576,6 +8580,7 @@ function adminFindUser(){
     document.getElementById('ap-find-coins').value = Math.round(data.coins);
     document.getElementById('ap-find-gram').value = Number(data.gram).toFixed(3);
     document.getElementById('ap-find-registered').textContent = data.registered_date;
+    document.getElementById('ap-find-ads').textContent = Number(data.ads_watched || 0).toLocaleString('en-US');
     document.getElementById('ap-find-invites').textContent = data.invites;
     document.getElementById('ap-find-active-invites').textContent = data.active_invites;
     document.getElementById('ap-find-referral-commission').textContent = Number(data.referral_commission_total).toLocaleString('en-US', { maximumFractionDigits: 0 });
