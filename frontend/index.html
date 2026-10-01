@@ -1075,6 +1075,14 @@ html[data-lang="ar"] b, html[data-lang="ar"] strong, html[data-lang="fa"] b, htm
   transition:opacity .28s ease, transform .28s ease;
 }
 .page.is-active{ opacity:1; transform:translateY(0); pointer-events:auto; }
+/* A page that is not shown stops being painted once its fade-out ends (layout and scroll stay as they are),
+   and its endless animations stop until it is shown again */
+.page:not(.is-active){ visibility:hidden; transition:opacity .28s ease, transform .28s ease, visibility 0s linear .28s; }
+.page.is-active{ visibility:visible; transition:opacity .28s ease, transform .28s ease, visibility 0s; }
+.page:not(.is-active) .pet-exclusive-tip{ visibility:hidden; }
+.page:not(.is-active) .char-slot__outer-ring,
+.page:not(.is-active) .char-slot__ring,
+.page:not(.is-active) .realm-label--shine span{ animation:none; }
 .page-title{ font-size:calc(22px * var(--s)); font-weight:900; margin:calc(10px * var(--s)) calc(2px * var(--s)) calc(16px * var(--s)); }
 .page-title--with-help{ display:flex; align-items:center; justify-content:space-between; }
 .card{
