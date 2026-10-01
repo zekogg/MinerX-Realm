@@ -1669,7 +1669,7 @@ async function handleAdminUserFind(request, env) {
   if (!Number.isInteger(targetId)) return jsonResponse({ error: "invalid_target_id" }, 400);
   const [user, depositResult, withdrawResult] = await Promise.all([
     env.DB.prepare(
-      "SELECT telegram_id, username, coins, gram, total_speed, invites_count, active_referrals_count, referral_deposit_commission_total, created_at FROM users WHERE telegram_id = ?"
+      "SELECT telegram_id, username, coins, gram, total_speed, invites_count, active_referrals_count, referral_deposit_commission_total, lifetime_ads_watched, created_at FROM users WHERE telegram_id = ?"
     ).bind(targetId).first(),
     env.DB.prepare(
       "SELECT COALESCE(SUM(amount_gram), 0) AS total FROM deposits WHERE telegram_id = ? AND status = 'confirmed'"
@@ -1689,6 +1689,7 @@ async function handleAdminUserFind(request, env) {
     active_invites: user.active_referrals_count || 0,
     referral_commission_total: user.referral_deposit_commission_total || 0,
     registered_date: user.created_at ? formatDateDDMMYYYY(user.created_at) : "—",
+    ads_watched: user.lifetime_ads_watched || 0,
     total_deposit_gram: depositResult.total || 0,
     total_withdraw_gram: withdrawResult.total || 0
   });
@@ -2226,7 +2227,7 @@ async function handleProfile(request, env) {
   const { telegramId, rawUsername, firstName, lastName } = auth;
   const [user, depositResult, withdrawResult] = await Promise.all([
     env.DB.prepare(
-      "SELECT coins, gram, total_speed, invites_count, active_referrals_count, referral_deposit_commission_total, created_at FROM users WHERE telegram_id = ?"
+      "SELECT coins, gram, total_speed, invites_count, active_referrals_count, referral_deposit_commission_total, lifetime_ads_watched, created_at FROM users WHERE telegram_id = ?"
     ).bind(telegramId).first(),
     env.DB.prepare(
       "SELECT COALESCE(SUM(amount_gram), 0) AS total FROM deposits WHERE telegram_id = ? AND status = 'confirmed'"
@@ -2243,6 +2244,7 @@ async function handleProfile(request, env) {
     display_name: [firstName, lastName].filter(Boolean).join(" ") || "Player",
     username: rawUsername,
     registered_date: user.created_at ? formatDateDDMMYYYY(user.created_at) : "—",
+    ads_watched: user.lifetime_ads_watched || 0,
     invites: user.invites_count || 0,
     active_invites: user.active_referrals_count || 0,
     referral_commission_total: user.referral_deposit_commission_total || 0,
