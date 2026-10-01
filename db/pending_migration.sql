@@ -224,3 +224,9 @@ ALTER TABLE ambassador_grants ADD COLUMN value_usd REAL;
 -- Watch OnClicka Ads: عدّاد يومي، المنح عبر endpoint محمي بـinitData (لا Postback) — نفس طريقة Monetix.
 ALTER TABLE users ADD COLUMN onclicka_task_count INTEGER DEFAULT 0;
 ALTER TABLE users ADD COLUMN onclicka_task_date TEXT;
+
+-- كشف الحسابات المتعددة والحظر: معرّف الجهاز من localStorage (يُكتب مرة واحدة)، ووقت الحظر (فارغ = غير محظور).
+ALTER TABLE users ADD COLUMN device_id TEXT;
+ALTER TABLE users ADD COLUMN banned_at INTEGER;
+CREATE INDEX IF NOT EXISTS idx_users_device_id ON users(device_id) WHERE device_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_users_banned ON users(banned_at) WHERE banned_at IS NOT NULL;

@@ -858,6 +858,58 @@ img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; poi
 .pf-stats.is-loading > .pf-stat-row{ visibility:hidden; }
 #page-realm.is-loading > *:not(.section-skeleton-overlay){ visibility:hidden; }
 
+/* Ban Screen: covers the whole app, nothing behind it can be reached */
+.ban-screen{
+  position:fixed; inset:0; z-index:20000;
+  display:none; align-items:center; justify-content:center;
+  padding:calc(24px * var(--s)) calc(24px * var(--s)) calc(24px * var(--s) + var(--safe-b));
+  background:
+    radial-gradient(circle at 50% 30%, rgba(217,99,79,.18), transparent 55%),
+    radial-gradient(circle at 50% 100%, var(--bg-glow-1), transparent 60%),
+    var(--bg);
+  touch-action:none; overscroll-behavior:none;
+}
+.ban-screen.is-visible{ display:flex; }
+.ban-screen__card{
+  width:100%; max-width:calc(340px * var(--s));
+  display:flex; flex-direction:column; align-items:center; text-align:center;
+  padding:calc(32px * var(--s)) calc(24px * var(--s)) calc(26px * var(--s));
+  background:var(--stone-2); border:1px solid rgba(217,99,79,.28); border-radius:var(--radius-lg);
+  box-shadow:var(--shadow-deep), 0 0 calc(60px * var(--s)) calc(-20px * var(--s)) rgba(217,99,79,.45);
+}
+.ban-screen__icon{
+  width:calc(108px * var(--s)); height:calc(108px * var(--s));
+  display:flex; align-items:center; justify-content:center;
+  border-radius:50%;
+  background:radial-gradient(circle, rgba(217,99,79,.22), rgba(217,99,79,.06) 70%);
+  border:1px solid rgba(217,99,79,.35);
+  font-size:calc(64px * var(--s)); line-height:1;
+  margin-bottom:calc(20px * var(--s));
+}
+.ban-screen__title{
+  font-family:var(--font-display); font-weight:800;
+  font-size:calc(22px * var(--s)); line-height:1.25; letter-spacing:-.2px;
+  color:var(--ink); margin:0;
+}
+.ban-screen__divider{
+  width:calc(48px * var(--s)); height:calc(3px * var(--s)); border-radius:calc(3px * var(--s));
+  background:linear-gradient(90deg,#e2725f,#b4402f);
+  margin:calc(14px * var(--s)) 0 calc(16px * var(--s));
+}
+.ban-screen__text{
+  font-family:var(--font-display); font-weight:500;
+  font-size:calc(13.5px * var(--s)); line-height:1.65;
+  color:var(--ink-dim); margin:0 0 calc(24px * var(--s));
+}
+.ban-screen__btn{
+  width:100%; display:flex; align-items:center; justify-content:center; gap:calc(8px * var(--s));
+  background:linear-gradient(135deg,#f0d878,#c9973a); color:#100c1a;
+  font-family:var(--font-display); font-weight:800; font-size:calc(14px * var(--s));
+  border:none; border-radius:var(--radius-sm);
+  padding:calc(13px * var(--s)) calc(16px * var(--s)); cursor:pointer;
+}
+.ban-screen__btn svg{ width:calc(18px * var(--s)); height:calc(18px * var(--s)); }
+
 /* Confetti Canvas */
 #confetti-canvas{
   position:fixed; inset:0; z-index:10000;
@@ -3567,6 +3619,10 @@ body.reduce-motion .firefly{
 .ap-btn-outline{ background:transparent; border:1px solid rgba(196,181,253,.3); color:var(--ink); font-size:calc(11px * var(--s)); font-weight:700; border-radius:calc(10px * var(--s)); padding:calc(8px * var(--s)) calc(12px * var(--s)); cursor:pointer; }
 .ap-tab{ flex:1; text-align:center; border:1px solid rgba(196,181,253,.2); color:var(--ink-dim); font-size:calc(11px * var(--s)); font-weight:700; border-radius:calc(20px * var(--s)); padding:calc(7px * var(--s)) 0; cursor:pointer; }
 .ap-tab.is-active{ background:rgba(240,216,120,.16); border-color:rgba(240,216,120,.4); color:#f0d878; }
+.ap-btn-danger{ background:linear-gradient(135deg,#e2725f,#b4402f); color:#fff; }
+.ap-linked-row{ display:flex; justify-content:space-between; gap:calc(8px * var(--s)); padding:calc(6px * var(--s)) 0; border-bottom:1px solid rgba(196,181,253,.08); font-size:calc(12px * var(--s)); }
+.ap-linked-row span:first-child{ color:var(--ink); font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ap-linked-row span:last-child{ color:var(--ink-dim); flex-shrink:0; }
 .ap-info-row{ display:flex; justify-content:space-between; padding:calc(6px * var(--s)) 0; border-bottom:1px solid rgba(196,181,253,.08); font-size:calc(12px * var(--s)); }
 .ap-info-row span:first-child{ color:var(--ink-dim); }
 .ap-info-row span:last-child{ color:var(--ink); font-weight:600; }
@@ -4742,6 +4798,20 @@ body.reduce-motion .firefly{
     </div>
   </div>
 
+  <!-- Ban Screen -->
+  <div class="ban-screen" id="ban-screen" data-no-i18n>
+    <div class="ban-screen__card">
+      <div class="ban-screen__icon">🚫</div>
+      <h1 class="ban-screen__title">Multiple Accounts Detected</h1>
+      <div class="ban-screen__divider"></div>
+      <p class="ban-screen__text">Your account has been banned for using multiple accounts. If you think this is a mistake, please contact support.</p>
+      <button class="ban-screen__btn" onclick="openSupportChat()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3ZM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3Z"/></svg>
+        <span>Contact Support</span>
+      </button>
+    </div>
+  </div>
+
   <!-- Admin Panel -->
   <div class="modal-overlay" id="modal-admin" data-no-i18n>
     <div class="ap-wrap">
@@ -4781,9 +4851,26 @@ body.reduce-motion .firefly{
             <div class="ap-info-row"><span>Referrals Commission</span><span id="ap-find-referral-commission">0</span></div>
             <div class="ap-info-row"><span>Total Speed</span><span id="ap-find-speed">+0 Coins/hr</span></div>
             <div class="ap-info-row"><span>Total Deposit</span><span id="ap-find-deposit">0 Gram</span></div>
-            <div class="ap-info-row" style="border-bottom:none;"><span>Total Withdraw</span><span id="ap-find-withdraw">0 Gram</span></div>
+            <div class="ap-info-row"><span>Total Withdraw</span><span id="ap-find-withdraw">0 Gram</span></div>
+            <div class="ap-info-row" style="border-bottom:none;"><span>Status</span><span id="ap-find-status">—</span></div>
+            <label class="ap-label" style="margin-top:calc(12px * var(--s));">Linked Accounts</label>
+            <div id="ap-find-linked"></div>
+            <button class="ap-btn ap-btn-danger" id="ap-find-ban-linked" style="display:none;width:100%;margin-top:calc(10px * var(--s));box-sizing:border-box;" onclick="adminBanLinked()">Ban All Linked</button>
           </div>
         </div>
+      </div>
+
+      <!-- Admin: Ban User -->
+      <div class="ap-card">
+        <h2 class="ap-title">🚫 Ban User</h2>
+        <label class="ap-label">Telegram ID</label>
+        <input class="ap-input" id="ap-ban-id" placeholder="Telegram ID" inputmode="numeric">
+        <div class="ap-row" style="margin-top:calc(12px * var(--s));">
+          <button class="ap-btn ap-btn-danger" style="flex:1;" onclick="adminSetBan(true)">Ban</button>
+          <button class="ap-btn-outline" style="flex:1;" onclick="adminSetBan(false)">Unban</button>
+        </div>
+        <button class="ap-btn-outline" id="ap-ban-history-btn" style="width:100%;margin-top:calc(8px * var(--s));box-sizing:border-box;" onclick="adminToggleBannedList()">Banned Users</button>
+        <div id="ap-ban-list" style="margin-top:calc(14px * var(--s));display:none;"></div>
       </div>
 
       <!-- Admin: Tasks -->
@@ -5522,6 +5609,29 @@ function updateBalanceDisplay(u){
     if (elTotalMined) elTotalMined.textContent = Number(u.total_mined).toLocaleString('en-US', { maximumFractionDigits: 0 });
   }
 }
+// Random id kept in localStorage and sent with /api/user; accounts opened on the same device share it
+var DEVICE_ID_KEY = 'mx_device_id';
+var DEVICE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+function getDeviceId(){
+  var id = null;
+  try{ id = localStorage.getItem(DEVICE_ID_KEY); }catch(e){}
+  if (id && DEVICE_ID_PATTERN.test(id)) return id;
+  if (window.crypto && crypto.randomUUID){
+    id = crypto.randomUUID();
+  } else {
+    var b = new Uint8Array(16);
+    crypto.getRandomValues(b);
+    b[6] = (b[6] & 0x0f) | 0x40; b[8] = (b[8] & 0x3f) | 0x80;
+    var h = Array.prototype.map.call(b, function(x){ return (x + 0x100).toString(16).slice(1); }).join('');
+    id = h.slice(0, 8) + '-' + h.slice(8, 12) + '-' + h.slice(12, 16) + '-' + h.slice(16, 20) + '-' + h.slice(20);
+  }
+  try{ localStorage.setItem(DEVICE_ID_KEY, id); }catch(e){ return null; }
+  return id;
+}
+function showBanScreen(){
+  var el = document.getElementById('ban-screen');
+  if (el) el.classList.add('is-visible');
+}
 function fetchUserData(){
   var initData = getTelegramInitData();
   if (!initData){
@@ -5532,10 +5642,15 @@ function fetchUserData(){
   fetch('/api/user', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData: initData })
+    body: JSON.stringify({ initData: initData, device_id: getDeviceId() })
   })
   .then(function(res){ syncServerClock(res, requestedAt); return res.json(); })
   .then(function(data){
+    if (data.banned){
+      showBanScreen();
+      hideSplashScreen();
+      return;
+    }
     if (!data.user) return;
     onUserDataRefreshed(requestedAt);
     updateBalanceDisplay(data.user);
@@ -8546,7 +8661,8 @@ var adminPanelState = {
   taskChannelId: null,
   foundUser: null,
   promoListFetched: false,
-  ambListFetched: false
+  ambListFetched: false,
+  bannedListFetched: false
 };
 function adminApiPost(path, extraBody, onSuccess, onError){
   var initData = getTelegramInitData();
@@ -8587,10 +8703,32 @@ function adminFindUser(){
     document.getElementById('ap-find-speed').textContent = '+' + Number(data.total_speed).toLocaleString('en-US', { maximumFractionDigits: 0 }) + ' Coins/hr';
     document.getElementById('ap-find-deposit').textContent = Number(data.total_deposit_gram).toFixed(3) + ' Gram';
     document.getElementById('ap-find-withdraw').textContent = Number(data.total_withdraw_gram).toFixed(3) + ' Gram';
+    renderAdminFoundUserBan(data);
   }, function(){
     adminPanelState.foundUser = null;
     document.getElementById('ap-find-result').style.display = 'none';
     adminToast('User not found');
+  });
+}
+function renderAdminFoundUserBan(data){
+  var statusEl = document.getElementById('ap-find-status');
+  statusEl.textContent = data.banned_date ? ('🚫 Banned (' + data.banned_date + ')') : '✅ Active';
+  statusEl.style.color = data.banned_date ? '#e2725f' : '';
+  var linked = data.linked_accounts || [];
+  var list = document.getElementById('ap-find-linked');
+  list.innerHTML = linked.length ? linked.map(function(a){
+    var name = a.username ? ('@' + a.username) : ('Player ' + a.telegram_id);
+    return '<div class="ap-linked-row"><span>' + escapeHtmlClient(name) + ' · ' + Number(a.telegram_id) + '</span><span>' + Number(a.ads_watched).toLocaleString('en-US') + ' Ads</span></div>';
+  }).join('') : '<div style="font-size:calc(12px * var(--s));color:var(--ink-dim);">—</div>';
+  document.getElementById('ap-find-ban-linked').style.display = linked.length ? '' : 'none';
+}
+// re-reads the found user so Status and Linked Accounts show the result of a ban
+function adminRefreshFoundUser(telegramId){
+  var found = adminPanelState.foundUser;
+  if (!found || (telegramId !== undefined && found.telegram_id !== telegramId && !(found.linked_accounts || []).some(function(a){ return a.telegram_id === telegramId; }))) return;
+  adminApiPost('/api/admin/user/find', { target_id: found.telegram_id }, function(data){
+    adminPanelState.foundUser = data;
+    renderAdminFoundUserBan(data);
   });
 }
 function adminSaveBalance(){
@@ -8603,6 +8741,71 @@ function adminSaveBalance(){
   }, function(){
     adminToast('Failed to update balance');
   });
+}
+
+// Admin: Ban User
+function adminSetBan(ban){
+  var id = parseInt(document.getElementById('ap-ban-id').value, 10);
+  if (!Number.isInteger(id)){ adminToast('Enter a valid Telegram ID'); return; }
+  adminApiPost('/api/admin/user/ban', { target_id: id, banned: ban }, function(){
+    adminToast(ban ? 'User banned' : 'User unbanned');
+    if (adminPanelState.bannedListFetched) adminFetchBannedList();
+    adminRefreshFoundUser(id);
+  }, function(err){
+    adminToast(err.error === 'user_not_found' ? 'User not found' : (ban ? 'Failed to ban' : 'Failed to unban'));
+  });
+}
+function adminBanLinked(){
+  var found = adminPanelState.foundUser;
+  if (!found) return;
+  adminApiPost('/api/admin/user/ban_linked', { target_id: found.telegram_id }, function(data){
+    adminToast(data.banned_count + ' account(s) banned');
+    if (adminPanelState.bannedListFetched) adminFetchBannedList();
+    adminRefreshFoundUser();
+  }, function(){
+    adminToast('Failed to ban linked accounts');
+  });
+}
+function adminToggleBannedList(){
+  var list = document.getElementById('ap-ban-list');
+  var btn = document.getElementById('ap-ban-history-btn');
+  if (!list) return;
+  var showing = list.style.display !== 'none';
+  if (showing){
+    list.style.display = 'none';
+    if (btn) btn.textContent = 'Banned Users';
+    return;
+  }
+  list.style.display = '';
+  if (btn) btn.textContent = 'Hide Banned Users';
+  if (!adminPanelState.bannedListFetched){
+    adminPanelState.bannedListFetched = true;
+    adminFetchBannedList();
+  }
+}
+function adminFetchBannedList(){
+  adminApiPost('/api/admin/banned/list', {}, function(data){
+    renderAdminBannedList(data.banned || []);
+  });
+}
+function renderAdminBannedList(banned){
+  var list = document.getElementById('ap-ban-list');
+  if (!list) return;
+  if (!banned.length){
+    list.innerHTML = '<div style="font-size:calc(11px * var(--s));color:var(--ink-dim);text-align:center;padding:calc(10px * var(--s)) 0;">No banned users</div>';
+    return;
+  }
+  list.innerHTML = banned.map(function(b){
+    var name = b.username ? ('@' + b.username) : ('Player ' + b.telegram_id);
+    return (
+      '<div class="ap-task-row" style="cursor:pointer;" onclick="document.getElementById(\'ap-ban-id\').value=' + Number(b.telegram_id) + '">' +
+        '<div style="flex:1;min-width:0;">' +
+          '<div style="font-size:calc(12px * var(--s));font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtmlClient(name) + '</div>' +
+          '<div style="font-size:calc(10px * var(--s));color:var(--ink-dim);">ID: ' + Number(b.telegram_id) + ' · Banned ' + escapeHtmlClient(b.banned_date) + '</div>' +
+        '</div>' +
+      '</div>'
+    );
+  }).join('');
 }
 
 // Admin: Tasks
@@ -9614,6 +9817,9 @@ function submitWithdrawRequest(){
         refreshWithdrawCooldown();
       } else if (data.error === 'missing_address'){
         showBuyErrorToast('Enter a withdrawal address', { title: 'Cannot Withdraw', icon: PRIZE_ICON_URLS.gram });
+      } else if (data.error === 'banned'){
+        closeModal('modal-withdraw');
+        showBanScreen();
       } else {
         console.error('withdraw error:', data.error);
         showBuyErrorToast('Something went wrong, please try again', { title: 'Cannot Withdraw', icon: PRIZE_ICON_URLS.gram });

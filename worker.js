@@ -43,6 +43,7 @@ const WITHDRAW_MIN_GRAM = 0.1;
 const WITHDRAW_FEE_RATE = 0.05;
 const WITHDRAW_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const ADMIN_TELEGRAM_ID = 1018495986;
+const DEVICE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const ADMIN_CHANNEL_ID = -1004325013522;
 const PLAY_GAME_URL = "https://t.me/MinerXRealmBot/app";
 const NEWS_CHANNEL_URL = "https://t.me/MinerXRealmNews";
@@ -377,6 +378,15 @@ async function routeRequest(request, env, url) {
     if (url.pathname === "/api/admin/user/find" && request.method === "POST") {
       return handleAdminUserFind(request, env);
     }
+    if (url.pathname === "/api/admin/user/ban" && request.method === "POST") {
+      return handleAdminUserBan(request, env);
+    }
+    if (url.pathname === "/api/admin/user/ban_linked" && request.method === "POST") {
+      return handleAdminUserBanLinked(request, env);
+    }
+    if (url.pathname === "/api/admin/banned/list" && request.method === "POST") {
+      return handleAdminBannedList(request, env);
+    }
     if (url.pathname === "/api/admin/user/edit_balance" && request.method === "POST") {
       return handleAdminEditBalance(request, env);
     }
@@ -415,9 +425,17 @@ async function routeRequest(request, env, url) {
 
 // /api/user
 async function handleGetUser(request, env) {
-  const auth = await authenticateRequest(request, env);
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "invalid_body" }, 400);
+  }
+  const auth = await authenticateRequest(request, env, body);
   if (!auth.ok) return auth.response;
   const { telegramId, username, referredBy, photoUrl } = auth;
+  // random id the app keeps in localStorage; accounts opened on the same device share it
+  const deviceId = typeof body.device_id === "string" && DEVICE_ID_PATTERN.test(body.device_id) ? body.device_id : null;
   const today = todayUTC();
   const userQuery = `
     SELECT u.telegram_id, u.username, u.coins, u.gram, u.total_speed, u.total_mined,
@@ -432,15 +450,15 @@ async function handleGetUser(request, env) {
            u.bonus_ad_count_today, u.bonus_ad_date, u.bonus_ad_last_watched_at,
            u.gigapub_task_count, u.gigapub_task_date, u.photo_url,
            u.monetix_task_count, u.monetix_task_date, u.onclicka_task_count, u.onclicka_task_date, u.lifetime_ads_watched,
-           u.combo_date, u.combo_attempts_used, u.combo_solved
+           u.combo_date, u.combo_attempts_used, u.combo_solved, u.device_id, u.banned_at
     FROM users u
     WHERE u.telegram_id = ?
   `;
   let user = await env.DB.prepare(userQuery).bind(telegramId).first();
   if (!user) {
     await env.DB.prepare(
-      "INSERT INTO users (telegram_id, username, referred_by, created_at, photo_url) VALUES (?, ?, ?, ?, ?)"
-    ).bind(telegramId, username, referredBy, Date.now(), photoUrl).run();
+      "INSERT INTO users (telegram_id, username, referred_by, created_at, photo_url, device_id) VALUES (?, ?, ?, ?, ?, ?)"
+    ).bind(telegramId, username, referredBy, Date.now(), photoUrl, deviceId).run();
     if (referredBy) {
       await env.DB.batch([
         env.DB.prepare(
@@ -455,10 +473,21 @@ async function handleGetUser(request, env) {
       await sendWelcomeMessage(env, telegramId);
     } catch (e) {   }
     user = await env.DB.prepare(userQuery).bind(telegramId).first();
-  } else if (photoUrl && photoUrl !== user.photo_url) {
-    await env.DB.prepare("UPDATE users SET photo_url = ? WHERE telegram_id = ?").bind(photoUrl, telegramId).run();
-    user.photo_url = photoUrl;
+  } else {
+    if (photoUrl && photoUrl !== user.photo_url) {
+      await env.DB.prepare("UPDATE users SET photo_url = ? WHERE telegram_id = ?").bind(photoUrl, telegramId).run();
+      user.photo_url = photoUrl;
+    }
+    // written once and never replaced, so accounts linked before a storage wipe stay linked
+    if (deviceId && !user.device_id) {
+      await env.DB.prepare("UPDATE users SET device_id = ? WHERE telegram_id = ? AND device_id IS NULL").bind(deviceId, telegramId).run();
+    }
   }
+  if (user.banned_at) {
+    return jsonResponse({ banned: true });
+  }
+  delete user.device_id;
+  delete user.banned_at;
   let view = withMiningView(user);
   view = withStreakView(view);
   view = withDailyPrizeView(view, "last_spin_date", "spin_claimed_today", "spin_next_reset_utc");
@@ -1302,7 +1331,7 @@ async function handleWithdrawRequest(request, env) {
   const netGram = Math.max(0, amountGram - feeGram);
   const reserveStmt = env.DB.prepare(
     `UPDATE users SET gram = gram - ?, last_withdraw_request_at = ?
-     WHERE telegram_id = ? AND gram >= ?
+     WHERE telegram_id = ? AND gram >= ? AND banned_at IS NULL
        AND (last_withdraw_request_at IS NULL OR last_withdraw_request_at <= ?)`
   ).bind(amountGram, now, telegramId, amountGram, cooldownCutoff);
   // changes() is the row count of reserveStmt just before it in the batch, so a refused request records nothing
@@ -1322,8 +1351,11 @@ async function handleWithdrawRequest(request, env) {
   const [reserveResult, insertResult] = batchResults;
   if (!reserveResult.meta || reserveResult.meta.changes === 0) {
     const user = await env.DB.prepare(
-      "SELECT gram, last_withdraw_request_at FROM users WHERE telegram_id = ?"
+      "SELECT gram, last_withdraw_request_at, banned_at FROM users WHERE telegram_id = ?"
     ).bind(telegramId).first();
+    if (user && user.banned_at) {
+      return jsonResponse({ error: "banned" }, 403);
+    }
     if (user && user.last_withdraw_request_at && user.last_withdraw_request_at > cooldownCutoff) {
       return jsonResponse({
         error: "cooldown_active",
@@ -1669,7 +1701,7 @@ async function handleAdminUserFind(request, env) {
   if (!Number.isInteger(targetId)) return jsonResponse({ error: "invalid_target_id" }, 400);
   const [user, depositResult, withdrawResult] = await Promise.all([
     env.DB.prepare(
-      "SELECT telegram_id, username, coins, gram, total_speed, invites_count, active_referrals_count, referral_deposit_commission_total, lifetime_ads_watched, created_at FROM users WHERE telegram_id = ?"
+      "SELECT telegram_id, username, coins, gram, total_speed, invites_count, active_referrals_count, referral_deposit_commission_total, lifetime_ads_watched, created_at, device_id, banned_at FROM users WHERE telegram_id = ?"
     ).bind(targetId).first(),
     env.DB.prepare(
       "SELECT COALESCE(SUM(amount_gram), 0) AS total FROM deposits WHERE telegram_id = ? AND status = 'confirmed'"
@@ -1679,6 +1711,17 @@ async function handleAdminUserFind(request, env) {
     ).bind(targetId).first()
   ]);
   if (!user) return jsonResponse({ error: "user_not_found" }, 404);
+  let linked = [];
+  if (user.device_id) {
+    const linkedResult = await env.DB.prepare(
+      "SELECT telegram_id, username, lifetime_ads_watched FROM users WHERE device_id = ? AND telegram_id <> ? ORDER BY telegram_id LIMIT 50"
+    ).bind(user.device_id, targetId).all();
+    linked = (linkedResult.results || []).map((r) => ({
+      telegram_id: r.telegram_id,
+      username: r.username,
+      ads_watched: r.lifetime_ads_watched || 0
+    }));
+  }
   return jsonResponse({
     telegram_id: user.telegram_id,
     username: user.username,
@@ -1691,7 +1734,74 @@ async function handleAdminUserFind(request, env) {
     registered_date: user.created_at ? formatDateDDMMYYYY(user.created_at) : "—",
     ads_watched: user.lifetime_ads_watched || 0,
     total_deposit_gram: depositResult.total || 0,
-    total_withdraw_gram: withdrawResult.total || 0
+    total_withdraw_gram: withdrawResult.total || 0,
+    banned_date: user.banned_at ? formatDateDDMMYYYY(user.banned_at) : null,
+    linked_accounts: linked
+  });
+}
+
+// /api/admin/user/ban — body.banned true bans, false unbans
+async function handleAdminUserBan(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "invalid_body" }, 400);
+  }
+  const auth = await authenticateAdmin(request, env, body);
+  if (!auth.ok) return auth.response;
+  const targetId = parseInt(body.target_id, 10);
+  if (!Number.isInteger(targetId)) return jsonResponse({ error: "invalid_target_id" }, 400);
+  const ban = body.banned === true;
+  // banning an already banned user keeps the first ban date
+  const result = await env.DB.prepare(
+    ban
+      ? "UPDATE users SET banned_at = COALESCE(banned_at, ?) WHERE telegram_id = ?"
+      : "UPDATE users SET banned_at = NULL WHERE telegram_id = ?"
+  ).bind(...(ban ? [Date.now(), targetId] : [targetId])).run();
+  if (!result.meta || result.meta.changes === 0) return jsonResponse({ error: "user_not_found" }, 404);
+  return jsonResponse({ ok: true, banned: ban });
+}
+
+// /api/admin/user/ban_linked — the user and every account sharing its device_id
+async function handleAdminUserBanLinked(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "invalid_body" }, 400);
+  }
+  const auth = await authenticateAdmin(request, env, body);
+  if (!auth.ok) return auth.response;
+  const targetId = parseInt(body.target_id, 10);
+  if (!Number.isInteger(targetId)) return jsonResponse({ error: "invalid_target_id" }, 400);
+  const result = await env.DB.prepare(
+    `UPDATE users SET banned_at = ?
+     WHERE banned_at IS NULL
+       AND (telegram_id = ? OR device_id = (SELECT device_id FROM users WHERE telegram_id = ?))`
+  ).bind(Date.now(), targetId, targetId).run();
+  return jsonResponse({ ok: true, banned_count: (result.meta && result.meta.changes) || 0 });
+}
+
+// /api/admin/banned/list
+async function handleAdminBannedList(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "invalid_body" }, 400);
+  }
+  const auth = await authenticateAdmin(request, env, body);
+  if (!auth.ok) return auth.response;
+  const result = await env.DB.prepare(
+    "SELECT telegram_id, username, banned_at FROM users WHERE banned_at IS NOT NULL ORDER BY banned_at DESC LIMIT 200"
+  ).all();
+  return jsonResponse({
+    banned: (result.results || []).map((r) => ({
+      telegram_id: r.telegram_id,
+      username: r.username,
+      banned_date: formatDateDDMMYYYY(r.banned_at)
+    }))
   });
 }
 
