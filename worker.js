@@ -425,7 +425,7 @@ async function handleGetUser(request, env) {
            u.streak_day, u.streak_last_claim_date,
            u.last_spin_date, u.last_chest_date, u.last_giftpick_date,
            u.last_withdraw_request_at,
-           u.ads_task_count, u.ads_task_date,
+           u.adsgram_task_count, u.adsgram_task_date,
            u.invites_count, u.active_referrals_count, u.referral_pending_earnings,
            u.milestone_10_claimed, u.milestone_25_claimed, u.milestone_50_claimed, u.milestone_100_claimed,
            u.checkin1_claimed_date, u.checkin2_claimed_date, u.checkin3_claimed_date, u.checkin4_claimed_date,
@@ -475,7 +475,7 @@ async function handleGetUser(request, env) {
   view.combo_solved_today = comboToday && !!user.combo_solved;
   view.combo_attempts_used = comboToday ? (user.combo_attempts_used || 0) : 0;
   view.combo_max_attempts = COMBO_MAX_ATTEMPTS;
-  view.ads_watched_today = user.ads_task_date === today ? (user.ads_task_count || 0) : 0;
+  view.ads_watched_today = user.adsgram_task_date === today ? (user.adsgram_task_count || 0) : 0;
   view.ads_daily_limit = ADS_TASK_DAILY_LIMIT;
   view.ads_reward_coins = ADS_TASK_REWARD_COINS;
   view.friends_invites = user.invites_count || 0;
@@ -1426,21 +1426,21 @@ async function handleAdsReward(url, env) {
     return handleBonusAdReward(telegramId, env);
   }
   const row = await env.DB.prepare(
-    "SELECT ads_task_count, ads_task_date FROM users WHERE telegram_id = ?"
+    "SELECT adsgram_task_count, adsgram_task_date FROM users WHERE telegram_id = ?"
   ).bind(telegramId).first();
   if (!row) {
     return new Response("user not found", { status: 404 });
   }
   const today = todayUTC();
-  const countToday = row.ads_task_date === today ? (row.ads_task_count || 0) : 0;
+  const countToday = row.adsgram_task_date === today ? (row.adsgram_task_count || 0) : 0;
   if (countToday >= ADS_TASK_DAILY_LIMIT) {
     return new Response("limit reached", { status: 200 });
   }
   const newCount = countToday + 1;
   // reward and ad counters in one write; RETURNING gives the new lifetime count without a second read
   const updated = await env.DB.prepare(
-    `UPDATE users SET coins = coins + ?, ads_task_count = ?, ads_task_date = ?, lifetime_ads_watched = COALESCE(lifetime_ads_watched, 0) + 1, weekly_ads_watched = weekly_ads_watched + 1
-     WHERE telegram_id = ? AND (ads_task_date IS NULL OR ads_task_date <> ? OR ads_task_count = ?)
+    `UPDATE users SET coins = coins + ?, adsgram_task_count = ?, adsgram_task_date = ?, lifetime_ads_watched = COALESCE(lifetime_ads_watched, 0) + 1, weekly_ads_watched = weekly_ads_watched + 1
+     WHERE telegram_id = ? AND (adsgram_task_date IS NULL OR adsgram_task_date <> ? OR adsgram_task_count = ?)
      RETURNING lifetime_ads_watched, referred_by`
   ).bind(ADS_TASK_REWARD_COINS, newCount, today, telegramId, today, countToday).first();
   if (updated) {
