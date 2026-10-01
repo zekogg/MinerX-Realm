@@ -354,11 +354,8 @@ async function routeRequest(request, env, url) {
     if (url.pathname === "/api/gigapub/postback" && request.method === "GET") {
       return handleGigapubPostback(url, env);
     }
-    if (url.pathname === "/api/monetix/reward" && request.method === "POST") {
-      return handleMonetixReward(request, env);
-    }
-    if (url.pathname === "/api/onclicka/reward" && request.method === "POST") {
-      return handleOnclickaReward(request, env);
+    if (url.pathname === "/api/ads/client-rewards" && request.method === "POST") {
+      return handleClientAdRewards(request, env);
     }
     if (url.pathname === "/api/pets/claim_happy_dog" && request.method === "POST") {
       return handleClaimHappyDog(request, env);
@@ -2253,70 +2250,69 @@ async function handleGigapubPostback(url, env) {
   return new Response("OK", { status: 200 });
 }
 
-// /api/monetix/reward
-async function handleMonetixReward(request, env) {
-  const auth = await authenticateRequest(request, env);
+// /api/ads/client-rewards — Monetix and OnClicka have no postback, so the app reports their ads itself:
+// it shows the reward at once and sends the counts here in one request a minute after the last ad
+const CLIENT_AD_NETWORKS = {
+  monetix: { countCol: "monetix_task_count", dateCol: "monetix_task_date", limit: MONETIX_DAILY_LIMIT, reward: MONETIX_REWARD_COINS },
+  onclicka: { countCol: "onclicka_task_count", dateCol: "onclicka_task_date", limit: ONCLICKA_DAILY_LIMIT, reward: ONCLICKA_REWARD_COINS }
+};
+async function handleClientAdRewards(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "invalid_body" }, 400);
+  }
+  const auth = await authenticateRequest(request, env, body);
   if (!auth.ok) return auth.response;
   const { telegramId } = auth;
-  const row = await env.DB.prepare(
-    "SELECT coins, monetix_task_count, monetix_task_date FROM users WHERE telegram_id = ?"
-  ).bind(telegramId).first();
-  if (!row) return jsonResponse({ error: "user_not_found" }, 404);
+  const networks = Object.keys(CLIENT_AD_NETWORKS);
   const today = todayUTC();
-  const countToday = row.monetix_task_date === today ? (row.monetix_task_count || 0) : 0;
-  if (countToday >= MONETIX_DAILY_LIMIT) {
-    return jsonResponse({ error: "daily_limit_reached", watched_today: countToday, daily_limit: MONETIX_DAILY_LIMIT }, 409);
+  // a lost compare-and-set (another request changed a count in between) is retried with fresh counts
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const row = await env.DB.prepare(
+      `SELECT coins, ${networks.map((n) => CLIENT_AD_NETWORKS[n].countCol + ", " + CLIENT_AD_NETWORKS[n].dateCol).join(", ")}
+       FROM users WHERE telegram_id = ?`
+    ).bind(telegramId).first();
+    if (!row) return jsonResponse({ error: "user_not_found" }, 404);
+    const sets = [];
+    const setArgs = [];
+    const guards = [];
+    const guardArgs = [];
+    const result = { credited: {} };
+    let coinsAdded = 0;
+    let adsAdded = 0;
+    for (const n of networks) {
+      const cfg = CLIENT_AD_NETWORKS[n];
+      const requested = Math.max(0, Math.min(cfg.limit, parseInt(body[n], 10) || 0));
+      const countToday = row[cfg.dateCol] === today ? (row[cfg.countCol] || 0) : 0;
+      const credit = Math.min(requested, cfg.limit - countToday);
+      result.credited[n] = credit;
+      result[n] = { watched_today: countToday + credit, daily_limit: cfg.limit, reward_coins: cfg.reward };
+      if (credit <= 0) continue;
+      sets.push(`${cfg.countCol} = ?`, `${cfg.dateCol} = ?`);
+      setArgs.push(countToday + credit, today);
+      guards.push(`(${cfg.dateCol} IS NULL OR ${cfg.dateCol} <> ? OR ${cfg.countCol} = ?)`);
+      guardArgs.push(today, countToday);
+      coinsAdded += credit * cfg.reward;
+      adsAdded += credit;
+    }
+    if (adsAdded === 0) {
+      result.coins = row.coins;
+      return jsonResponse(result);
+    }
+    // rewards and every ad counter in one write; RETURNING gives the new totals without a second read
+    const updated = await env.DB.prepare(
+      `UPDATE users SET coins = coins + ?, ${sets.join(", ")}, lifetime_ads_watched = COALESCE(lifetime_ads_watched, 0) + ?, weekly_ads_watched = weekly_ads_watched + ?
+       WHERE telegram_id = ? AND ${guards.join(" AND ")}
+       RETURNING coins, lifetime_ads_watched, referred_by`
+    ).bind(coinsAdded, ...setArgs, adsAdded, adsAdded, telegramId, ...guardArgs).first();
+    if (!updated) continue;
+    await activateReferralOnLifetimeAds(env, telegramId, updated.referred_by, updated.lifetime_ads_watched);
+    result.coins = updated.coins;
+    return jsonResponse(result);
   }
-  const newCount = countToday + 1;
-  // reward and ad counters in one write; RETURNING gives the new lifetime count without a second read
-  const updated = await env.DB.prepare(
-    `UPDATE users SET coins = coins + ?, monetix_task_count = ?, monetix_task_date = ?, lifetime_ads_watched = COALESCE(lifetime_ads_watched, 0) + 1, weekly_ads_watched = weekly_ads_watched + 1
-     WHERE telegram_id = ? AND (monetix_task_date IS NULL OR monetix_task_date <> ? OR monetix_task_count = ?)
-     RETURNING lifetime_ads_watched, referred_by`
-  ).bind(MONETIX_REWARD_COINS, newCount, today, telegramId, today, countToday).first();
-  if (!updated) {
-    return jsonResponse({ error: "daily_limit_reached", watched_today: countToday, daily_limit: MONETIX_DAILY_LIMIT }, 409);
-  }
-  await activateReferralOnLifetimeAds(env, telegramId, updated.referred_by, updated.lifetime_ads_watched);
-  return jsonResponse({
-    watched_today: newCount,
-    daily_limit: MONETIX_DAILY_LIMIT,
-    reward_coins: MONETIX_REWARD_COINS,
-    coins: row.coins + MONETIX_REWARD_COINS
-  });
-}
-
-// /api/onclicka/reward
-async function handleOnclickaReward(request, env) {
-  const auth = await authenticateRequest(request, env);
-  if (!auth.ok) return auth.response;
-  const { telegramId } = auth;
-  const row = await env.DB.prepare(
-    "SELECT coins, onclicka_task_count, onclicka_task_date FROM users WHERE telegram_id = ?"
-  ).bind(telegramId).first();
-  if (!row) return jsonResponse({ error: "user_not_found" }, 404);
-  const today = todayUTC();
-  const countToday = row.onclicka_task_date === today ? (row.onclicka_task_count || 0) : 0;
-  if (countToday >= ONCLICKA_DAILY_LIMIT) {
-    return jsonResponse({ error: "daily_limit_reached", watched_today: countToday, daily_limit: ONCLICKA_DAILY_LIMIT }, 409);
-  }
-  const newCount = countToday + 1;
-  // reward and ad counters in one write; RETURNING gives the new lifetime count without a second read
-  const updated = await env.DB.prepare(
-    `UPDATE users SET coins = coins + ?, onclicka_task_count = ?, onclicka_task_date = ?, lifetime_ads_watched = COALESCE(lifetime_ads_watched, 0) + 1, weekly_ads_watched = weekly_ads_watched + 1
-     WHERE telegram_id = ? AND (onclicka_task_date IS NULL OR onclicka_task_date <> ? OR onclicka_task_count = ?)
-     RETURNING lifetime_ads_watched, referred_by`
-  ).bind(ONCLICKA_REWARD_COINS, newCount, today, telegramId, today, countToday).first();
-  if (!updated) {
-    return jsonResponse({ error: "daily_limit_reached", watched_today: countToday, daily_limit: ONCLICKA_DAILY_LIMIT }, 409);
-  }
-  await activateReferralOnLifetimeAds(env, telegramId, updated.referred_by, updated.lifetime_ads_watched);
-  return jsonResponse({
-    watched_today: newCount,
-    daily_limit: ONCLICKA_DAILY_LIMIT,
-    reward_coins: ONCLICKA_REWARD_COINS,
-    coins: row.coins + ONCLICKA_REWARD_COINS
-  });
+  return jsonResponse({ error: "busy" }, 409);
 }
 
 // A Monetix/OnClicka ad shown before a gated action comes as gate_ad: true on the action's own request and is
