@@ -9976,7 +9976,8 @@ function submitWithdrawRequest(){
       }
       return;
     }
-    updateBalanceDisplay({ gram: data.gram });
+    // a withdrawal only changes Gram; the coin balance is passed through so it is not shown as 0
+    updateBalanceDisplay({ coins: CURRENT_COINS_BALANCE, gram: data.gram });
     NEXT_WITHDRAW_ALLOWED_AT = data.next_allowed_at;
     localCacheClear('wallet_history');
     closeModal('modal-withdraw');
