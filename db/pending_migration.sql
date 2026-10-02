@@ -234,3 +234,6 @@ CREATE INDEX IF NOT EXISTS idx_users_banned ON users(banned_at) WHERE banned_at 
 -- العملات المودعة مقفلة: تُستخدم لشراء وترقية الـ Pets والـ Storage فقط ولا تُحوَّل إلى Gram.
 -- coins يبقى الرصيد الكلي، وlocked_coins الجزء المودع منه.
 ALTER TABLE users ADD COLUMN locked_coins REAL DEFAULT 0;
+
+-- Previous Winners: الفائزون المدفوع لهم في كل توزيع أسبوعي (JSON)، يُعرضون حتى التوزيع التالي.
+ALTER TABLE leaderboard_payouts ADD COLUMN winners TEXT;
