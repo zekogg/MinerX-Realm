@@ -444,7 +444,7 @@ async function handleGetUser(request, env) {
            u.bonus_ad_count_today, u.bonus_ad_date, u.bonus_ad_last_watched_at,
            u.gigapub_task_count, u.gigapub_task_date, u.photo_url,
            u.monetix_task_count, u.monetix_task_date, u.onclicka_task_count, u.onclicka_task_date, u.lifetime_ads_watched,
-           u.combo_date, u.combo_attempts_used, u.combo_solved, u.device_id, u.banned_at
+           u.combo_date, u.combo_attempts_used, u.combo_solved, u.device_id, u.banned_at, u.locked_coins
     FROM users u
     WHERE u.telegram_id = ?
   `;
@@ -527,6 +527,7 @@ async function handleGetUser(request, env) {
   view.onclicka_watched_today = user.onclicka_task_date === today ? (user.onclicka_task_count || 0) : 0;
   view.onclicka_daily_limit = ONCLICKA_DAILY_LIMIT;
   view.onclicka_reward_coins = ONCLICKA_REWARD_COINS;
+  view.locked_coins = user.locked_coins || 0;
   return jsonResponse({ user: view });
 }
 
@@ -797,7 +798,7 @@ async function handlePetBuy(request, env, petId) {
   ).bind(telegramId, petId).first();
   if (existing) return jsonResponse({ error: "already_owned" }, 409);
   const storageRow = await env.DB.prepare(
-    `SELECT u.total_speed, u.capacity_hours, u.last_claim_at
+    `SELECT u.total_speed, u.capacity_hours, u.last_claim_at, u.locked_coins
      FROM users u
      WHERE u.telegram_id = ?`
   ).bind(telegramId).first();
@@ -807,13 +808,15 @@ async function handlePetBuy(request, env, petId) {
     const elapsedSeconds = Math.max(0, (Date.now() - Date.parse(storageRow.last_claim_at)) / 1000);
     preBuyAccrued = Math.min(elapsedSeconds, capacitySeconds) * ((storageRow.total_speed || 0) / 3600);
   }
-  const deductResult = await env.DB.prepare(
-    `UPDATE users SET coins = coins - ? + ?, total_speed = total_speed + ?
-     WHERE telegram_id = ? AND coins >= ?`
-  ).bind(pet.price, preBuyAccrued, pet.basespeed, telegramId, pet.price).run();
-  if (!deductResult.meta || deductResult.meta.changes === 0) {
+  const deducted = await env.DB.prepare(
+    `UPDATE users SET coins = coins - ? + ?, total_speed = total_speed + ?, locked_coins = MAX(0, COALESCE(locked_coins, 0) - ?)
+     WHERE telegram_id = ? AND coins >= ?
+     RETURNING locked_coins`
+  ).bind(pet.price, preBuyAccrued, pet.basespeed, pet.price, telegramId, pet.price).first();
+  if (!deducted) {
     return jsonResponse({ error: "insufficient_funds" }, 400);
   }
+  const lockedTaken = lockedTakenFor(pet.price, deducted.locked_coins, storageRow && storageRow.locked_coins);
   const nowIso = new Date().toISOString();
   const insertPetStmt = env.DB.prepare(
     "INSERT INTO user_pets (telegram_id, pet_id, level, current_speed) VALUES (?, ?, 1, ?)"
@@ -828,14 +831,15 @@ async function handlePetBuy(request, env, petId) {
     await env.DB.batch(stmts);
   } catch (e) {
     await env.DB.prepare(
-      "UPDATE users SET coins = coins + ? - ?, total_speed = total_speed - ? WHERE telegram_id = ?"
-    ).bind(pet.price, preBuyAccrued, pet.basespeed, telegramId).run();
+      "UPDATE users SET coins = coins + ? - ?, total_speed = total_speed - ?, locked_coins = COALESCE(locked_coins, 0) + ? WHERE telegram_id = ?"
+    ).bind(pet.price, preBuyAccrued, pet.basespeed, lockedTaken, telegramId).run();
     return jsonResponse({ error: "already_owned" }, 409);
   }
   const updatedUser = await env.DB.prepare(
-    "SELECT coins, total_speed FROM users WHERE telegram_id = ?"
+    "SELECT coins, total_speed, locked_coins FROM users WHERE telegram_id = ?"
   ).bind(telegramId).first();
   return jsonResponse({
+    locked_coins: updatedUser.locked_coins || 0,
     pet_id: petId,
     level: 1,
     speed: pet.basespeed,
@@ -851,7 +855,7 @@ async function handlePetUpgrade(request, env, petId) {
   if (!auth.ok) return auth.response;
   const { telegramId } = auth;
   const row = await env.DB.prepare(
-    `SELECT p.level, p.current_speed, u.total_speed, u.capacity_hours, u.last_claim_at
+    `SELECT p.level, p.current_speed, u.total_speed, u.capacity_hours, u.last_claim_at, u.locked_coins
      FROM user_pets p
      JOIN users u ON u.telegram_id = p.telegram_id
      WHERE p.telegram_id = ? AND p.pet_id = ?`
@@ -870,13 +874,15 @@ async function handlePetUpgrade(request, env, petId) {
     const elapsedSeconds = Math.max(0, (Date.now() - Date.parse(row.last_claim_at)) / 1000);
     preUpgradeAccrued = Math.min(elapsedSeconds, capacitySeconds) * ((row.total_speed || 0) / 3600);
   }
-  const deductResult = await env.DB.prepare(
-    `UPDATE users SET coins = coins - ? + ?, total_speed = total_speed + ?
-     WHERE telegram_id = ? AND coins >= ?`
-  ).bind(upgradeCost, preUpgradeAccrued, speedDelta, telegramId, upgradeCost).run();
-  if (!deductResult.meta || deductResult.meta.changes === 0) {
+  const deducted = await env.DB.prepare(
+    `UPDATE users SET coins = coins - ? + ?, total_speed = total_speed + ?, locked_coins = MAX(0, COALESCE(locked_coins, 0) - ?)
+     WHERE telegram_id = ? AND coins >= ?
+     RETURNING locked_coins`
+  ).bind(upgradeCost, preUpgradeAccrued, speedDelta, upgradeCost, telegramId, upgradeCost).first();
+  if (!deducted) {
     return jsonResponse({ error: "insufficient_funds" }, 400);
   }
+  const lockedTaken = lockedTakenFor(upgradeCost, deducted.locked_coins, row.locked_coins);
   const nowIso = new Date().toISOString();
   const updatePetStmt = env.DB.prepare(
     `UPDATE user_pets SET level = ?, current_speed = ?
@@ -889,14 +895,15 @@ async function handlePetUpgrade(request, env, petId) {
   const [updatePetResult] = await env.DB.batch(stmts);
   if (!updatePetResult.meta || updatePetResult.meta.changes === 0) {
     await env.DB.prepare(
-      "UPDATE users SET coins = coins + ? - ?, total_speed = total_speed - ? WHERE telegram_id = ?"
-    ).bind(upgradeCost, preUpgradeAccrued, speedDelta, telegramId).run();
+      "UPDATE users SET coins = coins + ? - ?, total_speed = total_speed - ?, locked_coins = COALESCE(locked_coins, 0) + ? WHERE telegram_id = ?"
+    ).bind(upgradeCost, preUpgradeAccrued, speedDelta, lockedTaken, telegramId).run();
     return jsonResponse({ error: "level_changed" }, 409);
   }
   const updatedUser = await env.DB.prepare(
-    "SELECT coins, total_speed FROM users WHERE telegram_id = ?"
+    "SELECT coins, total_speed, locked_coins FROM users WHERE telegram_id = ?"
   ).bind(telegramId).first();
   return jsonResponse({
+    locked_coins: updatedUser.locked_coins || 0,
     pet_id: petId,
     level: newLevel,
     speed: newSpeed,
@@ -957,7 +964,7 @@ async function handleStorageUpgrade(request, env) {
   if (!auth.ok) return auth.response;
   const { telegramId } = auth;
   const row = await env.DB.prepare(
-    `SELECT u.total_speed, u.capacity_hours, u.last_claim_at
+    `SELECT u.total_speed, u.capacity_hours, u.last_claim_at, u.locked_coins
      FROM users u
      WHERE u.telegram_id = ?`
   ).bind(telegramId).first();
@@ -976,13 +983,15 @@ async function handleStorageUpgrade(request, env) {
   const perSecondRate = (row.total_speed || 0) / 3600;
   const elapsedSeconds = Math.max(0, (Date.now() - Date.parse(row.last_claim_at)) / 1000);
   const preUpgradeAccrued = Math.min(elapsedSeconds, oldCapacitySeconds) * perSecondRate;
-  const deductResult = await env.DB.prepare(
-    `UPDATE users SET coins = coins - ? + ?
-     WHERE telegram_id = ? AND coins >= ?`
-  ).bind(STORAGE_UPGRADE_COST_COINS, preUpgradeAccrued, telegramId, STORAGE_UPGRADE_COST_COINS).run();
-  if (!deductResult.meta || deductResult.meta.changes === 0) {
+  const deducted = await env.DB.prepare(
+    `UPDATE users SET coins = coins - ? + ?, locked_coins = MAX(0, COALESCE(locked_coins, 0) - ?)
+     WHERE telegram_id = ? AND coins >= ?
+     RETURNING locked_coins`
+  ).bind(STORAGE_UPGRADE_COST_COINS, preUpgradeAccrued, STORAGE_UPGRADE_COST_COINS, telegramId, STORAGE_UPGRADE_COST_COINS).first();
+  if (!deducted) {
     return jsonResponse({ error: "insufficient_funds" }, 400);
   }
+  const lockedTaken = lockedTakenFor(STORAGE_UPGRADE_COST_COINS, deducted.locked_coins, row.locked_coins);
   const nowIso = new Date().toISOString();
   const updateStorageStmt = env.DB.prepare(
     `UPDATE users SET capacity_hours = ?, last_claim_at = ?
@@ -992,14 +1001,15 @@ async function handleStorageUpgrade(request, env) {
   const [updateStorageResult] = await env.DB.batch(stmts);
   if (!updateStorageResult.meta || updateStorageResult.meta.changes === 0) {
     await env.DB.prepare(
-      "UPDATE users SET coins = coins + ? - ? WHERE telegram_id = ?"
-    ).bind(STORAGE_UPGRADE_COST_COINS, preUpgradeAccrued, telegramId).run();
+      "UPDATE users SET coins = coins + ? - ?, locked_coins = COALESCE(locked_coins, 0) + ? WHERE telegram_id = ?"
+    ).bind(STORAGE_UPGRADE_COST_COINS, preUpgradeAccrued, lockedTaken, telegramId).run();
     return jsonResponse({ error: "level_changed" }, 409);
   }
   const updatedUser = await env.DB.prepare(
-    "SELECT coins FROM users WHERE telegram_id = ?"
+    "SELECT coins, locked_coins FROM users WHERE telegram_id = ?"
   ).bind(telegramId).first();
   return jsonResponse({
+    locked_coins: updatedUser.locked_coins || 0,
     level: newLevel,
     capacity_hours: newCapacityHours,
     capacity_seconds: newCapacitySeconds,
@@ -1081,17 +1091,29 @@ async function handleExchange(request, env) {
     return jsonResponse({ error: "below_minimum", minimum: EXCHANGE_MIN_COINS }, 400);
   }
   const gramAmount = amountCoins * EXCHANGE_RATE_COIN_TO_GRAM;
+  // deposited coins (locked_coins) are for pets and upgrades only; only the rest can become Gram
   const result = await env.DB.prepare(
     `UPDATE users SET coins = coins - ?, gram = gram + ?
-     WHERE telegram_id = ? AND coins >= ?`
+     WHERE telegram_id = ? AND coins - COALESCE(locked_coins, 0) >= ?`
   ).bind(amountCoins, gramAmount, telegramId, amountCoins).run();
   if (!result.meta || result.meta.changes === 0) {
+    const current = await env.DB.prepare(
+      "SELECT coins, locked_coins FROM users WHERE telegram_id = ?"
+    ).bind(telegramId).first();
+    if (current && current.coins >= amountCoins) {
+      return jsonResponse({
+        error: "locked_coins",
+        exchangeable: Math.max(0, current.coins - (current.locked_coins || 0)),
+        locked_coins: current.locked_coins || 0
+      }, 400);
+    }
     return jsonResponse({ error: "insufficient_funds" }, 400);
   }
   const updatedUser = await env.DB.prepare(
-    "SELECT coins, gram FROM users WHERE telegram_id = ?"
+    "SELECT coins, gram, locked_coins FROM users WHERE telegram_id = ?"
   ).bind(telegramId).first();
   return jsonResponse({
+    locked_coins: updatedUser.locked_coins || 0,
     exchanged_coins: amountCoins,
     received_gram: gramAmount,
     coins: updatedUser.coins,
@@ -1144,9 +1166,9 @@ async function handleDepositStatus(request, env) {
   const doData = await doRes.json();
   if (doData.status === "found" || doData.status === "already_processed") {
     const updatedUser = await env.DB.prepare(
-      "SELECT coins, gram FROM users WHERE telegram_id = ?"
+      "SELECT coins, gram, locked_coins FROM users WHERE telegram_id = ?"
     ).bind(telegramId).first();
-    return jsonResponse({ ...doData, coins: updatedUser.coins, gram: updatedUser.gram });
+    return jsonResponse({ ...doData, coins: updatedUser.coins, gram: updatedUser.gram, locked_coins: updatedUser.locked_coins || 0 });
   }
   return jsonResponse(doData);
 }
@@ -1242,9 +1264,10 @@ export class DepositChecker {
               this.env.DB.prepare(
                 "INSERT INTO deposits (telegram_id, tx_hash, amount_gram, coins_credited, status, memo, created_at) VALUES (?, ?, ?, ?, 'confirmed', ?, ?)"
               ).bind(telegramId, txHash, amountGram, coinsCredited, memo, Date.now()),
+              // deposited coins are also locked: usable for pets and upgrades, never exchangeable to Gram
               this.env.DB.prepare(
-                "UPDATE users SET coins = coins + ? WHERE telegram_id = ?"
-              ).bind(coinsCredited, telegramId)
+                "UPDATE users SET coins = coins + ?, locked_coins = COALESCE(locked_coins, 0) + ? WHERE telegram_id = ?"
+              ).bind(coinsCredited, coinsCredited, telegramId)
             ];
             if (referrerId) {
               depositBatch.push(
@@ -1695,7 +1718,7 @@ async function handleAdminUserFind(request, env) {
   if (!Number.isInteger(targetId)) return jsonResponse({ error: "invalid_target_id" }, 400);
   const [user, depositResult, withdrawResult] = await Promise.all([
     env.DB.prepare(
-      "SELECT telegram_id, username, coins, gram, total_speed, invites_count, active_referrals_count, referral_deposit_commission_total, lifetime_ads_watched, created_at, device_id, banned_at FROM users WHERE telegram_id = ?"
+      "SELECT telegram_id, username, coins, gram, total_speed, invites_count, active_referrals_count, referral_deposit_commission_total, lifetime_ads_watched, created_at, device_id, banned_at, locked_coins FROM users WHERE telegram_id = ?"
     ).bind(targetId).first(),
     env.DB.prepare(
       "SELECT COALESCE(SUM(amount_gram), 0) AS total FROM deposits WHERE telegram_id = ? AND status = 'confirmed'"
@@ -1730,6 +1753,7 @@ async function handleAdminUserFind(request, env) {
     total_deposit_gram: depositResult.total || 0,
     total_withdraw_gram: withdrawResult.total || 0,
     banned_date: user.banned_at ? formatDateDDMMYYYY(user.banned_at) : null,
+    locked_coins: user.locked_coins || 0,
     linked_accounts: linked
   });
 }
@@ -1811,20 +1835,22 @@ async function handleAdminEditBalance(request, env) {
   if (!auth.ok) return auth.response;
   const targetId = parseInt(body.target_id, 10);
   if (!Number.isInteger(targetId)) return jsonResponse({ error: "invalid_target_id" }, 400);
-  const newCoins = Number(body.coins);
+  // body.coins is the exchangeable part and body.locked_coins the deposited part; users.coins stores their total,
+  // so locked coins can never exceed the balance. Without locked_coins the current locked amount is kept.
+  const freeCoins = Number(body.coins);
   const newGram = Number(body.gram);
-  if (!Number.isFinite(newCoins) || newCoins < 0 || !Number.isFinite(newGram) || newGram < 0) {
+  const lockedGiven = body.locked_coins !== undefined && body.locked_coins !== null && body.locked_coins !== "";
+  const newLocked = lockedGiven ? Number(body.locked_coins) : null;
+  if (!Number.isFinite(freeCoins) || freeCoins < 0 || !Number.isFinite(newGram) || newGram < 0 ||
+      (lockedGiven && (!Number.isFinite(newLocked) || newLocked < 0))) {
     return jsonResponse({ error: "invalid_amount" }, 400);
   }
-  const row = await env.DB.prepare("SELECT coins, gram FROM users WHERE telegram_id = ?").bind(targetId).first();
+  const row = await env.DB.prepare("SELECT locked_coins FROM users WHERE telegram_id = ?").bind(targetId).first();
   if (!row) return jsonResponse({ error: "user_not_found" }, 404);
-  const coinsDelta = newCoins - row.coins;
-  const gramDelta = newGram - row.gram;
-  const stmts = [
-    env.DB.prepare("UPDATE users SET coins = ?, gram = ? WHERE telegram_id = ?").bind(newCoins, newGram, targetId)
-  ];
-  await env.DB.batch(stmts);
-  return jsonResponse({ ok: true, coins: newCoins, gram: newGram });
+  const locked = lockedGiven ? newLocked : (row.locked_coins || 0);
+  await env.DB.prepare("UPDATE users SET coins = ?, locked_coins = ?, gram = ? WHERE telegram_id = ?")
+    .bind(freeCoins + locked, locked, newGram, targetId).run();
+  return jsonResponse({ ok: true, coins: freeCoins + locked, locked_coins: locked, gram: newGram });
 }
 
 // /api/admin/tasks/list
@@ -2840,6 +2866,13 @@ function formatDateDDMMYYYY(ms) {
 }
 
 // User view
+// Spending takes locked (deposited) coins first. Locked coins left after the spend mean the whole cost came
+// from them; otherwise the share is what was locked just before, never more than the cost. A refund puts
+// exactly this share back as locked, so a failed purchase can never turn deposited coins into free ones.
+function lockedTakenFor(cost, lockedAfter, lockedBefore) {
+  if (lockedAfter > 0) return cost;
+  return Math.min(cost, Math.max(0, lockedBefore || 0));
+}
 function withMiningView(user) {
   const today = todayUTC();
   const isToday = user.mining_cycle_date === today;

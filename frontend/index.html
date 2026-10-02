@@ -2890,6 +2890,15 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   border-radius:var(--radius-lg);
   max-height:none; overflow-y:visible;
 }
+.exchange-locked{
+  margin:calc(-4px * var(--s)) 0 calc(12px * var(--s));
+  padding:calc(9px * var(--s)) calc(12px * var(--s));
+  border-radius:var(--radius-sm);
+  background:rgba(240,216,120,.07); border:1px solid rgba(240,216,120,.2);
+}
+.exchange-locked__row{ display:flex; justify-content:space-between; align-items:center; font-size:calc(12px * var(--s)); font-weight:700; color:var(--ink); }
+.exchange-locked__row span:last-child{ color:#f0d878; }
+.exchange-locked__hint{ margin-top:calc(3px * var(--s)); font-size:calc(10.5px * var(--s)); color:var(--ink-dim); }
 #modal-exchange .modal-sheet::before{
   top:auto; left:auto; right:auto; height:auto; inset:0; border-radius:inherit; padding:calc(1.6px * var(--s));
   background:linear-gradient(135deg, #f0d878 0%, #a9701f 28%, var(--c-royal-purple-2) 55%, #f0d878 100%);
@@ -4845,8 +4854,14 @@ body.reduce-motion .firefly{
           <div id="ap-find-name" style="font-weight:700;font-size:calc(13px * var(--s));color:var(--ink);margin-bottom:calc(10px * var(--s));">—</div>
           <div class="ap-row">
             <div style="flex:1;">
-              <label class="ap-label">Coins</label>
-              <input class="ap-input" id="ap-find-coins" inputmode="decimal">
+              <label class="ap-label">Coins (Exchangeable)</label>
+              <input class="ap-input" id="ap-find-coins" inputmode="decimal" oninput="adminRenderTotalCoins()">
+            </div>
+          </div>
+          <div class="ap-row" style="margin-top:calc(8px * var(--s));">
+            <div style="flex:1;">
+              <label class="ap-label">Locked Coins (Deposited)</label>
+              <input class="ap-input" id="ap-find-locked" inputmode="decimal" oninput="adminRenderTotalCoins()">
             </div>
           </div>
           <div class="ap-row" style="margin-top:calc(8px * var(--s));">
@@ -4855,6 +4870,7 @@ body.reduce-motion .firefly{
               <input class="ap-input" id="ap-find-gram" inputmode="decimal">
             </div>
           </div>
+          <div class="ap-info-row" style="border-bottom:none;margin-top:calc(4px * var(--s));"><span>Total Coins</span><span id="ap-find-total-coins">0</span></div>
           <button class="ap-btn" style="width:100%;margin-top:calc(10px * var(--s));box-sizing:border-box;" onclick="adminSaveBalance()">Save Balance</button>
           <div style="margin-top:calc(14px * var(--s));">
             <div class="ap-info-row"><span>Registered</span><span id="ap-find-registered">—</span></div>
@@ -5255,6 +5271,10 @@ body.reduce-motion .firefly{
           <div class="modal-balance-box__val" id="exchange-gram-balance" style="color:#4a9eff">0,000</div>
         </div>
       </div>
+      <div class="exchange-locked" id="exchange-locked" style="display:none;">
+        <div class="exchange-locked__row"><span>Exchangeable</span><span id="exchange-exchangeable">0 Coins</span></div>
+        <div class="exchange-locked__hint">Deposited coins can only be used for pets and upgrades</div>
+      </div>
       <div class="modal-field-label">
         <span>You Pay</span>
         <button class="modal-max" onclick="setMaxExchange()">MAX</button>
@@ -5579,7 +5599,13 @@ function formatCoinsK(value){
 }
 var CURRENT_COINS_BALANCE = 0;
 var CURRENT_GRAM_BALANCE = 0;
+// Deposited coins (part of the coin balance) are for pets and upgrades only and cannot be exchanged
+var CURRENT_LOCKED_COINS = 0;
+function exchangeableCoins(){
+  return Math.max(0, CURRENT_COINS_BALANCE - CURRENT_LOCKED_COINS);
+}
 function updateBalanceDisplay(u){
+  if (u.locked_coins !== undefined) CURRENT_LOCKED_COINS = Number(u.locked_coins) || 0;
   CURRENT_COINS_BALANCE = Number(u.coins) || 0;
   CURRENT_GRAM_BALANCE = Number(u.gram) || 0;
   var coinsWhole = Number(u.coins).toLocaleString('en-US', { maximumFractionDigits: 0 });
@@ -5876,7 +5902,7 @@ function runMiningRequest(isReadyToClaim){
       return;
     }
     if (isReadyToClaim && typeof data.coins === 'number'){
-      updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE, total_mined: data.total_mined });
+      updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE, total_mined: data.total_mined , locked_coins: data.locked_coins });
       showPrizeToast('coins', data.reward, 'You Got');
       triggerConfetti();
     }
@@ -5991,7 +6017,7 @@ function runStreakClaimRequest(initData){
       return;
     }
     if (typeof data.coins === 'number'){
-      updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE });
+      updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE , locked_coins: data.locked_coins });
     }
     applyStreakState({ display_day: data.day_claimed, claimed_today: true, next_reset_utc: data.next_reset_utc });
   })
@@ -6201,7 +6227,7 @@ function runSpinClaimRequest(initData, btn){
     }
     rotateSpinWheelToSegment(data.segment_index);
     setTimeout(function(){
-      updateBalanceDisplay({ coins: data.coins, gram: data.gram });
+      updateBalanceDisplay({ coins: data.coins, gram: data.gram , locked_coins: data.locked_coins });
       applySpinState({ claimed_today: true, next_reset_utc: data.next_reset_utc });
       showPrizeToast(data.prize_type, data.prize_amount);
     }, 4000);
@@ -6276,7 +6302,7 @@ function runChestClaimRequest(initData){
       return;
     }
     setTimeout(function(){
-      updateBalanceDisplay({ coins: data.coins, gram: data.gram });
+      updateBalanceDisplay({ coins: data.coins, gram: data.gram , locked_coins: data.locked_coins });
       applyChestState({ claimed_today: true, next_reset_utc: data.next_reset_utc });
       showPrizeToast(data.prize_type, data.prize_amount);
     }, 650);
@@ -6361,7 +6387,7 @@ function runGiftClaimRequest(initData, selectedBox){
     if (amountEl) amountEl.textContent = data.prize_amount + (data.prize_type === 'gram' ? ' Gram' : '');
     selectedBox.classList.add('is-revealed');
     setTimeout(function(){
-      updateBalanceDisplay({ coins: data.coins, gram: data.gram });
+      updateBalanceDisplay({ coins: data.coins, gram: data.gram , locked_coins: data.locked_coins });
       applyGiftPickState({ claimed_today: true, next_reset_utc: data.next_reset_utc });
       showPrizeToast(data.prize_type, data.prize_amount);
     }, 700);
@@ -6545,7 +6571,7 @@ function onPetBuyClick(petId, btn){
     }
     petStates[petId] = { level: data.level, speed: data.speed };
     renderPetCard(def);
-    updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE });
+    updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE , locked_coins: data.locked_coins });
     applyStorageState({
       storage_has_pet: true,
       total_speed: data.total_speed,
@@ -6598,7 +6624,7 @@ function onPetUpgradeConfirm(){
     closeModal('modal-upgrade-pet');
     petStates[petId] = { level: data.level, speed: data.speed };
     renderPetCard(def);
-    updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE });
+    updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE , locked_coins: data.locked_coins });
     applyStorageState({
       storage_has_pet: true,
       total_speed: data.total_speed,
@@ -6739,7 +6765,7 @@ function onStorageClaimClick(){
       }
       return;
     }
-    updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE });
+    updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE , locked_coins: data.locked_coins });
     showPrizeToast('coins', Math.round(data.claimed_amount * 100) / 100, 'You Got');
     triggerConfetti();
     invalidateRealmCache();
@@ -7238,7 +7264,7 @@ function onStorageUpgradeConfirm(){
       return;
     }
     closeModal('modal-upgrade-storage');
-    updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE });
+    updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE , locked_coins: data.locked_coins });
     applyStorageState({
       storage_has_pet: true,
       total_speed: storageState.totalSpeed,
@@ -7330,7 +7356,7 @@ function onClaimHappyDogClick(){
       return;
     }
     happyDogState.claimed = true;
-    if (typeof data.coins === 'number') updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE });
+    if (typeof data.coins === 'number') updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE , locked_coins: data.locked_coins });
     if (typeof data.total_speed === 'number') applyClaimedPetSpeed(data.total_speed);
     renderHappyDogUI();
     showAppToast({ title: 'Happy Dog', amount: 'Pet unlocked for free!' });
@@ -7415,7 +7441,7 @@ function onClaimGuardianClick(){
       return;
     }
     guardianState.claimed = true;
-    if (typeof data.coins === 'number') updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE });
+    if (typeof data.coins === 'number') updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE , locked_coins: data.locked_coins });
     if (typeof data.total_speed === 'number') applyClaimedPetSpeed(data.total_speed);
     renderGuardianUI();
     showAppToast({ title: 'The Guardian', amount: 'Pet unlocked for free!' });
@@ -7493,7 +7519,7 @@ function onClaimAmbassadorClick(){
     ambassadorState.claimed = true;
     ambassadorState.speed = data.speed || 0;
     ambassadorState.value = data.value === undefined ? null : data.value;
-    if (typeof data.coins === 'number') updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE });
+    if (typeof data.coins === 'number') updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE , locked_coins: data.locked_coins });
     if (typeof data.total_speed === 'number') applyClaimedPetSpeed(data.total_speed);
     renderAmbassadorUI();
     showAppToast({ title: 'The Ambassador', amount: 'Pet unlocked!' });
@@ -7657,7 +7683,7 @@ function onComboCheckClick(){
     comboState.attemptsUsed = data.attempts_used;
     if (data.correct){
       comboState.solvedToday = true;
-      updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE });
+      updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE , locked_coins: data.locked_coins });
       showAppToast({ title: 'Daily Combo Solved', icon: PRIZE_ICON_URLS.coins, amount: '+' + data.reward + ' Coins' });
       triggerConfetti();
       renderComboCheckButton();
@@ -8458,7 +8484,7 @@ function sendClientAdRewards(keepalive){
       return;
     }
     // ads watched while the request was on its way are still in the queue and are added back on top
-    updateBalanceDisplay({ coins: r.data.coins, gram: CURRENT_GRAM_BALANCE });
+    updateBalanceDisplay({ coins: r.data.coins, gram: CURRENT_GRAM_BALANCE , locked_coins: r.data.locked_coins });
     applyMonetixState(r.data.monetix);
     applyOnclickaState(r.data.onclicka);
     localCacheClear('profile');
@@ -8599,7 +8625,7 @@ function onCheckinClaimClick(task){
     }
     checkinState.claimedToday[task] = true;
     checkinState.ready[task] = false;
-    updateBalanceDisplay({ coins: r.data.coins, gram: CURRENT_GRAM_BALANCE });
+    updateBalanceDisplay({ coins: r.data.coins, gram: CURRENT_GRAM_BALANCE , locked_coins: r.data.locked_coins });
     showAppToast({ title: 'Check-in', icon: PRIZE_ICON_URLS.coins, amount: '+' + r.data.reward + ' Coins' });
     renderCheckinButton(task);
   })
@@ -8741,7 +8767,7 @@ function onAdminTaskClick(taskId, section){
     localCacheSet('tasks_' + section, list);
     delete adminTasksReady[taskId];
     delete adminTasksCountdown[taskId];
-    updateBalanceDisplay({ coins: r.data.coins, gram: CURRENT_GRAM_BALANCE });
+    updateBalanceDisplay({ coins: r.data.coins, gram: CURRENT_GRAM_BALANCE , locked_coins: r.data.locked_coins });
     showAppToast({ title: 'Task Reward', icon: PRIZE_ICON_URLS.coins, amount: '+' + r.data.reward + ' Coins' });
     renderAdminTasks(section);
   })
@@ -8795,7 +8821,10 @@ function adminFindUser(){
     adminPanelState.foundUser = data;
     document.getElementById('ap-find-result').style.display = '';
     document.getElementById('ap-find-name').textContent = data.username ? ('@' + data.username) : ('Player ' + data.telegram_id);
-    document.getElementById('ap-find-coins').value = Math.round(data.coins);
+    var locked = Number(data.locked_coins) || 0;
+    document.getElementById('ap-find-coins').value = Math.round(Math.max(0, data.coins - locked));
+    document.getElementById('ap-find-locked').value = Math.round(locked);
+    adminRenderTotalCoins();
     document.getElementById('ap-find-gram').value = Number(data.gram).toFixed(3);
     document.getElementById('ap-find-registered').textContent = data.registered_date;
     document.getElementById('ap-find-ads').textContent = Number(data.ads_watched || 0).toLocaleString('en-US');
@@ -8833,12 +8862,19 @@ function adminRefreshFoundUser(telegramId){
     renderAdminFoundUserBan(data);
   });
 }
+// Coins (exchangeable) + Locked Coins (deposited) = the user's coin balance
+function adminRenderTotalCoins(){
+  var free = Number(document.getElementById('ap-find-coins').value) || 0;
+  var locked = Number(document.getElementById('ap-find-locked').value) || 0;
+  document.getElementById('ap-find-total-coins').textContent = Math.round(free + locked).toLocaleString('en-US');
+}
 function adminSaveBalance(){
   if (!adminPanelState.foundUser) return;
   var coins = Number(document.getElementById('ap-find-coins').value);
+  var locked = Number(document.getElementById('ap-find-locked').value);
   var gram = Number(document.getElementById('ap-find-gram').value);
-  if (!Number.isFinite(coins) || coins < 0 || !Number.isFinite(gram) || gram < 0){ adminToast('Invalid amount'); return; }
-  adminApiPost('/api/admin/user/edit_balance', { target_id: adminPanelState.foundUser.telegram_id, coins: coins, gram: gram }, function(){
+  if (!Number.isFinite(coins) || coins < 0 || !Number.isFinite(locked) || locked < 0 || !Number.isFinite(gram) || gram < 0){ adminToast('Invalid amount'); return; }
+  adminApiPost('/api/admin/user/edit_balance', { target_id: adminPanelState.foundUser.telegram_id, coins: coins, locked_coins: locked, gram: gram }, function(){
     adminToast('Balance updated');
   }, function(){
     adminToast('Failed to update balance');
@@ -9359,7 +9395,7 @@ function onClaimFriendsEarningsClick(){
       showBuyErrorToast('Minimum ' + formatFriendsAmount(friendsState.minClaim) + ' Coins required', { title: 'Cannot Claim' });
       return;
     }
-    updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE });
+    updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE , locked_coins: data.locked_coins });
     friendsState.pendingEarnings = 0;
     renderFriendsStats();
     showAppToast({ title: 'Earnings Claimed', icon: PRIZE_ICON_URLS.coins, amount: '+' + formatFriendsAmount(data.claimed) + ' Coins' });
@@ -9387,7 +9423,7 @@ function onClaimMilestoneClick(tier){
       btn.disabled = false;
       return;
     }
-    updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE });
+    updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE , locked_coins: data.locked_coins });
     var m = friendsState.milestones.find(function(x){ return x.count === tier; });
     if (m) m.claimed = true;
     localCacheSet('milestones', friendsState.milestones);
@@ -9536,8 +9572,16 @@ function openExchangeModal(){
   var gramBalEl = document.getElementById('exchange-gram-balance');
   if (coinBalEl) coinBalEl.textContent = CURRENT_COINS_BALANCE.toLocaleString('en-US', { maximumFractionDigits: 0 });
   if (gramBalEl) gramBalEl.textContent = CURRENT_GRAM_BALANCE.toFixed(2);
+  renderExchangeLocked();
   updateExchange();
   openModal('modal-exchange');
+}
+function renderExchangeLocked(){
+  var box = document.getElementById('exchange-locked');
+  if (!box) return;
+  box.style.display = CURRENT_LOCKED_COINS > 0 ? '' : 'none';
+  var val = document.getElementById('exchange-exchangeable');
+  if (val) val.textContent = Math.floor(exchangeableCoins()).toLocaleString('en-US') + ' Coins';
 }
 function updateExchange(){
   var input = document.getElementById('exchange-input');
@@ -9545,14 +9589,14 @@ function updateExchange(){
   var output = val * EXCHANGE_RATE_COIN_TO_GRAM;
   document.getElementById('exchange-output').textContent = output.toFixed(5);
   var cta = document.getElementById('exchange-cta');
-  if (val > 0 && val >= EXCHANGE_MIN_COINS && val <= CURRENT_COINS_BALANCE){
+  if (val > 0 && val >= EXCHANGE_MIN_COINS && val <= exchangeableCoins()){
     cta.textContent = 'Exchange ' + val + ' coins';
     cta.classList.add('is-ready');
     cta.disabled = false;
   } else {
     cta.classList.remove('is-ready');
     cta.disabled = true;
-    if (val > CURRENT_COINS_BALANCE){
+    if (val > exchangeableCoins()){
       cta.textContent = 'Not Enough Coins';
     } else if (val > 0 && val < EXCHANGE_MIN_COINS){
       cta.textContent = 'Minimum ' + EXCHANGE_MIN_COINS + ' Coins';
@@ -9562,14 +9606,14 @@ function updateExchange(){
   }
 }
 function setMaxExchange(){
-  document.getElementById('exchange-input').value = Math.floor(CURRENT_COINS_BALANCE);
+  document.getElementById('exchange-input').value = Math.floor(exchangeableCoins());
   updateExchange();
 }
 function onExchangeConfirm(){
   if (exchangeBusy) return;
   var input = document.getElementById('exchange-input');
   var amount = parseFloat(input.value) || 0;
-  if (amount < EXCHANGE_MIN_COINS || amount > CURRENT_COINS_BALANCE) return;
+  if (amount < EXCHANGE_MIN_COINS || amount > exchangeableCoins()) return;
   var initData = getTelegramInitData();
   if (!initData){
     alert(t('Open this app from Telegram to exchange.'));
@@ -9591,12 +9635,16 @@ function onExchangeConfirm(){
         showBuyErrorToast('Not enough Coins', { title: 'Exchange Failed' });
       } else if (data.error === 'below_minimum'){
         showBuyErrorToast('Minimum ' + (data.minimum || EXCHANGE_MIN_COINS) + ' Coins', { title: 'Exchange Failed' });
+      } else if (data.error === 'locked_coins'){
+        if (typeof data.locked_coins === 'number') CURRENT_LOCKED_COINS = data.locked_coins;
+        renderExchangeLocked();
+        showBuyErrorToast('Deposited coins can only be used for pets and upgrades', { title: 'Exchange Failed' });
       } else {
         console.error('exchange error:', data.error);
       }
       return;
     }
-    updateBalanceDisplay({ coins: data.coins, gram: data.gram });
+    updateBalanceDisplay({ coins: data.coins, gram: data.gram , locked_coins: data.locked_coins });
     closeModal('modal-exchange');
     showAppToast({
       title: 'Exchange Successful',
@@ -9659,7 +9707,7 @@ function runPromoRedeemRequest(initData, code, input){
       showAppToast({ title: 'Redeem Failed', amount: messages[data.error] || 'Something went wrong' });
       return;
     }
-    updateBalanceDisplay({ coins: data.coins, gram: data.gram });
+    updateBalanceDisplay({ coins: data.coins, gram: data.gram , locked_coins: data.locked_coins });
     if (input) input.value = '';
     showPrizeToast(data.currency, data.reward, 'Code Redeemed!');
   })
@@ -9798,7 +9846,7 @@ function pollDepositStatus(initData){
     }
     if (data.status === 'found' || data.status === 'already_processed'){
       stopDepositPolling();
-      updateBalanceDisplay({ coins: data.coins, gram: data.gram });
+      updateBalanceDisplay({ coins: data.coins, gram: data.gram , locked_coins: data.locked_coins });
       localCacheClear('profile');
       localCacheClear('wallet_history');
       closeModal('modal-deposit');
@@ -9928,7 +9976,8 @@ function submitWithdrawRequest(){
       }
       return;
     }
-    updateBalanceDisplay({ gram: data.gram });
+    // a withdrawal only changes Gram; the coin balance is passed through so it is not shown as 0
+    updateBalanceDisplay({ coins: CURRENT_COINS_BALANCE, gram: data.gram });
     NEXT_WITHDRAW_ALLOWED_AT = data.next_allowed_at;
     localCacheClear('wallet_history');
     closeModal('modal-withdraw');
