@@ -230,3 +230,7 @@ ALTER TABLE users ADD COLUMN device_id TEXT;
 ALTER TABLE users ADD COLUMN banned_at INTEGER;
 CREATE INDEX IF NOT EXISTS idx_users_device_id ON users(device_id) WHERE device_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_users_banned ON users(banned_at) WHERE banned_at IS NOT NULL;
+
+-- العملات المودعة مقفلة: تُستخدم لشراء وترقية الـ Pets والـ Storage فقط ولا تُحوَّل إلى Gram.
+-- coins يبقى الرصيد الكلي، وlocked_coins الجزء المودع منه.
+ALTER TABLE users ADD COLUMN locked_coins REAL DEFAULT 0;
