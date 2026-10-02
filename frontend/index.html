@@ -3233,6 +3233,11 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 }
 /* while the dropdown is open the sheet is tall enough for it, even when this week's board is still empty */
 .lb-sheet.is-prev-open{ min-height:78vh; }
+/* and only "Weekly Leaderboard" stays above it: the schedule lines and the countdown belong to the
+   coming payout, not to the previous winners. display:none keeps them out of the translation fitting */
+.lb-sheet.is-prev-open .modal-head__sub,
+.lb-sheet.is-prev-open .modal-head__sub2{ display:none; }
+.lb-sheet.is-prev-open .lb-rewards-badge{ visibility:hidden; }
 .lb-prev.is-open{ opacity:1; visibility:visible; transform:translateY(0); transition:opacity .18s ease, transform .18s ease, visibility 0s; }
 .lb-prev__head{ display:flex; align-items:baseline; justify-content:space-between; gap:calc(8px * var(--s)); margin-bottom:calc(10px * var(--s)); }
 .lb-prev__title{ font-family:var(--font-display); font-weight:800; font-size:calc(13px * var(--s)); color:#f0d878; }
