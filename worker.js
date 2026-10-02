@@ -175,7 +175,7 @@ export default {
     if (event.cron === "0 0 * * *") {
       ctx.waitUntil(generateDailyCombo(env));
       ctx.waitUntil(applyDailyPetBoost(env));
-    } else if (event.cron === "30 0 * * 5") {
+    } else if (event.cron === "5 0 * * FRI") {
       ctx.waitUntil(handleLeaderboardPayout(env));
     }
   },
@@ -413,6 +413,9 @@ async function routeRequest(request, env, url) {
     }
     if (url.pathname === "/api/leaderboard" && request.method === "POST") {
       return handleLeaderboard(request, env);
+    }
+    if (url.pathname === "/api/leaderboard/previous" && request.method === "POST") {
+      return handleLeaderboardPrevious(request, env);
     }
     return env.ASSETS.fetch(request);
 }
@@ -2130,6 +2133,37 @@ async function handleAdminAmbassadorList(request, env) {
 }
 
 // /api/leaderboard
+// Ties keep a fixed order (telegram_id) in the board and in the payout alike. The index on each weekly
+// counter is stored as (counter DESC, rowid ASC), so this order still reads only the top rows.
+const LEADERBOARD_ADS_SQL =
+  `SELECT telegram_id, username, photo_url, weekly_ads_watched AS val
+   FROM users WHERE weekly_ads_watched > 0
+   ORDER BY weekly_ads_watched DESC, telegram_id ASC LIMIT ?`;
+const LEADERBOARD_REFS_SQL =
+  `SELECT telegram_id, username, photo_url, weekly_active_referrals AS val
+   FROM users WHERE weekly_active_referrals > 0
+   ORDER BY weekly_active_referrals DESC, telegram_id ASC LIMIT ?`;
+function shapeLeaderboardRows(rows) {
+  return (rows.results || []).map((r, i) => ({
+    rank: i + 1,
+    name: r.username || ("Player " + r.telegram_id),
+    photo_url: r.photo_url || null,
+    value: r.val,
+    prize: LEADERBOARD_PRIZES[i] || 0
+  }));
+}
+// When the board and the previous winners stop being current: at the next payout (or midnight for the
+// daily board). Until this week's payout has actually run, both stay short-lived so nobody keeps old data.
+// A week counts as paid by its week_key, so a payout that ran earlier in the same ISO week also counts.
+async function leaderboardTiming(env) {
+  const last = await env.DB.prepare(
+    "SELECT week_key, paid_at, winners FROM leaderboard_payouts ORDER BY paid_at DESC LIMIT 1"
+  ).first();
+  const now = Date.now();
+  const scheduled = lastScheduledLeaderboardPayoutAt(now);
+  const pending = (!last || last.week_key !== isoWeekKeyUTC(scheduled)) && now - scheduled < 24 * 3600 * 1000;
+  return { last, pending, nextPayoutAt: pending ? scheduled : scheduled + 7 * 24 * 3600 * 1000 };
+}
 async function handleLeaderboard(request, env) {
   const auth = await authenticateRequest(request, env);
   if (!auth.ok) return auth.response;
@@ -2137,32 +2171,46 @@ async function handleLeaderboard(request, env) {
   const cacheKey = new Request("https://internal.minerxrealm/leaderboard-cache");
   const cached = await cache.match(cacheKey);
   if (cached) return cached;
-  const [adsResult, refsResult] = await Promise.all([
-    env.DB.prepare(
-      `SELECT telegram_id, username, photo_url, weekly_ads_watched AS val
-       FROM users WHERE weekly_ads_watched > 0
-       ORDER BY weekly_ads_watched DESC LIMIT ?`
-    ).bind(LEADERBOARD_RANK_LIMIT).all(),
-    env.DB.prepare(
-      `SELECT telegram_id, username, photo_url, weekly_active_referrals AS val
-       FROM users WHERE weekly_active_referrals > 0
-       ORDER BY weekly_active_referrals DESC LIMIT ?`
-    ).bind(LEADERBOARD_RANK_LIMIT).all()
+  const [adsResult, refsResult, timing] = await Promise.all([
+    env.DB.prepare(LEADERBOARD_ADS_SQL).bind(LEADERBOARD_RANK_LIMIT).all(),
+    env.DB.prepare(LEADERBOARD_REFS_SQL).bind(LEADERBOARD_RANK_LIMIT).all(),
+    leaderboardTiming(env)
   ]);
-  const shape = (rows) => (rows.results || []).map((r, i) => ({
-    rank: i + 1,
-    name: r.username || ("Player " + r.telegram_id),
-    photo_url: r.photo_url || null,
-    value: r.val,
-    prize: LEADERBOARD_PRIZES[i] || 0
-  }));
   const payload = {
-    ads: shape(adsResult),
-    referrals: shape(refsResult),
-    next_payout_at: nextLeaderboardPayoutAt()
+    ads: shapeLeaderboardRows(adsResult),
+    referrals: shapeLeaderboardRows(refsResult),
+    next_payout_at: timing.nextPayoutAt
   };
   const response = jsonResponse(payload);
-  response.headers.set("Cache-Control", "public, max-age=" + secondsUntilNextMidnightUTC());
+  // daily refresh at 00:00 UTC, and never kept past the payout
+  const untilPayout = Math.floor((timing.nextPayoutAt - Date.now()) / 1000);
+  const maxAge = timing.pending ? 60 : Math.max(60, Math.min(secondsUntilNextMidnightUTC(), untilPayout));
+  response.headers.set("Cache-Control", "public, max-age=" + maxAge);
+  await cache.put(cacheKey, response.clone());
+  return response;
+}
+
+// /api/leaderboard/previous — last week's winners as saved by the payout; they change once a week
+async function handleLeaderboardPrevious(request, env) {
+  const auth = await authenticateRequest(request, env);
+  if (!auth.ok) return auth.response;
+  const cache = caches.default;
+  const cacheKey = new Request("https://internal.minerxrealm/leaderboard-previous-cache");
+  const cached = await cache.match(cacheKey);
+  if (cached) return cached;
+  const timing = await leaderboardTiming(env);
+  let winners = null;
+  try {
+    winners = timing.last && timing.last.winners ? JSON.parse(timing.last.winners) : null;
+  } catch (e) {   }
+  const response = jsonResponse({
+    paid_at: winners && timing.last ? timing.last.paid_at : null,
+    ads: (winners && winners.ads) || [],
+    referrals: (winners && winners.referrals) || [],
+    next_payout_at: timing.nextPayoutAt
+  });
+  const untilPayout = Math.floor((timing.nextPayoutAt - Date.now()) / 1000);
+  response.headers.set("Cache-Control", "public, max-age=" + (timing.pending ? 60 : Math.max(60, untilPayout)));
   await cache.put(cacheKey, response.clone());
   return response;
 }
@@ -2171,18 +2219,15 @@ async function handleLeaderboard(request, env) {
 async function handleLeaderboardPayout(env) {
   const weekKey = isoWeekKeyUTC();
   const [adsResult, refsResult] = await Promise.all([
-    env.DB.prepare(
-      `SELECT telegram_id, weekly_ads_watched AS val FROM users
-       WHERE weekly_ads_watched > 0 ORDER BY weekly_ads_watched DESC LIMIT ?`
-    ).bind(LEADERBOARD_RANK_LIMIT).all(),
-    env.DB.prepare(
-      `SELECT telegram_id, weekly_active_referrals AS val FROM users
-       WHERE weekly_active_referrals > 0 ORDER BY weekly_active_referrals DESC LIMIT ?`
-    ).bind(LEADERBOARD_RANK_LIMIT).all()
+    env.DB.prepare(LEADERBOARD_ADS_SQL).bind(LEADERBOARD_RANK_LIMIT).all(),
+    env.DB.prepare(LEADERBOARD_REFS_SQL).bind(LEADERBOARD_RANK_LIMIT).all()
   ]);
+  // the paid ranks are kept with the payout and shown as Previous Winners until the next one
+  const prizeWinners = (rows) => shapeLeaderboardRows(rows).filter((w) => w.prize > 0);
+  const winners = JSON.stringify({ ads: prizeWinners(adsResult), referrals: prizeWinners(refsResult) });
   const stmts = [
-    env.DB.prepare("INSERT INTO leaderboard_payouts (week_key, paid_at) VALUES (?, ?)")
-      .bind(weekKey, Date.now())
+    env.DB.prepare("INSERT INTO leaderboard_payouts (week_key, paid_at, winners) VALUES (?, ?, ?)")
+      .bind(weekKey, Date.now(), winners)
   ];
   const creditWinners = (rows) => {
     (rows.results || []).forEach((r, i) => {
@@ -2203,6 +2248,7 @@ async function handleLeaderboardPayout(env) {
     return;
   }
   await caches.default.delete(new Request("https://internal.minerxrealm/leaderboard-cache"));
+  await caches.default.delete(new Request("https://internal.minerxrealm/leaderboard-previous-cache"));
 }
 
 // Bonus AD Every 1H
@@ -2830,17 +2876,12 @@ function shiftUTCDate(dateStr, deltaDays) {
 function todayUTC() {
   return new Date().toISOString().slice(0, 10);
 }
-function nextLeaderboardPayoutAt() {
-  const now = new Date();
-  const result = new Date(Date.UTC(
-    now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 30, 0, 0
-  ));
-  const currentDay = result.getUTCDay();
-  let daysUntilFriday = (5 - currentDay + 7) % 7;
-  if (daysUntilFriday === 0 && now.getTime() >= result.getTime()) {
-    daysUntilFriday = 7;
-  }
-  result.setUTCDate(result.getUTCDate() + daysUntilFriday);
+// Weekly payout: Friday 00:05 UTC (cron "5 0 * * FRI"), five minutes after the daily board refresh
+function lastScheduledLeaderboardPayoutAt(now) {
+  const d = new Date(now);
+  const result = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 5, 0, 0));
+  result.setUTCDate(result.getUTCDate() - ((result.getUTCDay() - 5 + 7) % 7));
+  if (result.getTime() > now) result.setUTCDate(result.getUTCDate() - 7);
   return result.getTime();
 }
 function secondsUntilNextMidnightUTC() {
@@ -2848,8 +2889,8 @@ function secondsUntilNextMidnightUTC() {
   const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0, 0));
   return Math.max(60, Math.floor((next.getTime() - now.getTime()) / 1000));
 }
-function isoWeekKeyUTC() {
-  const now = new Date();
+function isoWeekKeyUTC(at = Date.now()) {
+  const now = new Date(at);
   const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   const dayNum = d.getUTCDay() || 7;
   d.setUTCDate(d.getUTCDate() + 4 - dayNum);
