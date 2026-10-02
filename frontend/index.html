@@ -3223,7 +3223,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .lb-prev-btn.is-open{ background:rgba(139,92,246,.22); border-color:rgba(167,139,250,.55); }
 .lb-prev{
   position:absolute; top:calc(100% + 8px * var(--s)); left:0; right:0; z-index:5;
-  max-height:calc(380px * var(--s)); overflow-y:auto; -webkit-overflow-scrolling:touch;
+  max-height:calc(380px * var(--s)); overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain;
   padding:calc(12px * var(--s));
   border-radius:calc(16px * var(--s));
   background:#1a1430; border:1px solid rgba(167,139,250,.28);
@@ -3231,6 +3231,8 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   opacity:0; visibility:hidden; transform:translateY(calc(-6px * var(--s)));
   transition:opacity .18s ease, transform .18s ease, visibility 0s linear .18s;
 }
+/* while the dropdown is open the sheet is tall enough for it, even when this week's board is still empty */
+.lb-sheet.is-prev-open{ min-height:78vh; }
 .lb-prev.is-open{ opacity:1; visibility:visible; transform:translateY(0); transition:opacity .18s ease, transform .18s ease, visibility 0s; }
 .lb-prev__head{ display:flex; align-items:baseline; justify-content:space-between; gap:calc(8px * var(--s)); margin-bottom:calc(10px * var(--s)); }
 .lb-prev__title{ font-family:var(--font-display); font-weight:800; font-size:calc(13px * var(--s)); color:#f0d878; }
@@ -7082,12 +7084,30 @@ function formatDateDDMMYYYYClient(ms){
   var d = new Date(ms);
   return String(d.getUTCDate()).padStart(2, '0') + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + d.getUTCFullYear();
 }
+// The dropdown takes the space between the Rewards row and the bottom of the sheet and scrolls inside it
+function fitLeaderboardPrevious(){
+  var panel = document.getElementById('lb-prev');
+  var scroller = document.querySelector('#modal-leaderboard .lb-scroll');
+  if (!panel || !scroller || !panel.classList.contains('is-open')) return;
+  var room = scroller.getBoundingClientRect().bottom - panel.getBoundingClientRect().top - 12;
+  panel.style.maxHeight = Math.max(160, Math.floor(room)) + 'px';
+}
 function setLeaderboardPreviousOpen(open){
   var panel = document.getElementById('lb-prev');
   var btn = document.getElementById('lb-prev-btn');
+  var sheet = document.querySelector('#modal-leaderboard .lb-sheet');
+  var scroller = document.querySelector('#modal-leaderboard .lb-scroll');
+  if (sheet) sheet.classList.toggle('is-prev-open', open);
   if (panel) panel.classList.toggle('is-open', open);
   if (btn) btn.classList.toggle('is-open', open);
+  if (open){
+    if (scroller) scroller.scrollTop = 0;
+    fitLeaderboardPrevious();
+    // the sheet grows with a transition; fit again once it has settled
+    setTimeout(fitLeaderboardPrevious, 350);
+  }
 }
+window.addEventListener('resize', fitLeaderboardPrevious);
 function toggleLeaderboardPrevious(ev){
   if (ev) ev.stopPropagation();
   var panel = document.getElementById('lb-prev');
