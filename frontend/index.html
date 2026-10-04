@@ -4311,7 +4311,7 @@ body.reduce-motion .firefly{
 
       <!-- Special Tab -->
       <div class="task-panel" id="task-panel-special">
-        <div class="add-task-card" id="special-tasks-empty">
+        <div class="add-task-card" id="special-tasks-empty" onclick="openSupportChat()">
           <span class="add-task-card__icon">+</span>
           <div class="add-task-card__body">
             <div class="add-task-card__title">Add Task</div>
@@ -7147,7 +7147,7 @@ function openQuickFreePetModal(){
 }
 
 // Profile: Support & Copy ID
-var SUPPORT_TELEGRAM_USERNAME = 'REPLACE_WITH_SUPPORT_USERNAME';
+var SUPPORT_TELEGRAM_USERNAME = 'MinerXRealm_SupportBot';
 function openSupportChat(){
   var url = 'https://t.me/' + SUPPORT_TELEGRAM_USERNAME;
   var tg = window.Telegram && window.Telegram.WebApp;

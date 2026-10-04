@@ -4,7 +4,7 @@ const WEBAPP_URL = "https://minerxrealm.zekobusiness0.workers.dev/";
 // Welcome message config
 const WELCOME_PHOTO_URL = "https://raw.githubusercontent.com/zekogg/MinerX-Realm/refs/heads/main/frontend/MinerX%20Welcome%20.webp";
 const PAYOUTS_CHANNEL_URL = "https://t.me/MinerXRealmWithdrawals";
-const SUPPORT_USERNAME = "REPLACE_WITH_SUPPORT_USERNAME";
+const SUPPORT_USERNAME = "MinerXRealm_SupportBot";
 
 // Start Mining config
 const MINING_CYCLE_SECONDS = 60 * 60;
