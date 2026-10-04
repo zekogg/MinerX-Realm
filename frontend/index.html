@@ -620,13 +620,8 @@ function i18nPick(ev, code){
   --c-reward-tier-icon-bolt:   #a56cf0;
   --c-reward-tier-icon-bag:    #a56cf0;
   --c-reward-tier-val:         #e3a542;
-  --c-reward-tier-border:      rgba(165,108,240,.5);
-  --c-wallet-glow:        rgba(139,92,246,.16);
   --c-royal-purple-1:     #4b2e83;
   --c-royal-purple-2:     #8b5cf6;
-  --c-royal-blue-1:       #1e3a8a;
-  --c-royal-blue-2:       #3b5bdb;
-  --c-small-card-border:  #c9834a;
   --c-btn-withdraw-1:     #d9634f;
   --c-btn-withdraw-2:     #9c3e2f;
   --c-btn-withdraw-text:  #fdf2ef;
@@ -1140,12 +1135,16 @@ html[data-lang="ar"] b, html[data-lang="ar"] strong, html[data-lang="fa"] b, htm
   margin:0;
   border-radius:50%;
   display:flex; align-items:center; justify-content:center;
+  /* a static light behind the character: soft moonlight with night stars while asleep */
   background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cdefs%3E%3CradialGradient id='g'%3E%3Cstop offset='0' stop-color='%23b9c8ff' stop-opacity='0.55'/%3E%3Cstop offset='0.35' stop-color='%238a7dff' stop-opacity='0.3'/%3E%3Cstop offset='0.7' stop-color='%235b3fd0' stop-opacity='0.1'/%3E%3Cstop offset='1' stop-color='%235b3fd0' stop-opacity='0'/%3E%3C/radialGradient%3E%3CradialGradient id='f'%3E%3Cstop offset='.15' stop-color='%23fff'/%3E%3Cstop offset='.55' stop-color='%23fff' stop-opacity='.4'/%3E%3Cstop offset='.95' stop-color='%23fff' stop-opacity='0'/%3E%3C/radialGradient%3E%3Cmask id='m'%3E%3Crect width='200' height='200' fill='url%28%23f%29'/%3E%3C/mask%3E%3C/defs%3E%3Ccircle cx='100' cy='100' r='100' fill='url%28%23g%29'/%3E%3Cpath d='M100 100L92.5 -19.8L107.5 -19.8ZM100 100L138.9 -13.5L152.8 -7.8ZM100 100L179.4 10.0L190.0 20.6ZM100 100L207.8 47.2L213.5 61.1ZM100 100L219.8 92.5L219.8 107.5ZM100 100L213.5 138.9L207.8 152.8ZM100 100L190.0 179.4L179.4 190.0ZM100 100L152.8 207.8L138.9 213.5ZM100 100L107.5 219.8L92.5 219.8ZM100 100L61.1 213.5L47.2 207.8ZM100 100L20.6 190.0L10.0 179.4ZM100 100L-7.8 152.8L-13.5 138.9ZM100 100L-19.8 107.5L-19.8 92.5ZM100 100L-13.5 61.1L-7.8 47.2ZM100 100L10.0 20.6L20.6 10.0ZM100 100L47.2 -7.8L61.1 -13.5Z' fill='%23c9d4ff' opacity='0.1' mask='url%28%23m%29'/%3E%3Cpath d='M52 39Q53.40 42.60 57 44Q53.40 45.40 52 49Q50.60 45.40 47 44Q50.60 42.60 52 39Z' fill='%23e6ecff' opacity='0.9'/%3E%3Cpath d='M150 36.5Q150.98 39.02 153.5 40Q150.98 40.98 150 43.5Q149.02 40.98 146.5 40Q149.02 39.02 150 36.5Z' fill='%23dfe6ff' opacity='0.8'/%3E%3Cpath d='M166 66.5Q167.54 70.46 171.5 72Q167.54 73.54 166 77.5Q164.46 73.54 160.5 72Q164.46 70.46 166 66.5Z' fill='%23eef2ff' opacity='0.9'/%3E%3Cpath d='M36 95Q36.84 97.16 39 98Q36.84 98.84 36 101Q35.16 98.84 33 98Q35.16 97.16 36 95Z' fill='%23d6deff' opacity='0.7'/%3E%3Cpath d='M160 146.5Q160.98 149.02 163.5 150Q160.98 150.98 160 153.5Q159.02 150.98 156.5 150Q159.02 149.02 160 146.5Z' fill='%23cfd8ff' opacity='0.7'/%3E%3Cpath d='M44 144Q45.12 146.88 48 148Q45.12 149.12 44 152Q42.88 149.12 40 148Q42.88 146.88 44 144Z' fill='%23e0e7ff' opacity='0.75'/%3E%3Cpath d='M118 23.5Q118.70 25.30 120.5 26Q118.70 26.70 118 28.5Q117.30 26.70 115.5 26Q117.30 25.30 118 23.5Z' fill='%23ffffff' opacity='0.7'/%3E%3C/svg%3E") center / 100% 100% no-repeat,
     radial-gradient(circle at 35% 30%, var(--c-char-glow-sleep), transparent 60%),
     var(--stone-2);
 }
+/* and a warm gold light with stronger rays and sparkles while mining */
 .char-slot.is-mining{
   background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cdefs%3E%3CradialGradient id='g'%3E%3Cstop offset='0' stop-color='%23ffd36b' stop-opacity='0.7'/%3E%3Cstop offset='0.32' stop-color='%23ffab3d' stop-opacity='0.42'/%3E%3Cstop offset='0.66' stop-color='%23e0682d' stop-opacity='0.14'/%3E%3Cstop offset='1' stop-color='%23e0682d' stop-opacity='0'/%3E%3C/radialGradient%3E%3CradialGradient id='f'%3E%3Cstop offset='.15' stop-color='%23fff'/%3E%3Cstop offset='.55' stop-color='%23fff' stop-opacity='.4'/%3E%3Cstop offset='.95' stop-color='%23fff' stop-opacity='0'/%3E%3C/radialGradient%3E%3Cmask id='m'%3E%3Crect width='200' height='200' fill='url%28%23f%29'/%3E%3C/mask%3E%3C/defs%3E%3Ccircle cx='100' cy='100' r='100' fill='url%28%23g%29'/%3E%3Cpath d='M100 100L91.2 -19.7L108.8 -19.7ZM100 100L132.7 -15.5L149.2 -9.5ZM100 100L170.2 2.7L183.7 14.0ZM100 100L199.2 32.5L208.0 47.8ZM100 100L216.3 70.6L219.4 87.9ZM100 100L219.4 112.1L216.3 129.4ZM100 100L208.0 152.2L199.2 167.5ZM100 100L183.7 186.0L170.2 197.3ZM100 100L149.2 209.5L132.7 215.5ZM100 100L108.8 219.7L91.2 219.7ZM100 100L67.3 215.5L50.8 209.5ZM100 100L29.8 197.3L16.3 186.0ZM100 100L0.8 167.5L-8.0 152.2ZM100 100L-16.3 129.4L-19.4 112.1ZM100 100L-19.4 87.9L-16.3 70.6ZM100 100L-8.0 47.8L0.8 32.5ZM100 100L16.3 14.0L29.8 2.7ZM100 100L50.8 -9.5L67.3 -15.5Z' fill='%23ffd27a' opacity='0.22' mask='url%28%23m%29'/%3E%3Cpath d='M44 46Q45.68 50.32 50 52Q45.68 53.68 44 58Q42.32 53.68 38 52Q42.32 50.32 44 46Z' fill='%23ffe9a8' opacity='0.95'/%3E%3Cpath d='M160 41.5Q161.26 44.74 164.5 46Q161.26 47.26 160 50.5Q158.74 47.26 155.5 46Q158.74 44.74 160 41.5Z' fill='%23ffd27a' opacity='0.9'/%3E%3Cpath d='M174 92.5Q174.98 95.02 177.5 96Q174.98 96.98 174 99.5Q173.02 96.98 170.5 96Q173.02 95.02 174 92.5Z' fill='%23ffe0a0' opacity='0.8'/%3E%3Cpath d='M30 100Q31.12 102.88 34 104Q31.12 105.12 30 108Q28.88 105.12 26 104Q28.88 102.88 30 100Z' fill='%23ffcf7a' opacity='0.85'/%3E%3Cpath d='M56 152.5Q56.98 155.02 59.5 156Q56.98 156.98 56 159.5Q55.02 156.98 52.5 156Q55.02 155.02 56 152.5Z' fill='%23ff9d5c' opacity='0.8'/%3E%3Cpath d='M150 155Q151.40 158.60 155 160Q151.40 161.40 150 165Q148.60 161.40 145 160Q148.60 158.60 150 155Z' fill='%23ffb070' opacity='0.85'/%3E%3C/svg%3E") center / 100% 100% no-repeat,
     radial-gradient(circle at 35% 30%, var(--c-char-glow-mining), transparent 60%),
     var(--stone-2);
 }
@@ -1238,12 +1237,7 @@ html[data-lang="ar"] b, html[data-lang="ar"] strong, html[data-lang="fa"] b, htm
   padding:calc(10px * var(--s)) calc(12px * var(--s));
   text-align:start;
 }
-.earn-hero .stat-box{ padding:calc(7px * var(--s)) calc(8px * var(--s)); border-color:var(--stone-border-2); }
-.earn-hero .stat-box::before{
-  left:31%; right:31%;
-  background:linear-gradient(90deg, #8a6d1f 0%, #f0d878 50%, #d4af37 100%);
-  box-shadow:0 0 calc(5px * var(--s)) rgba(212,175,55,.6);
-}
+.earn-hero .stat-box{ padding:calc(7px * var(--s)) calc(8px * var(--s)); }
 .stat-box__label{ font-size:calc(11px * var(--s)); color:var(--ink-faint); }
 .earn-hero .stat-box__label{ font-size:calc(8px * var(--s)); color:var(--ink-dim); font-weight:700; }
 .stat-box__val{ font-family:var(--font-display); font-size:calc(17px * var(--s)); font-weight:700; margin-top:calc(2px * var(--s)); }
@@ -1341,10 +1335,21 @@ html[data-lang="ar"] b, html[data-lang="ar"] strong, html[data-lang="fa"] b, htm
 .streak-card{
   position:relative;
   margin-top:calc(14px * var(--s));
+  /* an orange light behind the chest, anchored to the bottom-left corner it sits in (36px from both padding
+     edges), with rays and sparkles, on a solid dark fill; the frame below is drawn over the 1px border */
+  border:1px solid transparent;
   background:
-    radial-gradient(62% calc(80px * var(--s)) at 50% 0%, rgba(255,138,61,.36), rgba(255,138,61,.12) 55%, transparent 100%),
-    radial-gradient(100% calc(46px * var(--s)) at 50% 0%, rgba(255,138,61,.14), transparent 100%),
-    var(--stone);
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cdefs%3E%3CradialGradient id='g'%3E%3Cstop offset='0' stop-color='%23ffc46b' stop-opacity='.72'/%3E%3Cstop offset='.3' stop-color='%23ff8a3d' stop-opacity='.42'/%3E%3Cstop offset='.64' stop-color='%23d9542d' stop-opacity='.14'/%3E%3Cstop offset='1' stop-color='%23d9542d' stop-opacity='0'/%3E%3C/radialGradient%3E%3CradialGradient id='f'%3E%3Cstop offset='.12' stop-color='%23fff'/%3E%3Cstop offset='.5' stop-color='%23fff' stop-opacity='.45'/%3E%3Cstop offset='.9' stop-color='%23fff' stop-opacity='0'/%3E%3C/radialGradient%3E%3Cmask id='m'%3E%3Crect width='200' height='200' fill='url%28%23f%29'/%3E%3C/mask%3E%3C/defs%3E%3Ccircle cx='100' cy='100' r='100' fill='url%28%23g%29'/%3E%3Cpath d='M100 100L90.5 -29.7L109.5 -29.7ZM100 100L135.4 -25.1L153.3 -18.6ZM100 100L176.0 -5.4L190.6 6.8ZM100 100L207.5 26.9L217.0 43.4ZM100 100L226.0 68.1L229.3 86.9ZM100 100L229.3 113.1L226.0 131.9ZM100 100L217.0 156.6L207.5 173.1ZM100 100L190.6 193.2L176.0 205.4ZM100 100L153.3 218.6L135.4 225.1ZM100 100L109.5 229.7L90.5 229.7ZM100 100L64.6 225.1L46.7 218.6ZM100 100L24.0 205.4L9.4 193.2ZM100 100L-7.5 173.1L-17.0 156.6ZM100 100L-26.0 131.9L-29.3 113.1ZM100 100L-29.3 86.9L-26.0 68.1ZM100 100L-17.0 43.4L-7.5 26.9ZM100 100L9.4 6.8L24.0 -5.4ZM100 100L46.7 -18.6L64.6 -25.1Z' fill='%23ffcf8a' opacity='.22' mask='url%28%23m%29'/%3E%3Cpath d='M70 72.4Q71.01 74.99 73.6 76Q71.01 77.01 70 79.6Q68.99 77.01 66.4 76Q68.99 74.99 70 72.4Z' fill='%23ffe9a8' opacity='0.92'/%3E%3Cpath d='M130 72.4Q131.01 74.99 133.6 76Q131.01 77.01 130 79.6Q128.99 77.01 126.4 76Q128.99 74.99 130 72.4Z' fill='%23ffe9a8' opacity='0.92'/%3E%3Cpath d='M70 127.2Q70.78 129.22 72.8 130Q70.78 130.78 70 132.8Q69.22 130.78 67.2 130Q69.22 129.22 70 127.2Z' fill='%23ffb070' opacity='0.85'/%3E%3Cpath d='M130 127.2Q130.78 129.22 132.8 130Q130.78 130.78 130 132.8Q129.22 130.78 127.2 130Q129.22 129.22 130 127.2Z' fill='%23ffb070' opacity='0.85'/%3E%3C/svg%3E") left calc(-49px * var(--s)) bottom calc(-49px * var(--s)) / calc(170px * var(--s)) calc(170px * var(--s)) no-repeat,
+    radial-gradient(62% calc(80px * var(--s)) at 50% 0%, rgba(255,138,61,.18), rgba(255,138,61,.05) 55%, transparent 100%),
+    #18122a;
+}
+/* the frame: solid orange on the top edge, dimming down the sides to a dark brown at the bottom */
+.streak-card::after{
+  content:""; position:absolute; inset:-1px; border-radius:inherit; padding:calc(1.25px * var(--s)); pointer-events:none;
+  background:linear-gradient(180deg, #ffb27a, #c4683f 22%, #5a3a3a 60%, #3a2c3e);
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
 }
 .streak-card__head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:calc(14px * var(--s)); }
 .streak-card__title{ display:flex; align-items:center; gap:calc(6px * var(--s)); font-weight:800; font-size:calc(14px * var(--s)); }
@@ -1363,7 +1368,8 @@ html[data-lang="ar"] b, html[data-lang="ar"] strong, html[data-lang="fa"] b, htm
 .streak-days__day.is-active .d-val{ color:var(--c-streakcard-day-text); }
 .streak-chest{ display:flex; align-items:center; justify-content:space-between; gap:calc(10px * var(--s)); }
 .streak-chest__left{ display:flex; align-items:center; gap:calc(10px * var(--s)); }
-.streak-chest__icon{ width:calc(40px * var(--s)); height:calc(40px * var(--s)); flex-shrink:0; object-fit:contain; }
+/* drawn 15% bigger without taking more room, so nothing around it moves */
+.streak-chest__icon{ width:calc(40px * var(--s)); height:calc(40px * var(--s)); flex-shrink:0; object-fit:contain; transform:scale(1.15); }
 .streak-chest__label{ font-size:calc(10px * var(--s)); color:var(--ink-faint); }
 .streak-chest__timer{
   display:flex; align-items:center; gap:calc(4px * var(--s));
@@ -1389,9 +1395,22 @@ html[data-lang="ar"] b, html[data-lang="ar"] strong, html[data-lang="fa"] b, htm
   position:relative;
   aspect-ratio:1;
   display:flex; flex-direction:column; align-items:center; justify-content:center; gap:calc(10px * var(--s));
-  border:1px solid var(--stone-border);
-  background:rgba(236,107,179,.04);
+  /* a pink light behind the ticket (its centre is 43.5px from the padding edge) with rays and sparkles, on a
+     solid dark fill; the 1px border keeps its place and the frame below is drawn over it */
+  border:1px solid transparent;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cdefs%3E%3CradialGradient id='g'%3E%3Cstop offset='0' stop-color='%23ff9ad5' stop-opacity='0.72'/%3E%3Cstop offset='0.32' stop-color='%23ec6bb3' stop-opacity='0.42'/%3E%3Cstop offset='0.66' stop-color='%23b0307a' stop-opacity='0.14'/%3E%3Cstop offset='1' stop-color='%23b0307a' stop-opacity='0'/%3E%3C/radialGradient%3E%3CradialGradient id='f'%3E%3Cstop offset='.12' stop-color='%23fff'/%3E%3Cstop offset='.5' stop-color='%23fff' stop-opacity='.45'/%3E%3Cstop offset='.9' stop-color='%23fff' stop-opacity='0'/%3E%3C/radialGradient%3E%3Cmask id='m'%3E%3Crect width='200' height='200' fill='url%28%23f%29'/%3E%3C/mask%3E%3C/defs%3E%3Ccircle cx='100' cy='100' r='100' fill='url%28%23g%29'/%3E%3Cpath d='M100 100L91.2 -19.7L108.8 -19.7ZM100 100L132.7 -15.5L149.2 -9.5ZM100 100L170.2 2.7L183.7 14.0ZM100 100L199.2 32.5L208.0 47.8ZM100 100L216.3 70.6L219.4 87.9ZM100 100L219.4 112.1L216.3 129.4ZM100 100L208.0 152.2L199.2 167.5ZM100 100L183.7 186.0L170.2 197.3ZM100 100L149.2 209.5L132.7 215.5ZM100 100L108.8 219.7L91.2 219.7ZM100 100L67.3 215.5L50.8 209.5ZM100 100L29.8 197.3L16.3 186.0ZM100 100L0.8 167.5L-8.0 152.2ZM100 100L-16.3 129.4L-19.4 112.1ZM100 100L-19.4 87.9L-16.3 70.6ZM100 100L-8.0 47.8L0.8 32.5ZM100 100L16.3 14.0L29.8 2.7ZM100 100L50.8 -9.5L67.3 -15.5Z' fill='%23ffc2e4' opacity='0.2' mask='url%28%23m%29'/%3E%3Cpath d='M58 64Q59.68 68.32 64 70Q59.68 71.68 58 76Q56.32 71.68 52 70Q56.32 68.32 58 64Z' fill='%23ffe1f2' opacity='0.95'/%3E%3Cpath d='M144 57Q145.40 60.60 149 62Q145.40 63.40 144 67Q142.60 63.40 139 62Q142.60 60.60 144 57Z' fill='%23ffb3dd' opacity='0.9'/%3E%3Cpath d='M160 100.5Q160.98 103.02 163.5 104Q160.98 104.98 160 107.5Q159.02 104.98 156.5 104Q159.02 103.02 160 100.5Z' fill='%23ffe08a' opacity='0.85'/%3E%3Cpath d='M40 106.5Q40.98 109.02 43.5 110Q40.98 110.98 40 113.5Q39.02 110.98 36.5 110Q39.02 109.02 40 106.5Z' fill='%23ffb3dd' opacity='0.8'/%3E%3Cpath d='M80 53.2Q80.78 55.22 82.8 56Q80.78 56.78 80 58.8Q79.22 56.78 77.2 56Q79.22 55.22 80 53.2Z' fill='%23ffffff' opacity='0.8'/%3E%3Cpath d='M128 93.5Q128.70 95.30 130.5 96Q128.70 96.70 128 98.5Q127.30 96.70 125.5 96Q127.30 95.30 128 93.5Z' fill='%23ffe1f2' opacity='0.75'/%3E%3C/svg%3E") 50% calc(-41.5px * var(--s)) / calc(170px * var(--s)) calc(170px * var(--s)) no-repeat,
+    radial-gradient(62% calc(80px * var(--s)) at 50% 0%, rgba(236,107,179,.20), rgba(236,107,179,.06) 55%, transparent 100%),
+    #18122a;
   padding:calc(12px * var(--s));
+}
+/* the frame: solid pink on the top edge, dimming down the sides to a dark plum at the bottom */
+.promo-card::after{
+  content:""; position:absolute; inset:-1px; border-radius:inherit; padding:calc(1.25px * var(--s)); pointer-events:none;
+  background:linear-gradient(180deg, #f7a8d4, #c0619a 22%, #5a3550 60%, #3a2c3e);
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
 }
 .promo-card__icon-title{ display:flex; flex-direction:column; align-items:center; gap:calc(6px * var(--s)); text-align:center; }
 .promo-card__icon-art{ width:calc(32.5px * var(--s)); height:calc(32.5px * var(--s)); object-fit:contain; flex-shrink:0; }
@@ -1415,7 +1434,6 @@ html[data-lang="ar"] b, html[data-lang="ar"] strong, html[data-lang="fa"] b, htm
 .mystery-box{
   position:relative;
   display:flex; flex-direction:column; align-items:center; gap:calc(8px * var(--s));
-  border:1px solid var(--stone-border);
   padding:calc(14px * var(--s)) calc(10px * var(--s)) calc(10px * var(--s));
 }
 .mystery-box__label{
@@ -1477,11 +1495,24 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 /* Chest */
 .chest-card{
   margin-top:calc(12px * var(--s)); position:relative;
+  /* a warm light behind the bag (its centre is 61.5px from the padding edge): glow, fading rays and sparkles,
+     all in one static picture; the solid dark fill keeps the page from showing through */
   background:
-    radial-gradient(62% calc(80px * var(--s)) at 50% 0%, rgba(33,211,237,.36), rgba(33,211,237,.12) 55%, transparent 100%),
-    radial-gradient(100% calc(46px * var(--s)) at 50% 0%, rgba(33,211,237,.14), transparent 100%),
-    var(--stone);
-  border:1px solid var(--stone-border);
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cdefs%3E%3CradialGradient id='g'%3E%3Cstop offset='0' stop-color='%23ffd36b' stop-opacity='.78'/%3E%3Cstop offset='.32' stop-color='%23ff9a3d' stop-opacity='.46'/%3E%3Cstop offset='.66' stop-color='%23e0482d' stop-opacity='.16'/%3E%3Cstop offset='1' stop-color='%23e0482d' stop-opacity='0'/%3E%3C/radialGradient%3E%3CradialGradient id='f'%3E%3Cstop offset='.12' stop-color='%23fff'/%3E%3Cstop offset='.5' stop-color='%23fff' stop-opacity='.45'/%3E%3Cstop offset='.9' stop-color='%23fff' stop-opacity='0'/%3E%3C/radialGradient%3E%3Cmask id='m'%3E%3Crect width='200' height='200' fill='url%28%23f%29'/%3E%3C/mask%3E%3C/defs%3E%3Ccircle cx='100' cy='100' r='100' fill='url%28%23g%29'/%3E%3Cpath d='M100 100L91.2 -19.7L108.8 -19.7ZM100 100L132.7 -15.5L149.2 -9.5ZM100 100L170.2 2.7L183.7 14.0ZM100 100L199.2 32.5L208.0 47.8ZM100 100L216.3 70.6L219.4 87.9ZM100 100L219.4 112.1L216.3 129.4ZM100 100L208.0 152.2L199.2 167.5ZM100 100L183.7 186.0L170.2 197.3ZM100 100L149.2 209.5L132.7 215.5ZM100 100L108.8 219.7L91.2 219.7ZM100 100L67.3 215.5L50.8 209.5ZM100 100L29.8 197.3L16.3 186.0ZM100 100L0.8 167.5L-8.0 152.2ZM100 100L-16.3 129.4L-19.4 112.1ZM100 100L-19.4 87.9L-16.3 70.6ZM100 100L-8.0 47.8L0.8 32.5ZM100 100L16.3 14.0L29.8 2.7ZM100 100L50.8 -9.5L67.3 -15.5Z' fill='%23ffd27a' opacity='.2' mask='url%28%23m%29'/%3E%3Cpath d='M152 55Q153.96 60.04 159 62Q153.96 63.96 152 69Q150.04 63.96 145 62Q150.04 60.04 152 55Z' fill='%23ffe9a8' opacity='0.95'/%3E%3Cpath d='M170 96.5Q171.26 99.74 174.5 101Q171.26 102.26 170 105.5Q168.74 102.26 165.5 101Q168.74 99.74 170 96.5Z' fill='%23ffd27a' opacity='0.9'/%3E%3Cpath d='M153 129Q154.4 132.6 158 134Q154.4 135.4 153 139Q151.6 135.4 148 134Q151.6 132.6 153 129Z' fill='%23ff9d5c' opacity='0.9'/%3E%3Cpath d='M60 57.5Q61.26 60.74 64.5 62Q61.26 63.26 60 66.5Q58.74 63.26 55.5 62Q58.74 60.74 60 57.5Z' fill='%23ffcf7a' opacity='0.85'/%3E%3Cpath d='M126 54.5Q126.98 57.02 129.5 58Q126.98 58.98 126 61.5Q125.02 58.98 122.5 58Q125.02 57.02 126 54.5Z' fill='%23fff1c4' opacity='0.85'/%3E%3Cpath d='M184 71Q184.84 73.16 187 74Q184.84 74.84 184 77Q183.16 74.84 181 74Q183.16 73.16 184 71Z' fill='%23ffe0a0' opacity='0.75'/%3E%3Cpath d='M58 126Q59.12 128.88 62 130Q59.12 131.12 58 134Q56.88 131.12 54 130Q56.88 128.88 58 126Z' fill='%23ffb070' opacity='.9'/%3E%3C/svg%3E") calc(-53.5px * var(--s)) calc(-53.5px * var(--s)) / calc(230px * var(--s)) calc(230px * var(--s)) no-repeat,
+    radial-gradient(62% calc(80px * var(--s)) at 50% 0%, rgba(255,190,90,.22), rgba(255,170,80,.07) 55%, transparent 100%),
+    radial-gradient(100% calc(46px * var(--s)) at 50% 0%, rgba(255,190,90,.09), transparent 100%),
+    radial-gradient(calc(260px * var(--s)) calc(190px * var(--s)) at calc(61.5px * var(--s)) calc(61.5px * var(--s)), rgba(224,96,45,.22), transparent 70%),
+    #18122a;
+  /* the 1px border keeps its place; the frame below is drawn over it */
+  border:1px solid transparent;
+}
+/* the frame: solid warm gold on the top edge, dimming down the sides to a dark bronze at the bottom */
+.chest-card::after{
+  content:""; position:absolute; inset:-1px; border-radius:inherit; padding:calc(1.25px * var(--s)); pointer-events:none;
+  background:linear-gradient(180deg, #f2c46d, #b9824a 22%, #5a3e3a 60%, #3a2c3e);
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
 }
 .chest-card__help{
   position:absolute; top:calc(12px * var(--s)); right:calc(12px * var(--s));
@@ -1531,10 +1562,21 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .spin-card{
   position:relative;
   margin-top:calc(12px * var(--s)); text-align:center;
+  /* the wheel fills the card, so the light shines around it (its centre is 136px from the padding edge): a gold
+     halo on its rim, rays out into the card and sparkles in the free space, on a solid dark fill */
+  border:1px solid transparent;
   background:
-    radial-gradient(62% calc(80px * var(--s)) at 50% 0%, rgba(74,158,255,.36), rgba(74,158,255,.12) 55%, transparent 100%),
-    radial-gradient(100% calc(46px * var(--s)) at 50% 0%, rgba(74,158,255,.14), transparent 100%),
-    var(--stone);
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cdefs%3E%3CradialGradient id='g'%3E%3Cstop offset='0' stop-color='%23ffd36b' stop-opacity='.55'/%3E%3Cstop offset='.6' stop-color='%23ffc24d' stop-opacity='.55'/%3E%3Cstop offset='.72' stop-color='%23f29a3a' stop-opacity='.22'/%3E%3Cstop offset='.9' stop-color='%23c0602d' stop-opacity='.06'/%3E%3Cstop offset='1' stop-color='%23c0602d' stop-opacity='0'/%3E%3C/radialGradient%3E%3CradialGradient id='f'%3E%3Cstop offset='.58' stop-color='%23fff'/%3E%3Cstop offset='.8' stop-color='%23fff' stop-opacity='.4'/%3E%3Cstop offset='1' stop-color='%23fff' stop-opacity='0'/%3E%3C/radialGradient%3E%3Cmask id='m'%3E%3Crect width='200' height='200' fill='url%28%23f%29'/%3E%3C/mask%3E%3C/defs%3E%3Ccircle cx='100' cy='100' r='100' fill='url%28%23g%29'/%3E%3Cpath d='M100 100L92.9 -29.8L107.1 -29.8ZM100 100L126.7 -27.2L140.5 -23.5ZM100 100L158.7 -16.0L171.1 -8.8ZM100 100L186.7 3.2L196.8 13.3ZM100 100L208.8 28.9L216.0 41.3ZM100 100L223.5 59.5L227.2 73.3ZM100 100L229.8 92.9L229.8 107.1ZM100 100L227.2 126.7L223.5 140.5ZM100 100L216.0 158.7L208.8 171.1ZM100 100L196.8 186.7L186.7 196.8ZM100 100L171.1 208.8L158.7 216.0ZM100 100L140.5 223.5L126.7 227.2ZM100 100L107.1 229.8L92.9 229.8ZM100 100L73.3 227.2L59.5 223.5ZM100 100L41.3 216.0L28.9 208.8ZM100 100L13.3 196.8L3.2 186.7ZM100 100L-8.8 171.1L-16.0 158.7ZM100 100L-23.5 140.5L-27.2 126.7ZM100 100L-29.8 107.1L-29.8 92.9ZM100 100L-27.2 73.3L-23.5 59.5ZM100 100L-16.0 41.3L-8.8 28.9ZM100 100L3.2 13.3L13.3 3.2ZM100 100L28.9 -8.8L41.3 -16.0ZM100 100L59.5 -23.5L73.3 -27.2Z' fill='%23ffd27a' opacity='.24' mask='url%28%23m%29'/%3E%3Cpath d='M30 39Q31.68 43.32 36 45Q31.68 46.68 30 51Q28.32 46.68 24 45Q28.32 43.32 30 39Z' fill='%23ffe9a8' opacity='0.95'/%3E%3Cpath d='M62 28.5Q62.98 31.02 65.5 32Q62.98 32.98 62 35.5Q61.02 32.98 58.5 32Q61.02 31.02 62 28.5Z' fill='%23fff1c4' opacity='0.85'/%3E%3Cpath d='M22 96Q23.12 98.88 26 100Q23.12 101.12 22 104Q20.88 101.12 18 100Q20.88 98.88 22 96Z' fill='%23ffd27a' opacity='0.85'/%3E%3Cpath d='M35 147Q36.40 150.60 40 152Q36.40 153.40 35 157Q33.60 153.40 30 152Q33.60 150.60 35 147Z' fill='%23ff9d5c' opacity='0.85'/%3E%3Cpath d='M12 67.5Q12.70 69.30 14.5 70Q12.70 70.70 12 72.5Q11.30 70.70 9.5 70Q11.30 69.30 12 67.5Z' fill='%23ffe0a0' opacity='0.7'/%3E%3Cpath d='M170 96Q171.12 98.88 174 100Q171.12 101.12 170 104Q168.88 101.12 166 100Q168.88 98.88 170 96Z' fill='%23ffd27a' opacity='0.85'/%3E%3Cpath d='M166 147Q167.40 150.60 171 152Q167.40 153.40 166 157Q164.60 153.40 161 152Q164.60 150.60 166 147Z' fill='%23ffb070' opacity='0.85'/%3E%3Cpath d='M150 27Q150.84 29.16 153 30Q150.84 30.84 150 33Q149.16 30.84 147 30Q149.16 29.16 150 27Z' fill='%23ffe9a8' opacity='0.8'/%3E%3Cpath d='M186 122.5Q186.70 124.30 188.5 125Q186.70 125.70 186 127.5Q185.30 125.70 183.5 125Q185.30 124.30 186 122.5Z' fill='%23ffe0a0' opacity='0.7'/%3E%3C/svg%3E") 50% calc(-44px * var(--s)) / calc(360px * var(--s)) calc(360px * var(--s)) no-repeat,
+    radial-gradient(62% calc(80px * var(--s)) at 50% 0%, rgba(255,190,90,.16), rgba(255,170,80,.05) 55%, transparent 100%),
+    #18122a;
+}
+/* the frame: solid gold on the top edge, dimming down the sides to a dark bronze at the bottom */
+.spin-card::after{
+  content:""; position:absolute; inset:-1px; border-radius:inherit; padding:calc(1.25px * var(--s)); pointer-events:none;
+  background:linear-gradient(180deg, #f2c46d, #b9824a 22%, #5a3e3a 60%, #3a2c3e);
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
 }
 .spin-wheel-wrap{ position:relative; width:calc(220px * var(--s)); aspect-ratio:1; margin:calc(10px * var(--s)) auto calc(20px * var(--s)); }
 .spin-wheel-ring{
@@ -1614,18 +1656,29 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   position:relative;
   margin-top:calc(12px * var(--s)); text-align:center;
   padding:calc(22px * var(--s)) calc(18px * var(--s)) calc(20px * var(--s));
+  /* a warm red-gold light behind the middle gift (106.6px from the padding edge) spreading across the row, with
+     rays and sparkles in the free space, on a solid dark fill; the frame below is drawn over the 1px border */
+  border:1px solid transparent;
   background:
-    radial-gradient(62% calc(80px * var(--s)) at 50% 0%, rgba(33,211,237,.36), rgba(33,211,237,.12) 55%, transparent 100%),
-    radial-gradient(100% calc(46px * var(--s)) at 50% 0%, rgba(33,211,237,.14), transparent 100%),
-    var(--stone);
-  border:1px solid var(--stone-border);
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cdefs%3E%3CradialGradient id='g'%3E%3Cstop offset='0' stop-color='%23ffc66b' stop-opacity='.6'/%3E%3Cstop offset='.3' stop-color='%23ff8a4d' stop-opacity='.38'/%3E%3Cstop offset='.62' stop-color='%23d9413a' stop-opacity='.14'/%3E%3Cstop offset='1' stop-color='%23d9413a' stop-opacity='0'/%3E%3C/radialGradient%3E%3CradialGradient id='f'%3E%3Cstop offset='.12' stop-color='%23fff'/%3E%3Cstop offset='.5' stop-color='%23fff' stop-opacity='.45'/%3E%3Cstop offset='.9' stop-color='%23fff' stop-opacity='0'/%3E%3C/radialGradient%3E%3Cmask id='m'%3E%3Crect width='200' height='200' fill='url%28%23f%29'/%3E%3C/mask%3E%3C/defs%3E%3Ccircle cx='100' cy='100' r='100' fill='url%28%23g%29'/%3E%3Cpath d='M100 100L92.2 -29.8L107.8 -29.8ZM100 100L129.1 -26.7L144.0 -22.3ZM100 100L163.6 -13.4L176.7 -5.0ZM100 100L193.0 9.1L203.2 20.9ZM100 100L214.8 39.0L221.3 53.2ZM100 100L227.3 73.8L229.6 89.2ZM100 100L229.6 110.8L227.3 126.2ZM100 100L221.3 146.8L214.8 161.0ZM100 100L203.2 179.1L193.0 190.9ZM100 100L176.7 205.0L163.6 213.4ZM100 100L144.0 222.3L129.1 226.7ZM100 100L107.8 229.8L92.2 229.8ZM100 100L70.9 226.7L56.0 222.3ZM100 100L36.4 213.4L23.3 205.0ZM100 100L7.0 190.9L-3.2 179.1ZM100 100L-14.8 161.0L-21.3 146.8ZM100 100L-27.3 126.2L-29.6 110.8ZM100 100L-29.6 89.2L-27.3 73.8ZM100 100L-21.3 53.2L-14.8 39.0ZM100 100L-3.2 20.9L7.0 9.1ZM100 100L23.3 -5.0L36.4 -13.4ZM100 100L56.0 -22.3L70.9 -26.7Z' fill='%23ffcf8a' opacity='.2' mask='url%28%23m%29'/%3E%3Cpath d='M71 78.8Q71.90 81.10 74.2 82Q71.90 82.90 71 85.2Q70.10 82.90 67.8 82Q70.10 81.10 71 78.8Z' fill='%23fff1c4' opacity='0.9'/%3E%3Cpath d='M129 78.8Q129.90 81.10 132.2 82Q129.90 82.90 129 85.2Q128.10 82.90 125.8 82Q128.10 81.10 129 78.8Z' fill='%23fff1c4' opacity='0.9'/%3E%3Cpath d='M71 118.6Q71.67 120.33 73.4 121Q71.67 121.67 71 123.4Q70.33 121.67 68.6 121Q70.33 120.33 71 118.6Z' fill='%23ffe0a0' opacity='0.8'/%3E%3Cpath d='M129 118.6Q129.67 120.33 131.4 121Q129.67 121.67 129 123.4Q128.33 121.67 126.6 121Q128.33 120.33 129 118.6Z' fill='%23ffe0a0' opacity='0.8'/%3E%3Cpath d='M34 129.5Q35.26 132.74 38.5 134Q35.26 135.26 34 138.5Q32.74 135.26 29.5 134Q32.74 132.74 34 129.5Z' fill='%23ffb070' opacity='0.88'/%3E%3Cpath d='M166 129.5Q167.26 132.74 170.5 134Q167.26 135.26 166 138.5Q164.74 135.26 161.5 134Q164.74 132.74 166 129.5Z' fill='%23ffb070' opacity='0.88'/%3E%3Cpath d='M14 149Q14.84 151.16 17 152Q14.84 152.84 14 155Q13.16 152.84 11 152Q13.16 151.16 14 149Z' fill='%23ffd27a' opacity='0.78'/%3E%3Cpath d='M186 149Q186.84 151.16 189 152Q186.84 152.84 186 155Q185.16 152.84 183 152Q185.16 151.16 186 149Z' fill='%23ffd27a' opacity='0.78'/%3E%3C/svg%3E") 50% calc(-73.4px * var(--s)) / calc(360px * var(--s)) calc(360px * var(--s)) no-repeat,
+    radial-gradient(62% calc(80px * var(--s)) at 50% 0%, rgba(255,170,100,.14), rgba(255,150,90,.04) 55%, transparent 100%),
+    #18122a;
+}
+/* the frame: solid warm coral-gold on the top edge, dimming down the sides to a dark red-brown at the bottom */
+.gift-pick-card::after{
+  content:""; position:absolute; inset:-1px; border-radius:inherit; padding:calc(1.25px * var(--s)); pointer-events:none;
+  background:linear-gradient(180deg, #f6b47a, #bf6a45 22%, #5a3a3a 60%, #3a2c3e);
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
 }
 .gift-pick-card__title-row{ display:flex; align-items:center; justify-content:space-between; margin-bottom:calc(20px * var(--s)); }
 .gift-pick-card__title{ text-align:left; font-weight:800; font-size:calc(13px * var(--s)); color:var(--ink); }
 .gift-pick-card__grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:calc(16px * var(--s)); max-width:calc(300px * var(--s)); margin:0 auto calc(22px * var(--s)); }
 .gift-pick-box{
   aspect-ratio:1; border-radius:calc(16px * var(--s));
-  background:var(--stone-2); border:calc(2px * var(--s)) solid var(--stone-border-2);
+  /* each gift glows softly from inside its box */
+  background:radial-gradient(circle at 50% 50%, rgba(255,180,100,.42), rgba(255,130,80,.24) 50%, rgba(255,110,80,.08) 78%, transparent 100%), var(--stone-2); border:calc(2px * var(--s)) solid var(--stone-border-2);
   display:flex; align-items:center; justify-content:center;
   color:var(--c-ad-watch-1);
   perspective:calc(600px * var(--s));
@@ -1729,11 +1782,6 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 }
 .free-pet-box{
   position:relative;
-  background:
-    radial-gradient(62% calc(80px * var(--s)) at 50% 0%, rgba(165,108,240,.36), rgba(165,108,240,.12) 55%, transparent 100%),
-    radial-gradient(100% calc(46px * var(--s)) at 50% 0%, rgba(165,108,240,.14), transparent 100%),
-    var(--stone);
-  border:1px solid var(--stone-border);
   margin-bottom:calc(12px * var(--s));
 }
 .free-pet-box__top{ display:flex; align-items:flex-start; gap:calc(10px * var(--s)); }
@@ -1796,10 +1844,6 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .invite-box{
   position:relative;
   padding:calc(18px * var(--s)); text-align:center;
-  background:
-    radial-gradient(62% calc(80px * var(--s)) at 50% 0%, rgba(139,92,246,.36), rgba(139,92,246,.12) 55%, transparent 100%),
-    radial-gradient(100% calc(46px * var(--s)) at 50% 0%, rgba(139,92,246,.14), transparent 100%),
-    var(--stone);
 }
 .invite-box__gift{ width:calc(44px * var(--s)); height:calc(44px * var(--s)); margin:0 auto calc(8px * var(--s)); object-fit:contain; }
 .invite-box__title{ font-weight:800; font-size:calc(11.5px * var(--s)); letter-spacing:.6px; text-transform:uppercase; color:var(--ink-dim); margin-bottom:calc(8px * var(--s)); }
@@ -1880,7 +1924,6 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   text-align:center;
   padding:calc(12px * var(--s)) calc(8px * var(--s));
 }
-.reward-tier.is-featured{ border-color:var(--c-reward-tier-border); }
 .reward-tier__icon{ width:calc(26px * var(--s)); height:calc(26px * var(--s)); margin:0 auto calc(5px * var(--s)); }
 .reward-tier__val{
   font-family:var(--font-display); font-weight:800; font-size:calc(19px * var(--s));
@@ -1890,8 +1933,6 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .reward-note{
   position:relative;
   display:flex; align-items:flex-start; gap:calc(10px * var(--s));
-  border:1px solid var(--c-reward-tier-border);
-  background:rgba(165,108,240,.05);
   border-radius:var(--radius-md);
   padding:calc(14px * var(--s)) calc(16px * var(--s));
   backdrop-filter:blur(var(--glass-blur));
@@ -1914,7 +1955,6 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   color:var(--ink-faint); margin:calc(14px * var(--s)) 0 calc(8px * var(--s));
 }
 .milestone-mission{
-  background:var(--stone); border:1px solid var(--stone-border);
   border-radius:var(--radius-sm); padding:calc(10px * var(--s)) calc(12px * var(--s)); margin-bottom:calc(8px * var(--s));
 }
 .milestone-mission__head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:calc(6px * var(--s)); }
@@ -1946,10 +1986,6 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .wallet-card{
   position:relative;
   padding:calc(22px * var(--s)) calc(20px * var(--s)); text-align:center;
-  background:
-    radial-gradient(62% calc(80px * var(--s)) at 50% 0%, rgba(139,92,246,.36), rgba(139,92,246,.12) 55%, transparent 100%),
-    radial-gradient(100% calc(46px * var(--s)) at 50% 0%, rgba(139,92,246,.14), transparent 100%),
-    var(--stone);
   box-shadow:var(--shadow-deep);
 }
 .wallet-card__label{ font-size:calc(12.5px * var(--s)); font-weight:700; color:var(--ink-dim); letter-spacing:.3px; }
@@ -2793,41 +2829,53 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .pod.is-active .pod__inner{ box-shadow:inset 0 0 0 calc(2px * var(--s)) var(--pod-c1); }
 
 /* Card Shine Bar */
-.streak-card::before, .promo-card::before, .chest-card::before, .spin-card::before,
-.gift-pick-card::before, .free-pet-box::before, .ad-task::before, .invite-box::before,
-.wallet-card::before, .stat-box::before, .reward-tier::before, .earn-hero::before,
-.storage-card::before, .mystery-box::before,
-.tx.is-pos::before, .tx.is-neg::before, .friend-row::before{
+.earn-hero::before, .storage-card::before{
   content:"";
   position:absolute; top:0; left:12%; right:12%; height:calc(2px * var(--s));
   border-radius:calc(2px * var(--s));
   pointer-events:none;
 }
-.mystery-box::before{ background:linear-gradient(90deg, transparent, #4a9eff, transparent); box-shadow:0 0 calc(6px * var(--s)) #4a9effaa; }
 .earn-hero::before{ background:linear-gradient(90deg, transparent, #8a6d1f 15%, #f0d878 50%, #d4af37 85%, transparent); box-shadow:0 0 calc(7px * var(--s)) #e3a542aa; }
 .storage-card::before{ background:linear-gradient(90deg, transparent, #e3a542, transparent); box-shadow:0 0 calc(6px * var(--s)) #e3a542aa; }
-.streak-card::before{ background:linear-gradient(90deg, transparent, #ff8a3d, transparent); box-shadow:0 0 calc(6px * var(--s)) #ff8a3daa; }
-.promo-card::before{ background:linear-gradient(90deg, transparent, #ec6bb3, transparent); box-shadow:0 0 calc(6px * var(--s)) #ec6bb3aa; }
-.chest-card::before{ background:linear-gradient(90deg, transparent, #21D3ED, transparent); box-shadow:0 0 calc(6px * var(--s)) #21D3EDaa; }
-.spin-card::before{ background:linear-gradient(90deg, transparent, #4a9eff, transparent); box-shadow:0 0 calc(6px * var(--s)) #4a9effaa; }
-.gift-pick-card::before{ background:linear-gradient(90deg, transparent, #21D3ED, transparent); box-shadow:0 0 calc(6px * var(--s)) #21D3EDaa; }
-.free-pet-box::before{ background:linear-gradient(90deg, transparent, #a56cf0, transparent); box-shadow:0 0 calc(6px * var(--s)) #a56cf0aa; }
-.ad-task::before{ background:linear-gradient(90deg, transparent, #4a9eff, transparent); box-shadow:0 0 calc(6px * var(--s)) #4a9effaa; }
-.invite-box::before, .wallet-card::before{ background:linear-gradient(90deg, transparent, var(--c-royal-purple-1), var(--c-royal-purple-2), transparent); box-shadow:0 0 calc(7px * var(--s)) #8b5cf6aa; }
-.stat-box::before, .reward-tier::before{ background:linear-gradient(90deg, transparent, var(--c-small-card-border), transparent); box-shadow:0 0 calc(5px * var(--s)) #c9834a99; }
-.reward-tier:first-child::before{ background:linear-gradient(90deg, transparent, var(--c-reward-tier-icon-person), transparent); box-shadow:0 0 calc(5px * var(--s)) #4a9eff99; }
-.friend-stats .stat-box::before,
-.reward-tiers .reward-tier::before{
-  background:linear-gradient(90deg, transparent, var(--c-royal-blue-1), var(--c-royal-blue-2), transparent);
-  box-shadow:0 0 calc(6px * var(--s)) #3b5bdbaa;
+
+/* Premium cards (no picture to light): a solid dark fill with a soft glow from the top edge, and a solid frame
+   (the card's colour on the top edge, dimming down the sides) drawn over the 1px border. Each card keeps its colour through --pf-rgb (glow), --pf-top and --pf-mid (frame) */
+.mystery-box, .free-pet-box, .ad-task, .partner-task, .invite-box, .wallet-card,
+#page-friends .stat-box, .earn-hero .stat-box, .reward-tiers .reward-tier, .reward-note, .milestone-mission, .friend-row, .tx.is-pos, .tx.is-neg{
+  border:1px solid transparent;
+  background:
+    radial-gradient(62% calc(80px * var(--s)) at 50% 0%, rgba(var(--pf-rgb),.16), rgba(var(--pf-rgb),.05) 55%, transparent 100%),
+    #18122a;
 }
-.reward-tiers .reward-tier.is-featured::before{
-  background:linear-gradient(90deg, transparent, var(--c-royal-purple-1), var(--c-royal-purple-2), transparent);
-  box-shadow:0 0 calc(6px * var(--s)) #8b5cf6aa;
+.mystery-box::after, .free-pet-box::after, .ad-task::after, .partner-task::after, .invite-box::after, .wallet-card::after,
+#page-friends .stat-box::after, .earn-hero .stat-box::after, .reward-tiers .reward-tier::after, .reward-note::after, .milestone-mission::after,
+.friend-row::after, .tx.is-pos::after, .tx.is-neg::after{
+  content:""; position:absolute; inset:-1px; border-radius:inherit; padding:calc(1.25px * var(--s)); pointer-events:none;
+  background:linear-gradient(180deg, var(--pf-top), var(--pf-mid) 22%, #3f3348 60%, #34283a);
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
 }
-.tx.is-pos::before{ background:linear-gradient(90deg, transparent, var(--success), transparent); box-shadow:0 0 calc(5px * var(--s)) #6fbf7399; }
-.tx.is-neg::before{ background:linear-gradient(90deg, transparent, var(--danger), transparent); box-shadow:0 0 calc(5px * var(--s)) #d9634f99; }
-.friend-row::before{ background:linear-gradient(90deg, transparent, #38bdf8, transparent); box-shadow:0 0 calc(5px * var(--s)) #38bdf899; }
+/* blue: Daily Combo and the task cards */
+.mystery-box, .ad-task, .partner-task{ --pf-rgb:74,158,255; --pf-top:#8cc4ff; --pf-mid:#3f7fd6; }
+/* purple: Get A Free Pet */
+.free-pet-box{ --pf-rgb:165,108,240; --pf-top:#c9a2f7; --pf-mid:#8452c9; }
+/* royal purple: the invite and balance cards, the featured reward tier */
+.invite-box, .wallet-card, .reward-tiers .reward-tier.is-featured{ --pf-rgb:139,92,246; --pf-top:#b69cfa; --pf-mid:#6d45c9; }
+/* royal blue: the friends' stats and the other reward tiers */
+#page-friends .stat-box, .reward-tiers .reward-tier{ --pf-rgb:59,91,219; --pf-top:#8aa2f0; --pf-mid:#3450b8; }
+.reward-tiers .reward-tier.is-featured{ --pf-rgb:139,92,246; --pf-top:#b69cfa; --pf-mid:#6d45c9; }
+/* purple: the "counts as active" note; gold: the milestone missions (their rewards) */
+.reward-note{ --pf-rgb:165,108,240; --pf-top:#c9a2f7; --pf-mid:#8452c9; }
+.milestone-mission{ position:relative; --pf-rgb:227,165,66; --pf-top:#f2c46d; --pf-mid:#b9824a; }
+/* gold: the Total mined and Session time boxes in the Earn card */
+.earn-hero .stat-box{ --pf-rgb:227,180,70; --pf-top:#f0d878; --pf-mid:#b08a2e; }
+/* sky: the friends list; green and red: incoming and outgoing transactions */
+.friend-row{ --pf-rgb:56,189,248; --pf-top:#8fdcfb; --pf-mid:#2a93c4; }
+.tx.is-pos{ --pf-rgb:111,191,115; --pf-top:#a9dcab; --pf-mid:#4f9a53; }
+.tx.is-neg{ --pf-rgb:217,99,79; --pf-top:#ec9f92; --pf-mid:#b0493a; }
+/* the Daily Combo label sits on the top edge, above the frame */
+.mystery-box__label{ z-index:1; }
 
 /* Modals */
 .modal-overlay{
