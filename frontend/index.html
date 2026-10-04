@@ -3206,6 +3206,56 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   overflow-x:hidden;
   -webkit-overflow-scrolling:touch;
 }
+/* Rewards badge row: Previous Winners button on the left, badge centred, dropdown below both */
+.lb-top{ position:relative; display:flex; align-items:center; justify-content:center; margin-bottom:calc(14px * var(--s)); min-height:calc(32px * var(--s)); }
+.lb-top .lb-rewards-badge{ margin:0; }
+.lb-prev-btn{
+  position:absolute; left:0; top:50%; transform:translateY(-50%);
+  width:calc(32px * var(--s)); height:calc(32px * var(--s)); padding:0;
+  display:flex; align-items:center; justify-content:center;
+  border-radius:calc(10px * var(--s));
+  background:rgba(255,255,255,.06); border:1px solid rgba(196,181,253,.2);
+  color:#f5f3ff; cursor:pointer;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06);
+  transition:background .2s ease, border-color .2s ease;
+}
+.lb-prev-btn svg{ width:calc(17px * var(--s)); height:calc(17px * var(--s)); }
+.lb-prev-btn.is-open{ background:rgba(139,92,246,.22); border-color:rgba(167,139,250,.55); }
+.lb-prev{
+  position:absolute; top:calc(100% + 8px * var(--s)); left:0; right:0; z-index:5;
+  max-height:calc(380px * var(--s)); overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain;
+  padding:calc(12px * var(--s));
+  border-radius:calc(16px * var(--s));
+  background:#1a1430; border:1px solid rgba(167,139,250,.28);
+  box-shadow:0 calc(14px * var(--s)) calc(32px * var(--s)) rgba(0,0,0,.55);
+  opacity:0; visibility:hidden; transform:translateY(calc(-6px * var(--s)));
+  transition:opacity .18s ease, transform .18s ease, visibility 0s linear .18s;
+}
+/* while the dropdown is open it takes the board's place in the sheet, so the sheet fits it whatever the
+   board's length (an empty new week included) and nothing is cut off */
+.lb-sheet.is-prev-open .lb-top{ flex-wrap:wrap; }
+.lb-sheet.is-prev-open .lb-prev{ position:static; flex-basis:100%; margin-top:calc(42px * var(--s)); }
+.lb-sheet.is-prev-open .lb-prev-btn{ top:0; transform:none; }
+.lb-sheet.is-prev-open .lb-tabs,
+.lb-sheet.is-prev-open .lb-panel,
+.lb-sheet.is-prev-open .lb-panel.is-active{ display:none; }
+/* and only "Weekly Leaderboard" stays above it: the schedule lines and the countdown belong to the
+   coming payout, not to the previous winners. display:none keeps them out of the translation fitting */
+.lb-sheet.is-prev-open .modal-head__sub,
+.lb-sheet.is-prev-open .modal-head__sub2{ display:none; }
+.lb-sheet.is-prev-open .lb-rewards-badge{ display:none; }
+.lb-prev.is-open{ opacity:1; visibility:visible; transform:translateY(0); transition:opacity .18s ease, transform .18s ease, visibility 0s; }
+.lb-prev__head{ display:flex; align-items:baseline; justify-content:space-between; gap:calc(8px * var(--s)); margin-bottom:calc(10px * var(--s)); }
+.lb-prev__title{ font-family:var(--font-display); font-weight:800; font-size:calc(13px * var(--s)); color:#f0d878; }
+.lb-prev__date{ font-size:calc(9.5px * var(--s)); font-weight:700; color:var(--ink-faint); }
+.lb-prev__section{ font-size:calc(9.5px * var(--s)); font-weight:800; letter-spacing:.8px; text-transform:uppercase; color:var(--ink-faint); margin:calc(4px * var(--s)) 0 calc(8px * var(--s)); }
+.lb-prev__section + .lb-prev__list{ margin-bottom:calc(12px * var(--s)); }
+.lb-prev__list{ display:flex; flex-direction:column; gap:calc(6px * var(--s)); }
+.lb-prev__list .lb-row{ padding:calc(7px * var(--s)) calc(9px * var(--s)); }
+.lb-prev__list .lb-row[data-rank="1"] .lb-row__rank{ color:#e3a542; }
+.lb-prev__list .lb-row[data-rank="2"] .lb-row__rank{ color:#cbd5e1; }
+.lb-prev__list .lb-row[data-rank="3"] .lb-row__rank{ color:#c9834a; }
+.lb-prev__empty{ text-align:center; padding:calc(14px * var(--s)) calc(8px * var(--s)); font-size:calc(11.5px * var(--s)); color:var(--ink-faint); }
 .lb-rewards-badge{
   text-align:center; margin:0 auto calc(14px * var(--s)); display:table;
   padding:calc(5px * var(--s)) calc(14px * var(--s)); border-radius:calc(999px * var(--s));
@@ -5121,13 +5171,25 @@ body.reduce-motion .firefly{
           <div>
             <div class="modal-head__title">Weekly Leaderboard</div>
             <div class="modal-head__sub">Updates Every Day at 00:00 UTC</div>
-            <div class="modal-head__sub2">Prizes will be distributed every Friday at 00:30 UTC</div>
+            <div class="modal-head__sub2">Prizes will be distributed every Friday at 00:05 UTC</div>
           </div>
         </div>
         <button class="modal-close" onclick="closeModal('modal-leaderboard')">✕</button>
       </div>
       <div class="lb-scroll">
-      <div class="lb-rewards-badge" id="lb-rewards-badge">Rewards in —</div>
+      <div class="lb-top">
+        <button class="lb-prev-btn" id="lb-prev-btn" type="button" aria-label="Previous Winners" onclick="toggleLeaderboardPrevious(event)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4.6 16.2A8.5 8.5 0 1 0 3.5 12"/><path d="M3 20.5V16h4.5"/><path d="M12 7.5V12h3.8"/></svg>
+        </button>
+        <div class="lb-rewards-badge" id="lb-rewards-badge">Rewards in —</div>
+        <div class="lb-prev" id="lb-prev" onclick="event.stopPropagation()">
+          <div class="lb-prev__head">
+            <div class="lb-prev__title">Previous Winners</div>
+            <div class="lb-prev__date" id="lb-prev-date" data-no-i18n></div>
+          </div>
+          <div class="lb-prev__body" id="lb-prev-body"></div>
+        </div>
+      </div>
       <div class="lb-tabs">
         <button class="lb-tab is-active" data-lb-tab="ads">By Ads</button>
         <button class="lb-tab" data-lb-tab="referrals">By Referrals</button>
@@ -6885,18 +6947,39 @@ function closeModal(id){
 var LB_METRIC_LABEL = { ads: 'Ads Watched', referrals: 'Active Referrals' };
 var leaderboardNextPayoutAt = null;
 var leaderboardCountdownTimer = null;
-function lbCacheKey(){
-  return 'lb_cache_' + new Date().toISOString().slice(0, 10);
+// The board is kept until the next 00:00 UTC refresh or the weekly payout, whichever comes first;
+// Previous Winners until the next payout. Both are read again from the server only after that.
+var LB_CACHE_KEY = 'lb_cache';
+var LB_PREV_CACHE_KEY = 'lb_prev_cache';
+function lbNextUtcMidnight(){
+  var d = new Date();
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1);
 }
-function getCachedLeaderboardData(){
+function lbCacheRead(key){
   try {
-    var raw = localStorage.getItem(lbCacheKey());
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch (e) { return null; }
+    var saved = JSON.parse(localStorage.getItem(key) || 'null');
+    if (saved && saved.data && Date.now() < saved.until) return saved.data;
+  } catch (e) {}
+  return null;
+}
+function lbCacheWrite(key, data, until){
+  if (!(until > Date.now())) return;
+  try { localStorage.setItem(key, JSON.stringify({ data: data, until: until })); } catch (e) {}
+}
+// earlier versions kept one board per day under lb_cache_YYYY-MM-DD and never removed them
+(function(){
+  try {
+    for (var i = localStorage.length - 1; i >= 0; i--){
+      var k = localStorage.key(i);
+      if (k && k.indexOf('lb_cache_') === 0) localStorage.removeItem(k);
+    }
+  } catch (e) {}
+})();
+function getCachedLeaderboardData(){
+  return lbCacheRead(LB_CACHE_KEY);
 }
 function setCachedLeaderboardData(data){
-  try { localStorage.setItem(lbCacheKey(), JSON.stringify(data)); } catch (e) {}
+  lbCacheWrite(LB_CACHE_KEY, data, Math.min(lbNextUtcMidnight(), data.next_payout_at || 0));
 }
 function lbAvatarInner(entry){
   if (entry.photo_url){
@@ -6978,7 +7061,105 @@ function applyLeaderboardData(data){
     leaderboardCountdownTimer = setInterval(renderLeaderboardCountdown, 1000);
   }
 }
+// Previous Winners dropdown: one request the first time it is opened after a payout, then none
+var lbPrevLoaded = false;
+var lbPrevBusy = false;
+function lbPrevListHtml(type, entries){
+  if (!entries || !entries.length) return '<div class="lb-prev__empty">No winners yet</div>';
+  return '<div class="lb-prev__list">' + entries.map(function(entry){
+    return (
+      '<div class="lb-row" data-rank="' + entry.rank + '">' +
+        '<div class="lb-row__rank">' + entry.rank + '</div>' +
+        '<div class="lb-avatar lb-avatar--sm">' + lbAvatarInner(entry) + '</div>' +
+        '<div class="lb-row__info">' +
+          '<div class="lb-row__name" data-no-i18n>' + escapeHtmlClient(entry.name) + '</div>' +
+          '<div class="lb-row__meta">' + LB_METRIC_LABEL[type] + ': ' + entry.value + '</div>' +
+        '</div>' +
+        '<div class="lb-row__coins">' + lbCoinsHtml(entry.prize, 20) + '</div>' +
+      '</div>'
+    );
+  }).join('') + '</div>';
+}
+function renderLeaderboardPrevious(data){
+  var body = document.getElementById('lb-prev-body');
+  var dateEl = document.getElementById('lb-prev-date');
+  if (!body) return;
+  var hasAny = (data.ads && data.ads.length) || (data.referrals && data.referrals.length);
+  if (dateEl) dateEl.textContent = hasAny && data.paid_at ? formatDateDDMMYYYYClient(data.paid_at) : '';
+  body.innerHTML = hasAny
+    ? '<div class="lb-prev__section">By Ads</div>' + lbPrevListHtml('ads', data.ads) +
+      '<div class="lb-prev__section">By Referrals</div>' + lbPrevListHtml('referrals', data.referrals)
+    : '<div class="lb-prev__empty">No winners yet</div>';
+  fitLeaderboardPrevious();
+}
+function formatDateDDMMYYYYClient(ms){
+  var d = new Date(ms);
+  return String(d.getUTCDate()).padStart(2, '0') + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + d.getUTCFullYear();
+}
+// The dropdown shows up to 5 winners at once and scrolls inside itself for the rest
+var LB_PREV_VISIBLE_ROWS = 5;
+function fitLeaderboardPrevious(){
+  var panel = document.getElementById('lb-prev');
+  if (!panel || !panel.classList.contains('is-open')) return;
+  panel.style.maxHeight = '';
+  var rows = panel.querySelectorAll('.lb-row');
+  if (rows.length <= LB_PREV_VISIBLE_ROWS) return;
+  var top = panel.getBoundingClientRect().top - panel.scrollTop;
+  var lastBottom = rows[LB_PREV_VISIBLE_ROWS - 1].getBoundingClientRect().bottom;
+  var padBottom = parseFloat(getComputedStyle(panel).paddingBottom) || 0;
+  panel.style.maxHeight = Math.ceil(lastBottom - top + padBottom) + 'px';
+}
+function setLeaderboardPreviousOpen(open){
+  var panel = document.getElementById('lb-prev');
+  var btn = document.getElementById('lb-prev-btn');
+  var sheet = document.querySelector('#modal-leaderboard .lb-sheet');
+  var scroller = document.querySelector('#modal-leaderboard .lb-scroll');
+  if (sheet) sheet.classList.toggle('is-prev-open', open);
+  if (panel) panel.classList.toggle('is-open', open);
+  if (btn) btn.classList.toggle('is-open', open);
+  if (open){
+    if (scroller) scroller.scrollTop = 0;
+    var panelEl = document.getElementById('lb-prev');
+    if (panelEl) panelEl.scrollTop = 0;
+    fitLeaderboardPrevious();
+  }
+}
+window.addEventListener('resize', fitLeaderboardPrevious);
+function toggleLeaderboardPrevious(ev){
+  if (ev) ev.stopPropagation();
+  var panel = document.getElementById('lb-prev');
+  var open = !(panel && panel.classList.contains('is-open'));
+  setLeaderboardPreviousOpen(open);
+  if (!open) return;
+  var cached = lbCacheRead(LB_PREV_CACHE_KEY);
+  if (cached){ renderLeaderboardPrevious(cached); return; }
+  if (lbPrevBusy) return;
+  var initData = getTelegramInitData();
+  if (!initData) return;
+  lbPrevBusy = true;
+  var body = document.getElementById('lb-prev-body');
+  if (body && !lbPrevLoaded) body.innerHTML = skeletonRowsHtml(3, 'avatar');
+  fetch('/api/leaderboard/previous', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: initData })
+  })
+  .then(function(res){ return res.json(); })
+  .then(function(data){
+    if (data.error) return;
+    lbPrevLoaded = true;
+    lbCacheWrite(LB_PREV_CACHE_KEY, data, data.next_payout_at);
+    renderLeaderboardPrevious(data);
+  })
+  .catch(function(err){ console.error('previous winners fetch failed:', err); })
+  .finally(function(){ lbPrevBusy = false; });
+}
+document.addEventListener('click', function(e){
+  var panel = document.getElementById('lb-prev');
+  if (panel && panel.classList.contains('is-open') && !panel.contains(e.target)) setLeaderboardPreviousOpen(false);
+});
 function openLeaderboardModal(){
+  setLeaderboardPreviousOpen(false);
   openModal('modal-leaderboard');
   var cached = getCachedLeaderboardData();
   if (cached){

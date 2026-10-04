@@ -25,12 +25,13 @@ class_name = "DepositChecker"
 tag = "v1"
 new_sqlite_classes = ["DepositChecker"]
 
-# يشغّل scheduled() في worker.js مرتين فقط أسبوعياً (استدعاءان لا تكلفة
-# إضافية ولا علاقة لهما بحصة الطلبات العادية):
-# - "0 0 * * *"  كل يوم 00:00 UTC: يختار تركيبة Daily Combo الجديدة ويرسلها للأدمن فقط.
-# - "30 0 * * 5" الجمعة فقط 00:30 UTC: يوزّع جوائز Weekly Leaderboard ويصفّر عداديه الأسبوعيين.
+# يشغّل scheduled() في worker.js (لا علاقة له بحصة الطلبات العادية):
+# - "0 0 * * *"   كل يوم 00:00 UTC: يختار تركيبة Daily Combo الجديدة ويرسلها للأدمن فقط.
+# - "5 0 * * FRI" الجمعة فقط 00:05 UTC (بعد تحديث اللوحة اليومي بخمس دقائق): يوزّع جوائز
+#   Weekly Leaderboard، يحفظ الفائزين لـ Previous Winners، ويصفّر العدادين الأسبوعيين.
+#   في Cloudflare الأحد = 1 والجمعة = 6، لذلك يُكتب اليوم بالاسم FRI وليس بالرقم.
 [triggers]
-crons = ["0 0 * * *", "30 0 * * 5"]
+crons = ["0 0 * * *", "5 0 * * FRI"]
 
 # DEPOSIT_ADDRESS و TONCENTER_API_KEY (اختياري) يُضبطان كـ Cloudflare Secrets
 # لا كـ [vars] — عبر: wrangler secret put DEPOSIT_ADDRESS
