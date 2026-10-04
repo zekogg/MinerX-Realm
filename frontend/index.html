@@ -7744,7 +7744,7 @@ function toggleGrowthTooltipTC(){
 }
 
 // Daily Combo
-var comboState = { solvedToday: false, attemptsUsed: 0, maxAttempts: 2, busy: false };
+var comboState = { solvedToday: false, attemptsUsed: 0, maxAttempts: 1, busy: false };
 function pickCombo(btn, imgUrl, name, cardId){
   if (btn.classList.contains('is-used') || btn.classList.contains('is-locked')) return;
   for (var i = 0; i < 3; i++){
@@ -7804,7 +7804,7 @@ function getComboGuessOrder(){
 function applyComboState(data){
   comboState.solvedToday = !!data.solved_today;
   comboState.attemptsUsed = data.attempts_used || 0;
-  comboState.maxAttempts = data.max_attempts || 2;
+  comboState.maxAttempts = data.max_attempts || 1;
   renderComboCheckButton();
   renderComboPickLock();
 }
@@ -7879,11 +7879,7 @@ function onComboCheckClick(){
     }
     resetComboSlots();
     shuffleComboPickButtons();
-    if (data.attempts_left > 0){
-      showAppToast({ title: 'Wrong!', amount: data.attempts_left + ' Attempt Left' });
-    } else {
-      showAppToast({ title: 'Wrong!', amount: 'Come Back Tomorrow' });
-    }
+    showAppToast({ title: 'Wrong!', amount: 'Come Back Tomorrow' });
     renderComboCheckButton();
     renderComboPickLock();
   })

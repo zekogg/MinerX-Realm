@@ -51,8 +51,8 @@ const NEWS_CHANNEL_URL = "https://t.me/MinerXRealmNews";
 // Daily Combo config
 const COMBO_CARDS = ["duck", "polar_bear", "penguin"];
 const COMBO_CARD_LABELS = { duck: "Duck", polar_bear: "Polar Bear", penguin: "Penguin" };
-const COMBO_REWARD_COINS = 100;
-const COMBO_MAX_ATTEMPTS = 2;
+const COMBO_REWARD_COINS = 200;
+const COMBO_MAX_ATTEMPTS = 1;
 
 // Watch Adsgram Ad config
 const ADS_TASK_REWARD_COINS = 15;
