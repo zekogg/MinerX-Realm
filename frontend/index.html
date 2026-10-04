@@ -1485,7 +1485,16 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
     radial-gradient(100% calc(46px * var(--s)) at 50% 0%, rgba(255,190,90,.09), transparent 100%),
     radial-gradient(calc(260px * var(--s)) calc(190px * var(--s)) at calc(61.5px * var(--s)) calc(61.5px * var(--s)), rgba(224,96,45,.22), transparent 70%),
     #18122a;
-  border:1px solid var(--stone-border);
+  /* the 1px border keeps its place; the frame below is drawn over it */
+  border:1px solid transparent;
+}
+/* the frame: solid warm gold on the top edge, dimming down the sides to a dark bronze at the bottom */
+.chest-card::after{
+  content:""; position:absolute; inset:-1px; border-radius:inherit; padding:calc(1.25px * var(--s)); pointer-events:none;
+  background:linear-gradient(180deg, #f2c46d, #b9824a 22%, #5a3e3a 60%, #3a2c3e);
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
 }
 .chest-card__help{
   position:absolute; top:calc(12px * var(--s)); right:calc(12px * var(--s));
@@ -2812,7 +2821,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .storage-card::before{ background:linear-gradient(90deg, transparent, #e3a542, transparent); box-shadow:0 0 calc(6px * var(--s)) #e3a542aa; }
 .streak-card::before{ background:linear-gradient(90deg, transparent, #ff8a3d, transparent); box-shadow:0 0 calc(6px * var(--s)) #ff8a3daa; }
 .promo-card::before{ background:linear-gradient(90deg, transparent, #ec6bb3, transparent); box-shadow:0 0 calc(6px * var(--s)) #ec6bb3aa; }
-.chest-card::before{ background:linear-gradient(90deg, transparent, #f2c46d, transparent); box-shadow:0 0 calc(6px * var(--s)) #f2c46d88; }
+.chest-card::before{ display:none; }
 .spin-card::before{ background:linear-gradient(90deg, transparent, #4a9eff, transparent); box-shadow:0 0 calc(6px * var(--s)) #4a9effaa; }
 .gift-pick-card::before{ background:linear-gradient(90deg, transparent, #21D3ED, transparent); box-shadow:0 0 calc(6px * var(--s)) #21D3EDaa; }
 .free-pet-box::before{ background:linear-gradient(90deg, transparent, #a56cf0, transparent); box-shadow:0 0 calc(6px * var(--s)) #a56cf0aa; }
