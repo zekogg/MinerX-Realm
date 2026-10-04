@@ -6593,7 +6593,7 @@ function onPetBuyClick(petId, btn){
       setButtonBusy(btn, false);
       if (data.error === 'insufficient_funds'){
         showBuyErrorToast('Not enough Coins');
-      } else if (data.error === 'already_owned'){
+      } else if (data.error === 'already_owned' || data.error === 'storage_changed'){
         fetchUserData();
       } else {
         console.error('pet buy error:', data.error);

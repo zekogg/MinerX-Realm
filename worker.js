@@ -157,14 +157,14 @@ async function applyDailyPetBoost(env) {
         const elapsedSeconds = Math.max(0, (Date.now() - Date.parse(row.last_claim_at)) / 1000);
         preBoostAccrued = Math.min(elapsedSeconds, capacitySeconds) * ((row.total_speed || 0) / 3600);
       }
+      // the credit of the storage, the new speed and the storage reset are one write
       stmts.push(
         env.DB.prepare(
-          "UPDATE users SET coins = coins + ?, total_speed = total_speed + ? WHERE telegram_id = ?"
-        ).bind(preBoostAccrued, deltaSpeed, row.telegram_id),
+          "UPDATE users SET coins = coins + ?, total_speed = total_speed + ?, last_claim_at = ? WHERE telegram_id = ?"
+        ).bind(preBoostAccrued, deltaSpeed, nowIso, row.telegram_id),
         env.DB.prepare(
           "UPDATE user_pets SET current_speed = current_speed + ?, daily_boost_days = daily_boost_days + 1 WHERE telegram_id = ? AND pet_id = ?"
-        ).bind(deltaSpeed, row.telegram_id, petId),
-        env.DB.prepare("UPDATE users SET last_claim_at = ? WHERE telegram_id = ?").bind(nowIso, row.telegram_id)
+        ).bind(deltaSpeed, row.telegram_id, petId)
       );
     }
     try {
@@ -819,46 +819,46 @@ async function handlePetBuy(request, env, petId) {
   ).bind(telegramId, petId).first();
   if (existing) return jsonResponse({ error: "already_owned" }, 409);
   const storageRow = await env.DB.prepare(
-    `SELECT u.total_speed, u.capacity_hours, u.last_claim_at, u.locked_coins
+    `SELECT u.coins, u.total_speed, u.capacity_hours, u.last_claim_at
      FROM users u
      WHERE u.telegram_id = ?`
   ).bind(telegramId).first();
+  if (!storageRow || storageRow.coins < pet.price) {
+    return jsonResponse({ error: "insufficient_funds" }, 400);
+  }
   let preBuyAccrued = 0;
-  if (storageRow && storageRow.last_claim_at) {
+  if (storageRow.last_claim_at) {
     const capacitySeconds = (storageRow.capacity_hours || STORAGE_DEFAULT_CAPACITY_HOURS) * 3600;
     const elapsedSeconds = Math.max(0, (Date.now() - Date.parse(storageRow.last_claim_at)) / 1000);
     preBuyAccrued = Math.min(elapsedSeconds, capacitySeconds) * ((storageRow.total_speed || 0) / 3600);
   }
-  const deducted = await env.DB.prepare(
-    `UPDATE users SET coins = coins - ? + ?, total_speed = total_speed + ?, locked_coins = MAX(0, COALESCE(locked_coins, 0) - ?)
-     WHERE telegram_id = ? AND coins >= ?
-     RETURNING locked_coins`
-  ).bind(pet.price, preBuyAccrued, pet.basespeed, pet.price, telegramId, pet.price).first();
-  if (!deducted) {
-    return jsonResponse({ error: "insufficient_funds" }, 400);
-  }
-  const lockedTaken = lockedTakenFor(pet.price, deducted.locked_coins, storageRow && storageRow.locked_coins);
   const nowIso = new Date().toISOString();
+  // the price, the credit of the storage and its reset are one write, guarded on the values the credit was worked out
+  // from, so a storage claim or another purchase in between cannot pay the same storage twice
+  const storageSet = storageRow.last_claim_at ? "last_claim_at = ?" : "capacity_hours = " + STORAGE_DEFAULT_CAPACITY_HOURS + ", last_claim_at = ?";
+  const deductStmt = env.DB.prepare(
+    `UPDATE users SET coins = coins - ? + ?, total_speed = total_speed + ?, locked_coins = MAX(0, COALESCE(locked_coins, 0) - ?), ${storageSet}
+     WHERE telegram_id = ? AND coins >= ? AND last_claim_at IS ? AND total_speed IS ? AND capacity_hours IS ?
+     RETURNING coins, total_speed, locked_coins`
+  ).bind(
+    pet.price, preBuyAccrued, pet.basespeed, pet.price, nowIso,
+    telegramId, pet.price, storageRow.last_claim_at, storageRow.total_speed, storageRow.capacity_hours
+  );
+  // changes() is the row count of the write just before it in the batch; a pet already owned fails the batch and
+  // nothing in it is kept
   const insertPetStmt = env.DB.prepare(
-    "INSERT INTO user_pets (telegram_id, pet_id, level, current_speed) VALUES (?, ?, 1, ?)"
+    "INSERT INTO user_pets (telegram_id, pet_id, level, current_speed) SELECT ?, ?, 1, ? WHERE changes() = 1"
   ).bind(telegramId, petId, pet.basespeed);
-  const storageStmt = (storageRow && storageRow.last_claim_at)
-    ? env.DB.prepare("UPDATE users SET last_claim_at = ? WHERE telegram_id = ?").bind(nowIso, telegramId)
-    : env.DB.prepare(
-        "UPDATE users SET capacity_hours = ?, last_claim_at = ? WHERE telegram_id = ?"
-      ).bind(STORAGE_DEFAULT_CAPACITY_HOURS, nowIso, telegramId);
-  const stmts = [insertPetStmt, storageStmt];
+  let deductResult;
   try {
-    await env.DB.batch(stmts);
+    [deductResult] = await env.DB.batch([deductStmt, insertPetStmt]);
   } catch (e) {
-    await env.DB.prepare(
-      "UPDATE users SET coins = coins + ? - ?, total_speed = total_speed - ?, locked_coins = COALESCE(locked_coins, 0) + ? WHERE telegram_id = ?"
-    ).bind(pet.price, preBuyAccrued, pet.basespeed, lockedTaken, telegramId).run();
     return jsonResponse({ error: "already_owned" }, 409);
   }
-  const updatedUser = await env.DB.prepare(
-    "SELECT coins, total_speed, locked_coins FROM users WHERE telegram_id = ?"
-  ).bind(telegramId).first();
+  const updatedUser = deductResult.results && deductResult.results[0];
+  if (!updatedUser) {
+    return jsonResponse({ error: "storage_changed" }, 409);
+  }
   return jsonResponse({
     locked_coins: updatedUser.locked_coins || 0,
     pet_id: petId,
@@ -876,7 +876,7 @@ async function handlePetUpgrade(request, env, petId) {
   if (!auth.ok) return auth.response;
   const { telegramId } = auth;
   const row = await env.DB.prepare(
-    `SELECT p.level, p.current_speed, u.total_speed, u.capacity_hours, u.last_claim_at, u.locked_coins
+    `SELECT p.level, p.current_speed, u.coins, u.total_speed, u.capacity_hours, u.last_claim_at, u.locked_coins
      FROM user_pets p
      JOIN users u ON u.telegram_id = p.telegram_id
      WHERE p.telegram_id = ? AND p.pet_id = ?`
@@ -889,40 +889,46 @@ async function handlePetUpgrade(request, env, petId) {
   const newSpeed = petSpeedForLevel(petId, newLevel);
   const speedDelta = newSpeed - row.current_speed;
   const upgradeCost = petUpgradeCost(petId);
+  if (row.coins < upgradeCost) {
+    return jsonResponse({ error: "insufficient_funds" }, 400);
+  }
   const capacitySeconds = (row.capacity_hours || STORAGE_DEFAULT_CAPACITY_HOURS) * 3600;
   let preUpgradeAccrued = 0;
   if (row.last_claim_at) {
     const elapsedSeconds = Math.max(0, (Date.now() - Date.parse(row.last_claim_at)) / 1000);
     preUpgradeAccrued = Math.min(elapsedSeconds, capacitySeconds) * ((row.total_speed || 0) / 3600);
   }
-  const deducted = await env.DB.prepare(
-    `UPDATE users SET coins = coins - ? + ?, total_speed = total_speed + ?, locked_coins = MAX(0, COALESCE(locked_coins, 0) - ?)
-     WHERE telegram_id = ? AND coins >= ?
-     RETURNING locked_coins`
-  ).bind(upgradeCost, preUpgradeAccrued, speedDelta, upgradeCost, telegramId, upgradeCost).first();
-  if (!deducted) {
-    return jsonResponse({ error: "insufficient_funds" }, 400);
-  }
-  const lockedTaken = lockedTakenFor(upgradeCost, deducted.locked_coins, row.locked_coins);
   const nowIso = new Date().toISOString();
+  // the cost, the credit of the storage and its reset are one write, guarded on the values the credit was worked out
+  // from, so a storage claim or another purchase in between cannot pay the same storage twice
+  const deductStmt = env.DB.prepare(
+    `UPDATE users SET coins = coins - ? + ?, total_speed = total_speed + ?, locked_coins = MAX(0, COALESCE(locked_coins, 0) - ?), last_claim_at = ?
+     WHERE telegram_id = ? AND coins >= ? AND last_claim_at IS ? AND total_speed IS ? AND capacity_hours IS ?
+     RETURNING coins, total_speed, locked_coins`
+  ).bind(
+    upgradeCost, preUpgradeAccrued, speedDelta, upgradeCost, nowIso,
+    telegramId, upgradeCost, row.last_claim_at, row.total_speed, row.capacity_hours
+  );
+  // changes() is the row count of the write just before it in the batch, so a refused payment upgrades nothing
   const updatePetStmt = env.DB.prepare(
     `UPDATE user_pets SET level = ?, current_speed = ?
-     WHERE telegram_id = ? AND pet_id = ? AND level = ?`
+     WHERE telegram_id = ? AND pet_id = ? AND level = ? AND changes() = 1`
   ).bind(newLevel, newSpeed, telegramId, petId, row.level);
-  const resetStorageStmt = env.DB.prepare(
-    "UPDATE users SET last_claim_at = ? WHERE telegram_id = ?"
-  ).bind(nowIso, telegramId);
-  const stmts = [updatePetStmt, resetStorageStmt];
-  const [updatePetResult] = await env.DB.batch(stmts);
-  if (!updatePetResult.meta || updatePetResult.meta.changes === 0) {
-    await env.DB.prepare(
-      "UPDATE users SET coins = coins + ? - ?, total_speed = total_speed - ?, locked_coins = COALESCE(locked_coins, 0) + ? WHERE telegram_id = ?"
-    ).bind(upgradeCost, preUpgradeAccrued, speedDelta, lockedTaken, telegramId).run();
+  const [deductResult, updatePetResult] = await env.DB.batch([deductStmt, updatePetStmt]);
+  const updatedUser = deductResult.results && deductResult.results[0];
+  if (!updatedUser) {
     return jsonResponse({ error: "level_changed" }, 409);
   }
-  const updatedUser = await env.DB.prepare(
-    "SELECT coins, total_speed, locked_coins FROM users WHERE telegram_id = ?"
-  ).bind(telegramId).first();
+  if (!updatePetResult.meta || updatePetResult.meta.changes === 0) {
+    // the level moved on in between: give the payment back and put the storage back as it was
+    const lockedTaken = lockedTakenFor(upgradeCost, updatedUser.locked_coins, row.locked_coins);
+    await env.DB.prepare(
+      `UPDATE users SET coins = coins + ? - ?, total_speed = total_speed - ?, locked_coins = COALESCE(locked_coins, 0) + ?,
+         last_claim_at = CASE WHEN last_claim_at = ? THEN ? ELSE last_claim_at END
+       WHERE telegram_id = ?`
+    ).bind(upgradeCost, preUpgradeAccrued, speedDelta, lockedTaken, nowIso, row.last_claim_at, telegramId).run();
+    return jsonResponse({ error: "level_changed" }, 409);
+  }
   return jsonResponse({
     locked_coins: updatedUser.locked_coins || 0,
     pet_id: petId,
@@ -959,19 +965,15 @@ async function handleStorageClaim(request, env) {
     }, 400);
   }
   const nowIso = new Date().toISOString();
-  const resetResult = await env.DB.prepare(
-    "UPDATE users SET last_claim_at = ? WHERE telegram_id = ? AND last_claim_at = ?"
-  ).bind(nowIso, telegramId, row.last_claim_at).run();
-  if (!resetResult.meta || resetResult.meta.changes === 0) {
+  // reset and credit in one write, so neither can happen without the other; RETURNING gives the new balance
+  const updatedUser = await env.DB.prepare(
+    `UPDATE users SET last_claim_at = ?, coins = coins + ?
+     WHERE telegram_id = ? AND last_claim_at = ?
+     RETURNING coins`
+  ).bind(nowIso, accrued, telegramId, row.last_claim_at).first();
+  if (!updatedUser) {
     return jsonResponse({ error: "already_claimed" }, 409);
   }
-  const creditStmt = env.DB.prepare(
-    "UPDATE users SET coins = coins + ? WHERE telegram_id = ?"
-  ).bind(accrued, telegramId);
-  await creditStmt.run();
-  const updatedUser = await env.DB.prepare(
-    "SELECT coins FROM users WHERE telegram_id = ?"
-  ).bind(telegramId).first();
   return jsonResponse({
     claimed_amount: accrued,
     coins: updatedUser.coins,
@@ -985,7 +987,7 @@ async function handleStorageUpgrade(request, env) {
   if (!auth.ok) return auth.response;
   const { telegramId } = auth;
   const row = await env.DB.prepare(
-    `SELECT u.total_speed, u.capacity_hours, u.last_claim_at, u.locked_coins
+    `SELECT u.coins, u.total_speed, u.capacity_hours, u.last_claim_at
      FROM users u
      WHERE u.telegram_id = ?`
   ).bind(telegramId).first();
@@ -1001,34 +1003,26 @@ async function handleStorageUpgrade(request, env) {
   const newCapacityHours = STORAGE_LEVELS[newLevel - 1];
   const newCapacitySeconds = newCapacityHours * 3600;
   const oldCapacitySeconds = currentCapacityHours * 3600;
+  if (row.coins < STORAGE_UPGRADE_COST_COINS) {
+    return jsonResponse({ error: "insufficient_funds" }, 400);
+  }
   const perSecondRate = (row.total_speed || 0) / 3600;
   const elapsedSeconds = Math.max(0, (Date.now() - Date.parse(row.last_claim_at)) / 1000);
   const preUpgradeAccrued = Math.min(elapsedSeconds, oldCapacitySeconds) * perSecondRate;
-  const deducted = await env.DB.prepare(
-    `UPDATE users SET coins = coins - ? + ?, locked_coins = MAX(0, COALESCE(locked_coins, 0) - ?)
-     WHERE telegram_id = ? AND coins >= ?
-     RETURNING locked_coins`
-  ).bind(STORAGE_UPGRADE_COST_COINS, preUpgradeAccrued, STORAGE_UPGRADE_COST_COINS, telegramId, STORAGE_UPGRADE_COST_COINS).first();
-  if (!deducted) {
-    return jsonResponse({ error: "insufficient_funds" }, 400);
-  }
-  const lockedTaken = lockedTakenFor(STORAGE_UPGRADE_COST_COINS, deducted.locked_coins, row.locked_coins);
   const nowIso = new Date().toISOString();
-  const updateStorageStmt = env.DB.prepare(
-    `UPDATE users SET capacity_hours = ?, last_claim_at = ?
-     WHERE telegram_id = ? AND capacity_hours = ?`
-  ).bind(newCapacityHours, nowIso, telegramId, currentCapacityHours);
-  const stmts = [updateStorageStmt];
-  const [updateStorageResult] = await env.DB.batch(stmts);
-  if (!updateStorageResult.meta || updateStorageResult.meta.changes === 0) {
-    await env.DB.prepare(
-      "UPDATE users SET coins = coins + ? - ?, locked_coins = COALESCE(locked_coins, 0) + ? WHERE telegram_id = ?"
-    ).bind(STORAGE_UPGRADE_COST_COINS, preUpgradeAccrued, lockedTaken, telegramId).run();
+  // the cost, the credit of the storage, the new capacity and the reset are one write, guarded on the values the
+  // credit was worked out from, so nothing has to be given back and the same storage cannot be paid twice
+  const updatedUser = await env.DB.prepare(
+    `UPDATE users SET coins = coins - ? + ?, locked_coins = MAX(0, COALESCE(locked_coins, 0) - ?), capacity_hours = ?, last_claim_at = ?
+     WHERE telegram_id = ? AND coins >= ? AND capacity_hours = ? AND last_claim_at = ? AND total_speed IS ?
+     RETURNING coins, locked_coins`
+  ).bind(
+    STORAGE_UPGRADE_COST_COINS, preUpgradeAccrued, STORAGE_UPGRADE_COST_COINS, newCapacityHours, nowIso,
+    telegramId, STORAGE_UPGRADE_COST_COINS, currentCapacityHours, row.last_claim_at, row.total_speed
+  ).first();
+  if (!updatedUser) {
     return jsonResponse({ error: "level_changed" }, 409);
   }
-  const updatedUser = await env.DB.prepare(
-    "SELECT coins, locked_coins FROM users WHERE telegram_id = ?"
-  ).bind(telegramId).first();
   return jsonResponse({
     locked_coins: updatedUser.locked_coins || 0,
     level: newLevel,
@@ -1123,11 +1117,12 @@ async function handleExchange(request, env) {
   }
   const gramAmount = amountCoins * EXCHANGE_RATE_COIN_TO_GRAM;
   // deposited coins (locked_coins) are for pets and upgrades only; only the rest can become Gram
-  const result = await env.DB.prepare(
+  const updatedUser = await env.DB.prepare(
     `UPDATE users SET coins = coins - ?, gram = gram + ?
-     WHERE telegram_id = ? AND coins - COALESCE(locked_coins, 0) >= ?`
-  ).bind(amountCoins, gramAmount, telegramId, amountCoins).run();
-  if (!result.meta || result.meta.changes === 0) {
+     WHERE telegram_id = ? AND coins - COALESCE(locked_coins, 0) >= ?
+     RETURNING coins, gram, locked_coins`
+  ).bind(amountCoins, gramAmount, telegramId, amountCoins).first();
+  if (!updatedUser) {
     const current = await env.DB.prepare(
       "SELECT coins, locked_coins FROM users WHERE telegram_id = ?"
     ).bind(telegramId).first();
@@ -1140,9 +1135,6 @@ async function handleExchange(request, env) {
     }
     return jsonResponse({ error: "insufficient_funds" }, 400);
   }
-  const updatedUser = await env.DB.prepare(
-    "SELECT coins, gram, locked_coins FROM users WHERE telegram_id = ?"
-  ).bind(telegramId).first();
   return jsonResponse({
     locked_coins: updatedUser.locked_coins || 0,
     exchanged_coins: amountCoins,
@@ -1382,7 +1374,8 @@ async function handleWithdrawRequest(request, env) {
      WHERE telegram_id = ? AND gram >= ? AND banned_at IS NULL
        AND (last_withdraw_request_at IS NULL OR last_withdraw_request_at <= ?)
        AND (CASE WHEN ads_today_date = date('now') THEN ads_today ELSE 0 END) >= ?
-       AND active_referrals_count >= ?`
+       AND active_referrals_count >= ?
+     RETURNING gram`
   ).bind(amountGram, now, telegramId, amountGram, cooldownCutoff, WITHDRAW_DAILY_ADS, WITHDRAW_ACTIVE_REFERRALS);
   // changes() is the row count of reserveStmt just before it in the batch, so a refused request records nothing
   const insertStmt = env.DB.prepare(
@@ -1399,7 +1392,8 @@ async function handleWithdrawRequest(request, env) {
     return jsonResponse({ error: "server_error" }, 500);
   }
   const [reserveResult, insertResult] = batchResults;
-  if (!reserveResult.meta || reserveResult.meta.changes === 0) {
+  const reserved = reserveResult.results && reserveResult.results[0];
+  if (!reserved) {
     const user = await env.DB.prepare(
       "SELECT gram, last_withdraw_request_at, banned_at, ads_today, ads_today_date, active_referrals_count FROM users WHERE telegram_id = ?"
     ).bind(telegramId).first();
@@ -1467,11 +1461,8 @@ async function handleWithdrawRequest(request, env) {
   } catch (e) {
     console.error("withdraw confirmation DM failed:", e?.message || e);
   }
-  const updatedUser = await env.DB.prepare(
-    "SELECT gram FROM users WHERE telegram_id = ?"
-  ).bind(telegramId).first();
   return jsonResponse({
-    gram: updatedUser.gram,
+    gram: reserved.gram,
     net_gram: netGram,
     next_allowed_at: now + WITHDRAW_COOLDOWN_MS
   });
@@ -1600,23 +1591,21 @@ async function handleClaimHappyDog(request, env) {
   const insertPetStmt = env.DB.prepare(
     "INSERT INTO user_pets (telegram_id, pet_id, level, current_speed) VALUES (?, 'happy_dog', 1, ?)"
   ).bind(telegramId, HAPPY_DOG_SPEED);
-  const speedStmt = env.DB.prepare(
-    "UPDATE users SET total_speed = total_speed + ?, coins = coins + ? WHERE telegram_id = ?"
-  ).bind(HAPPY_DOG_SPEED, preClaimAccrued, telegramId);
-  const storageStmt = row.last_claim_at
-    ? env.DB.prepare("UPDATE users SET last_claim_at = ? WHERE telegram_id = ?").bind(nowIso, telegramId)
+  // the new speed, the credit of the storage and its reset are one write; RETURNING gives the new values
+  const userStmt = row.last_claim_at
+    ? env.DB.prepare(
+        "UPDATE users SET total_speed = total_speed + ?, coins = coins + ?, last_claim_at = ? WHERE telegram_id = ? RETURNING total_speed, coins"
+      ).bind(HAPPY_DOG_SPEED, preClaimAccrued, nowIso, telegramId)
     : env.DB.prepare(
-        "UPDATE users SET capacity_hours = ?, last_claim_at = ? WHERE telegram_id = ?"
-      ).bind(STORAGE_DEFAULT_CAPACITY_HOURS, nowIso, telegramId);
-  const stmts = [insertPetStmt, speedStmt, storageStmt];
+        "UPDATE users SET total_speed = total_speed + ?, coins = coins + ?, capacity_hours = ?, last_claim_at = ? WHERE telegram_id = ? RETURNING total_speed, coins"
+      ).bind(HAPPY_DOG_SPEED, preClaimAccrued, STORAGE_DEFAULT_CAPACITY_HOURS, nowIso, telegramId);
+  let userResult;
   try {
-    await env.DB.batch(stmts);
+    [, userResult] = await env.DB.batch([insertPetStmt, userStmt]);
   } catch (e) {
     return jsonResponse({ error: "already_claimed" }, 409);
   }
-  const updatedUser = await env.DB.prepare(
-    "SELECT total_speed, coins FROM users WHERE telegram_id = ?"
-  ).bind(telegramId).first();
+  const updatedUser = userResult.results[0];
   return jsonResponse({
     pet_id: "happy_dog",
     level: 1,
@@ -1655,23 +1644,21 @@ async function handleClaimGuardian(request, env) {
   const insertPetStmt = env.DB.prepare(
     "INSERT INTO user_pets (telegram_id, pet_id, level, current_speed) VALUES (?, 'guardian', 1, ?)"
   ).bind(telegramId, GUARDIAN_SPEED);
-  const speedStmt = env.DB.prepare(
-    "UPDATE users SET total_speed = total_speed + ?, coins = coins + ? WHERE telegram_id = ?"
-  ).bind(GUARDIAN_SPEED, preClaimAccrued, telegramId);
-  const storageStmt = row.last_claim_at
-    ? env.DB.prepare("UPDATE users SET last_claim_at = ? WHERE telegram_id = ?").bind(nowIso, telegramId)
+  // the new speed, the credit of the storage and its reset are one write; RETURNING gives the new values
+  const userStmt = row.last_claim_at
+    ? env.DB.prepare(
+        "UPDATE users SET total_speed = total_speed + ?, coins = coins + ?, last_claim_at = ? WHERE telegram_id = ? RETURNING total_speed, coins"
+      ).bind(GUARDIAN_SPEED, preClaimAccrued, nowIso, telegramId)
     : env.DB.prepare(
-        "UPDATE users SET capacity_hours = ?, last_claim_at = ? WHERE telegram_id = ?"
-      ).bind(STORAGE_DEFAULT_CAPACITY_HOURS, nowIso, telegramId);
-  const stmts = [insertPetStmt, speedStmt, storageStmt];
+        "UPDATE users SET total_speed = total_speed + ?, coins = coins + ?, capacity_hours = ?, last_claim_at = ? WHERE telegram_id = ? RETURNING total_speed, coins"
+      ).bind(GUARDIAN_SPEED, preClaimAccrued, STORAGE_DEFAULT_CAPACITY_HOURS, nowIso, telegramId);
+  let userResult;
   try {
-    await env.DB.batch(stmts);
+    [, userResult] = await env.DB.batch([insertPetStmt, userStmt]);
   } catch (e) {
     return jsonResponse({ error: "already_claimed" }, 409);
   }
-  const updatedUser = await env.DB.prepare(
-    "SELECT total_speed, coins FROM users WHERE telegram_id = ?"
-  ).bind(telegramId).first();
+  const updatedUser = userResult.results[0];
   return jsonResponse({
     pet_id: "guardian",
     level: 1,
@@ -1712,23 +1699,21 @@ async function handleClaimAmbassador(request, env) {
   const insertPetStmt = env.DB.prepare(
     "INSERT INTO user_pets (telegram_id, pet_id, level, current_speed) VALUES (?, 'ambassador', 1, ?)"
   ).bind(telegramId, ambassadorSpeed);
-  const speedStmt = env.DB.prepare(
-    "UPDATE users SET total_speed = total_speed + ?, coins = coins + ? WHERE telegram_id = ?"
-  ).bind(ambassadorSpeed, preClaimAccrued, telegramId);
-  const storageStmt = storageRow.last_claim_at
-    ? env.DB.prepare("UPDATE users SET last_claim_at = ? WHERE telegram_id = ?").bind(nowIso, telegramId)
+  // the new speed, the credit of the storage and its reset are one write; RETURNING gives the new values
+  const userStmt = storageRow.last_claim_at
+    ? env.DB.prepare(
+        "UPDATE users SET total_speed = total_speed + ?, coins = coins + ?, last_claim_at = ? WHERE telegram_id = ? RETURNING total_speed, coins"
+      ).bind(ambassadorSpeed, preClaimAccrued, nowIso, telegramId)
     : env.DB.prepare(
-        "UPDATE users SET capacity_hours = ?, last_claim_at = ? WHERE telegram_id = ?"
-      ).bind(STORAGE_DEFAULT_CAPACITY_HOURS, nowIso, telegramId);
-  const stmts = [insertPetStmt, speedStmt, storageStmt];
+        "UPDATE users SET total_speed = total_speed + ?, coins = coins + ?, capacity_hours = ?, last_claim_at = ? WHERE telegram_id = ? RETURNING total_speed, coins"
+      ).bind(ambassadorSpeed, preClaimAccrued, STORAGE_DEFAULT_CAPACITY_HOURS, nowIso, telegramId);
+  let userResult;
   try {
-    await env.DB.batch(stmts);
+    [, userResult] = await env.DB.batch([insertPetStmt, userStmt]);
   } catch (e) {
     return jsonResponse({ error: "already_claimed" }, 409);
   }
-  const updatedUser = await env.DB.prepare(
-    "SELECT total_speed, coins FROM users WHERE telegram_id = ?"
-  ).bind(telegramId).first();
+  const updatedUser = userResult.results[0];
   return jsonResponse({
     pet_id: "ambassador",
     level: 1,
@@ -2553,16 +2538,14 @@ async function handleFriendsClaimMilestone(request, env) {
   }
   // the column name comes from the fixed list above, never from the request
   const column = `milestone_${milestone.friends}_claimed`;
-  const claimStmt = await env.DB.prepare(
+  const user = await env.DB.prepare(
     `UPDATE users SET coins = coins + ?, ${column} = 1
-     WHERE telegram_id = ? AND active_referrals_count >= ? AND ${column} = 0`
-  ).bind(milestone.reward, telegramId, milestone.friends).run();
-  if (!claimStmt.meta || claimStmt.meta.changes === 0) {
+     WHERE telegram_id = ? AND active_referrals_count >= ? AND ${column} = 0
+     RETURNING coins`
+  ).bind(milestone.reward, telegramId, milestone.friends).first();
+  if (!user) {
     return jsonResponse({ error: "not_eligible" }, 400);
   }
-  const user = await env.DB.prepare(
-    "SELECT coins FROM users WHERE telegram_id = ?"
-  ).bind(telegramId).first();
   return jsonResponse({ reward: milestone.reward, coins: user.coins });
 }
 
@@ -2665,15 +2648,14 @@ async function handleCheckinClaim(request, env) {
     return jsonResponse({ error: "not_verified" }, 400);
   }
   const today = todayUTC();
-  const updateStmt = env.DB.prepare(
+  const user = await env.DB.prepare(
     `UPDATE users SET coins = coins + ?, ${column} = ?
-     WHERE telegram_id = ? AND (${column} IS NULL OR ${column} <> ?)`
-  ).bind(reward, today, telegramId, today);
-  const result = await updateStmt.run();
-  if (!result.meta || result.meta.changes === 0) {
+     WHERE telegram_id = ? AND (${column} IS NULL OR ${column} <> ?)
+     RETURNING coins`
+  ).bind(reward, today, telegramId, today).first();
+  if (!user) {
     return jsonResponse({ error: "already_claimed_today" }, 409);
   }
-  const user = await env.DB.prepare("SELECT coins FROM users WHERE telegram_id = ?").bind(telegramId).first();
   return jsonResponse({ reward, coins: user.coins });
 }
 
@@ -2749,8 +2731,7 @@ async function handleTasksClaim(request, env) {
     ).bind(telegramId, taskId).run();
     return jsonResponse({ error: "task_full" }, 400);
   }
-  await env.DB.prepare("UPDATE users SET coins = coins + ? WHERE telegram_id = ?").bind(task.reward_coins, telegramId).run();
-  const user = await env.DB.prepare("SELECT coins FROM users WHERE telegram_id = ?").bind(telegramId).first();
+  const user = await env.DB.prepare("UPDATE users SET coins = coins + ? WHERE telegram_id = ? RETURNING coins").bind(task.reward_coins, telegramId).first();
   return jsonResponse({ reward: task.reward_coins, coins: user.coins });
 }
 async function checkChannelMembership(env, channelId, telegramId) {
@@ -2832,14 +2813,15 @@ async function handleComboCheck(request, env) {
     return jsonResponse({ error: "no_attempts_left" }, 409);
   }
   const isCorrect = guess.join(",") === combo.card_order;
-  const claimResult = await env.DB.prepare(
+  const user = await env.DB.prepare(
     `UPDATE users SET combo_date = ?, combo_attempts_used = ?, combo_solved = ?, coins = coins + ?
-     WHERE telegram_id = ? AND combo_date IS ? AND combo_attempts_used IS ? AND combo_solved IS ?`
+     WHERE telegram_id = ? AND combo_date IS ? AND combo_attempts_used IS ? AND combo_solved IS ?
+     RETURNING coins`
   ).bind(
     today, attemptsUsed + 1, isCorrect ? 1 : 0, isCorrect ? COMBO_REWARD_COINS : 0,
     telegramId, comboRow.combo_date, comboRow.combo_attempts_used, comboRow.combo_solved
-  ).run();
-  if (!claimResult.meta || claimResult.meta.changes === 0) {
+  ).first();
+  if (!user) {
     return jsonResponse({ error: "no_attempts_left" }, 409);
   }
   const newAttemptsUsed = attemptsUsed + 1;
@@ -2850,9 +2832,6 @@ async function handleComboCheck(request, env) {
       attempts_left: COMBO_MAX_ATTEMPTS - newAttemptsUsed
     });
   }
-  const user = await env.DB.prepare(
-    "SELECT coins FROM users WHERE telegram_id = ?"
-  ).bind(telegramId).first();
   return jsonResponse({
     correct: true,
     reward: COMBO_REWARD_COINS,
@@ -3168,16 +3147,13 @@ async function handleWithdrawCallback(cbq, env) {
   const withdrawalId = Number(match[2]);
   const newStatus = action === "approve" ? "approved" : "rejected";
   try {
-    const updateResult = await env.DB.prepare(
-      "UPDATE withdrawals SET status = ?, resolved_at = ? WHERE id = ? AND status = 'pending'"
-    ).bind(newStatus, Date.now(), withdrawalId).run();
-    if (!updateResult.meta || updateResult.meta.changes === 0) {
+    const w = await env.DB.prepare(
+      "UPDATE withdrawals SET status = ?, resolved_at = ? WHERE id = ? AND status = 'pending' RETURNING *"
+    ).bind(newStatus, Date.now(), withdrawalId).first();
+    if (!w) {
       await answerCallbackQuery(env, cbq.id, "⚠️ Already processed");
       return;
     }
-    const w = await env.DB.prepare(
-      "SELECT * FROM withdrawals WHERE id = ?"
-    ).bind(withdrawalId).first();
     if (newStatus === "rejected") {
       await env.DB.prepare("UPDATE users SET gram = gram + ? WHERE telegram_id = ?")
         .bind(w.amount_gram, w.telegram_id).run();
