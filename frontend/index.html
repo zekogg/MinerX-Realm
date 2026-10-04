@@ -3230,6 +3230,8 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 }
 .lb-prev-btn svg{ width:calc(17px * var(--s)); height:calc(17px * var(--s)); }
 .lb-prev-btn.is-open{ background:rgba(139,92,246,.22); border-color:rgba(167,139,250,.55); }
+/* the press effect keeps the centring: the global button:active scale alone would drop the button by half its height */
+.lb-prev-btn:active{ transform:translateY(-50%) scale(.97); }
 .lb-prev{
   position:absolute; top:calc(100% + 8px * var(--s)); left:0; right:0; z-index:5;
   max-height:calc(380px * var(--s)); overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain;
@@ -3245,6 +3247,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .lb-sheet.is-prev-open .lb-top{ flex-wrap:wrap; }
 .lb-sheet.is-prev-open .lb-prev{ position:static; flex-basis:100%; margin-top:calc(42px * var(--s)); }
 .lb-sheet.is-prev-open .lb-prev-btn{ top:0; transform:none; }
+.lb-sheet.is-prev-open .lb-prev-btn:active{ transform:scale(.97); }
 .lb-sheet.is-prev-open .lb-tabs,
 .lb-sheet.is-prev-open .lb-panel,
 .lb-sheet.is-prev-open .lb-panel.is-active{ display:none; }
