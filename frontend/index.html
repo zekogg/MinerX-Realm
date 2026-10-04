@@ -2897,14 +2897,14 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
    (the card's colour on the top edge, dimming down the sides) drawn over the 1px border in place of the fading
    top line. Each card keeps its colour through --pf-rgb (glow), --pf-top and --pf-mid (frame) */
 .mystery-box, .free-pet-box, .ad-task, .partner-task, .invite-box, .wallet-card,
-#page-friends .stat-box, .reward-tiers .reward-tier, .reward-note, .milestone-mission, .friend-row, .tx.is-pos, .tx.is-neg{
+#page-friends .stat-box, .earn-hero .stat-box, .reward-tiers .reward-tier, .reward-note, .milestone-mission, .friend-row, .tx.is-pos, .tx.is-neg{
   border:1px solid transparent;
   background:
     radial-gradient(62% calc(80px * var(--s)) at 50% 0%, rgba(var(--pf-rgb),.16), rgba(var(--pf-rgb),.05) 55%, transparent 100%),
     #18122a;
 }
 .mystery-box::after, .free-pet-box::after, .ad-task::after, .partner-task::after, .invite-box::after, .wallet-card::after,
-#page-friends .stat-box::after, .reward-tiers .reward-tier::after, .reward-note::after, .milestone-mission::after,
+#page-friends .stat-box::after, .earn-hero .stat-box::after, .reward-tiers .reward-tier::after, .reward-note::after, .milestone-mission::after,
 .friend-row::after, .tx.is-pos::after, .tx.is-neg::after{
   content:""; position:absolute; inset:-1px; border-radius:inherit; padding:calc(1.25px * var(--s)); pointer-events:none;
   background:linear-gradient(180deg, var(--pf-top), var(--pf-mid) 22%, #3f3348 60%, #34283a);
@@ -2913,7 +2913,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   mask:linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
 }
 .mystery-box::before, .free-pet-box::before, .ad-task::before, .invite-box::before, .wallet-card::before,
-#page-friends .stat-box::before, .reward-tiers .reward-tier::before, .friend-row::before, .tx.is-pos::before, .tx.is-neg::before{ display:none; }
+#page-friends .stat-box::before, .earn-hero .stat-box::before, .reward-tiers .reward-tier::before, .friend-row::before, .tx.is-pos::before, .tx.is-neg::before{ display:none; }
 /* blue: Daily Combo and the task cards */
 .mystery-box, .ad-task, .partner-task{ --pf-rgb:74,158,255; --pf-top:#8cc4ff; --pf-mid:#3f7fd6; }
 /* purple: Get A Free Pet */
@@ -2926,6 +2926,8 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 /* purple: the "counts as active" note; gold: the milestone missions (their rewards) */
 .reward-note{ --pf-rgb:165,108,240; --pf-top:#c9a2f7; --pf-mid:#8452c9; }
 .milestone-mission{ position:relative; --pf-rgb:227,165,66; --pf-top:#f2c46d; --pf-mid:#b9824a; }
+/* gold: the Total mined and Session time boxes in the Earn card */
+.earn-hero .stat-box{ --pf-rgb:227,180,70; --pf-top:#f0d878; --pf-mid:#b08a2e; }
 /* sky: the friends list; green and red: incoming and outgoing transactions */
 .friend-row{ --pf-rgb:56,189,248; --pf-top:#8fdcfb; --pf-mid:#2a93c4; }
 .tx.is-pos{ --pf-rgb:111,191,115; --pf-top:#a9dcab; --pf-mid:#4f9a53; }
