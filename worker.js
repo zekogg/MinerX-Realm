@@ -1050,31 +1050,41 @@ async function handlePromoRedeem(request, env) {
   if (promo.expires_at && Date.now() > Date.parse(promo.expires_at)) {
     return jsonResponse({ error: "code_expired" }, 400);
   }
-  try {
-    await env.DB.prepare(
-      "INSERT INTO promo_redemptions (telegram_id, code) VALUES (?, ?)"
-    ).bind(telegramId, code).run();
-  } catch (e) {
-    return jsonResponse({ error: "already_redeemed" }, 409);
-  }
-  const counterResult = await env.DB.prepare(
-    `UPDATE promo_codes SET uses_count = uses_count + 1
-     WHERE code = ? AND (max_uses IS NULL OR uses_count < max_uses)`
-  ).bind(code).run();
-  if (!counterResult.meta || counterResult.meta.changes === 0) {
-    await env.DB.prepare(
-      "DELETE FROM promo_redemptions WHERE telegram_id = ? AND code = ?"
-    ).bind(telegramId, code).run();
-    return jsonResponse({ error: "code_exhausted" }, 400);
-  }
+  // One transaction, all or nothing: the redemption is recorded only if this user has not used the code and it
+  // has uses left; the counter and the reward each follow only if the statement before them changed a row.
+  // (user, code) is the table's primary key, so the same user can never be recorded twice.
   const column = promo.currency === "gram" ? "gram" : "coins";
-  const creditStmt = env.DB.prepare(
-    `UPDATE users SET ${column} = ${column} + ? WHERE telegram_id = ?`
-  ).bind(promo.reward, telegramId);
-  await creditStmt.run();
-  const updatedUser = await env.DB.prepare(
-    "SELECT coins, gram FROM users WHERE telegram_id = ?"
-  ).bind(telegramId).first();
+  let results;
+  try {
+    results = await env.DB.batch([
+      env.DB.prepare(
+        `INSERT OR IGNORE INTO promo_redemptions (telegram_id, code)
+         SELECT ?, ? WHERE EXISTS (
+           SELECT 1 FROM promo_codes WHERE code = ? AND (max_uses IS NULL OR uses_count < max_uses)
+         ) AND EXISTS (SELECT 1 FROM users WHERE telegram_id = ?)`
+      ).bind(telegramId, code, code, telegramId),
+      env.DB.prepare(
+        "UPDATE promo_codes SET uses_count = uses_count + 1 WHERE code = ? AND changes() = 1"
+      ).bind(code),
+      env.DB.prepare(
+        `UPDATE users SET ${column} = ${column} + ? WHERE telegram_id = ? AND changes() = 1`
+      ).bind(promo.reward, telegramId),
+      env.DB.prepare("SELECT coins, gram FROM users WHERE telegram_id = ?").bind(telegramId)
+    ]);
+  } catch (e) {
+    console.error("promo redeem batch failed:", e?.message || e);
+    return jsonResponse({ error: "server_error" }, 500);
+  }
+  if (!results[2].meta || results[2].meta.changes !== 1) {
+    // nothing was recorded: either this user already used the code, or it has no uses left
+    const used = await env.DB.prepare(
+      "SELECT 1 FROM promo_redemptions WHERE telegram_id = ? AND code = ?"
+    ).bind(telegramId, code).first();
+    return used
+      ? jsonResponse({ error: "already_redeemed" }, 409)
+      : jsonResponse({ error: "code_exhausted" }, 400);
+  }
+  const updatedUser = (results[3].results || [])[0];
   return jsonResponse({
     reward: promo.reward,
     currency: column,
