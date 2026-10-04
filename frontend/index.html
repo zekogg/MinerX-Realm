@@ -8258,7 +8258,6 @@ function runAdGateOnclickaFallback(onSuccess, onFail){
     if (settled) return;
     settled = true;
     clearTimeout(safetyTimer);
-    console.log('[onclicka] gate ad not shown:', detail && detail.message ? detail.message : detail);
     runAdGateMonetixFallback(onSuccess, onFail);
   };
   // show() only settles when the ad ends, so the safety timer covers a whole video
@@ -8441,12 +8440,10 @@ function onclickaEnsureReady(){
   onclickaInitPromise = new Promise(function(resolve, reject){
     (function waitForSdk(){
       if (typeof window.initCdTma === 'function'){
-        console.log('[onclicka] SDK loaded, initialising spot ' + ONCLICKA_SPOT_ID);
         var initTimer = setTimeout(function(){ reject(new Error('initCdTma did not answer within ' + (ONCLICKA_READY_WAIT_MS / 1000) + 's')); }, ONCLICKA_READY_WAIT_MS);
         window.initCdTma({ id: ONCLICKA_SPOT_ID }).then(function(show){
           clearTimeout(initTimer);
           if (typeof show !== 'function') throw new Error('initCdTma returned no show() function: ' + String(show) + ' (spot ' + ONCLICKA_SPOT_ID + ', ' + typeof ONCLICKA_SPOT_ID + ')');
-          console.log('[onclicka] ready');
           onclickaShow = show;
           resolve(show);
         }).catch(function(e){ clearTimeout(initTimer); reject(e); });
@@ -8459,7 +8456,6 @@ function onclickaEnsureReady(){
       setTimeout(waitForSdk, 250);
     })();
   }).catch(function(e){
-    console.log('[onclicka] init failed:', e && e.message ? e.message : e);
     onclickaInitPromise = null;
     throw e;
   });
@@ -8521,7 +8517,6 @@ function onWatchOnclickaClick(){
     if (settled) return;
     settled = true;
     clearTimeout(safetyTimer);
-    if (detail !== undefined) console.log('[onclicka] ' + message + ':', detail && detail.message ? detail.message : detail);
     hideAdLoadingOverlay();
     onclickaState.busy = false;
     renderOnclickaButton();
@@ -8531,12 +8526,10 @@ function onWatchOnclickaClick(){
   var safetyTimer = setTimeout(function(){ finishWithError('No ad available right now', 'no answer from the SDK'); }, ONCLICKA_MAX_WAIT_MS);
   onclickaEnsureReady().then(function(show){
     if (settled) return;
-    console.log('[onclicka] show()');
     return Promise.resolve().then(function(){ return show(); }).then(function(result){
       if (settled) return;
       settled = true;
       clearTimeout(safetyTimer);
-      console.log('[onclicka] ad completed', result);
       setAdLoadingOverlayVerifying();
       creditOnclickaReward();
     }, function(e){ finishWithError('Ad was not completed', e); });
