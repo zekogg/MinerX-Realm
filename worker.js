@@ -8,7 +8,7 @@ const SUPPORT_USERNAME = "REPLACE_WITH_SUPPORT_USERNAME";
 
 // Start Mining config
 const MINING_CYCLE_SECONDS = 60 * 60;
-const MINING_REWARD_COINS = 80;
+const MINING_REWARD_COINS = 70;
 const MINING_DAILY_LIMIT = 5;
 
 // Daily Streak config
@@ -51,8 +51,8 @@ const NEWS_CHANNEL_URL = "https://t.me/MinerXRealmNews";
 // Daily Combo config
 const COMBO_CARDS = ["duck", "polar_bear", "penguin"];
 const COMBO_CARD_LABELS = { duck: "Duck", polar_bear: "Polar Bear", penguin: "Penguin" };
-const COMBO_REWARD_COINS = 100;
-const COMBO_MAX_ATTEMPTS = 2;
+const COMBO_REWARD_COINS = 200;
+const COMBO_MAX_ATTEMPTS = 1;
 
 // Watch Adsgram Ad config
 const ADS_TASK_REWARD_COINS = 15;
@@ -73,7 +73,7 @@ const LEADERBOARD_PRIZES = [20000, 15000, 10000, 5000, 5000, 5000, 5000, 5000, 5
 const GUARDIAN_ADS_THRESHOLD = 4000;
 const GUARDIAN_SPEED = 50;
 const HAPPY_DOG_FRIENDS_THRESHOLD = 100;
-const HAPPY_DOG_SPEED = 50;
+const HAPPY_DOG_SPEED = 40;
 
 // Check-in config
 const CHECKIN_TASK_REWARDS = { 1: 10, 2: 10, 3: 20, 4: 20 };
