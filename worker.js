@@ -157,13 +157,17 @@ async function applyDailyPetBoost(env) {
         const elapsedSeconds = Math.max(0, (Date.now() - Date.parse(row.last_claim_at)) / 1000);
         preBoostAccrued = Math.min(elapsedSeconds, capacitySeconds) * ((row.total_speed || 0) / 3600);
       }
-      // the credit of the storage, the new speed and the storage reset are one write
+      // the credit of the storage, the new speed and the storage reset are one write, guarded on the values the credit
+      // was worked out from, so a storage claim at the same moment cannot pay the same storage twice; the pet changes
+      // only when it went through (changes() is the row count of the statement just before it), and a boost missed
+      // that way is given on the next run
       stmts.push(
         env.DB.prepare(
-          "UPDATE users SET coins = coins + ?, total_speed = total_speed + ?, last_claim_at = ? WHERE telegram_id = ?"
-        ).bind(preBoostAccrued, deltaSpeed, nowIso, row.telegram_id),
+          `UPDATE users SET coins = coins + ?, total_speed = total_speed + ?, last_claim_at = ?
+           WHERE telegram_id = ? AND last_claim_at IS ? AND total_speed IS ? AND capacity_hours IS ?`
+        ).bind(preBoostAccrued, deltaSpeed, nowIso, row.telegram_id, row.last_claim_at, row.total_speed, row.capacity_hours),
         env.DB.prepare(
-          "UPDATE user_pets SET current_speed = current_speed + ?, daily_boost_days = daily_boost_days + 1 WHERE telegram_id = ? AND pet_id = ?"
+          "UPDATE user_pets SET current_speed = current_speed + ?, daily_boost_days = daily_boost_days + 1 WHERE telegram_id = ? AND pet_id = ? AND changes() = 1"
         ).bind(deltaSpeed, row.telegram_id, petId)
       );
     }
@@ -471,22 +475,30 @@ async function handleGetUser(request, env) {
   `;
   let user = await env.DB.prepare(userQuery).bind(telegramId).first();
   if (!user) {
-    await env.DB.prepare(
-      "INSERT INTO users (telegram_id, username, referred_by, created_at, photo_url, device_id) VALUES (?, ?, ?, ?, ?, ?)"
-    ).bind(telegramId, username, referredBy, Date.now(), photoUrl, deviceId).run();
+    // the new account and its referral are one batch, so the link and the inviter's bonus are never lost; OR IGNORE
+    // lets two first opens at the same moment both go through, and changes() (the row count of the statement just
+    // before) makes only the one that created the account record the referral
+    const signupStmts = [
+      env.DB.prepare(
+        "INSERT OR IGNORE INTO users (telegram_id, username, referred_by, created_at, photo_url, device_id) VALUES (?, ?, ?, ?, ?, ?)"
+      ).bind(telegramId, username, referredBy, Date.now(), photoUrl, deviceId)
+    ];
     if (referredBy) {
-      await env.DB.batch([
+      signupStmts.push(
         env.DB.prepare(
-          "INSERT OR IGNORE INTO referrals (referrer_id, referred_id, invited_at) VALUES (?, ?, ?)"
+          "INSERT OR IGNORE INTO referrals (referrer_id, referred_id, invited_at) SELECT ?, ?, ? WHERE changes() = 1"
         ).bind(referredBy, telegramId, Date.now()),
         env.DB.prepare(
-          "UPDATE users SET referral_pending_earnings = referral_pending_earnings + ?, invites_count = invites_count + 1 WHERE telegram_id = ?"
+          "UPDATE users SET referral_pending_earnings = referral_pending_earnings + ?, invites_count = invites_count + 1 WHERE telegram_id = ? AND changes() = 1"
         ).bind(REFERRAL_SIGNUP_BONUS_COINS, referredBy)
-      ]);
+      );
     }
-    try {
-      await sendWelcomeMessage(env, telegramId);
-    } catch (e) {   }
+    const [insertResult] = await env.DB.batch(signupStmts);
+    if (insertResult.meta && insertResult.meta.changes === 1) {
+      try {
+        await sendWelcomeMessage(env, telegramId);
+      } catch (e) {   }
+    }
     user = await env.DB.prepare(userQuery).bind(telegramId).first();
   } else {
     if (photoUrl && photoUrl !== user.photo_url) {
@@ -1553,16 +1565,18 @@ async function bumpLifetimeAdsWatched(env, telegramId) {
 // Referral becomes active once the invited user reaches ACTIVE_FRIEND_ADS_THRESHOLD lifetime ads
 async function activateReferralOnLifetimeAds(env, telegramId, referredBy, lifetimeAds) {
   if (referredBy && lifetimeAds >= ACTIVE_FRIEND_ADS_THRESHOLD) {
-    const activateResult = await env.DB.prepare(
-      `UPDATE referrals SET is_active = 1, earned_coins = earned_coins + ?
-       WHERE referrer_id = ? AND referred_id = ? AND is_active = 0`
-    ).bind(REFERRAL_ACTIVE_BONUS_COINS, referredBy, telegramId).run();
-    if (activateResult.meta && activateResult.meta.changes > 0) {
-      await env.DB.prepare(
+    // one batch, so a friend is never marked active without the inviter's bonus and counters; changes() is the row
+    // count of the statement just before it, so an already active friend pays nothing
+    await env.DB.batch([
+      env.DB.prepare(
+        `UPDATE referrals SET is_active = 1, earned_coins = earned_coins + ?
+         WHERE referrer_id = ? AND referred_id = ? AND is_active = 0`
+      ).bind(REFERRAL_ACTIVE_BONUS_COINS, referredBy, telegramId),
+      env.DB.prepare(
         `UPDATE users SET referral_pending_earnings = referral_pending_earnings + ?, active_referrals_count = active_referrals_count + 1, weekly_active_referrals = weekly_active_referrals + 1
-         WHERE telegram_id = ?`
-      ).bind(REFERRAL_ACTIVE_BONUS_COINS, referredBy).run();
-    }
+         WHERE telegram_id = ? AND changes() = 1`
+      ).bind(REFERRAL_ACTIVE_BONUS_COINS, referredBy)
+    ]);
   }
 }
 
@@ -2826,15 +2840,16 @@ async function handleComboCheck(request, env) {
     return jsonResponse({ error: "invalid_order" }, 400);
   }
   const today = todayUTC();
-  const combo = await env.DB.prepare(
-    "SELECT card_order FROM daily_combo WHERE date = ?"
-  ).bind(today).first();
+  // both reads at once
+  const [combo, comboRow] = await Promise.all([
+    env.DB.prepare("SELECT card_order FROM daily_combo WHERE date = ?").bind(today).first(),
+    env.DB.prepare(
+      "SELECT combo_date, combo_attempts_used, combo_solved FROM users WHERE telegram_id = ?"
+    ).bind(telegramId).first()
+  ]);
   if (!combo) {
     return jsonResponse({ error: "combo_not_ready" }, 409);
   }
-  const comboRow = await env.DB.prepare(
-    "SELECT combo_date, combo_attempts_used, combo_solved FROM users WHERE telegram_id = ?"
-  ).bind(telegramId).first();
   if (!comboRow) return jsonResponse({ error: "user_not_found" }, 404);
   const isToday = comboRow.combo_date === today;
   const attemptsUsed = isToday ? (comboRow.combo_attempts_used || 0) : 0;

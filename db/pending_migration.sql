@@ -241,3 +241,6 @@ ALTER TABLE leaderboard_payouts ADD COLUMN winners TEXT;
 -- Withdraw requirements: ads watched today (every ad, the gates included), restarted by the first ad of a new UTC day
 ALTER TABLE users ADD COLUMN ads_today INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE users ADD COLUMN ads_today_date TEXT;
+
+-- قائمة الأصدقاء: فهرس بنفس ترتيب العرض (النشطون أولاً ثم الأحدث)، فتقرأ كل صفحة أصدقاءها فقط بدل كل أصدقاء الداعي.
+CREATE INDEX IF NOT EXISTS idx_referrals_referrer_active ON referrals(referrer_id, is_active DESC, invited_at DESC);
