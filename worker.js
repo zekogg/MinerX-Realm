@@ -407,6 +407,9 @@ async function routeRequest(request, env, url) {
     if (url.pathname === "/api/admin/promo/create" && request.method === "POST") {
       return handleAdminPromoCreate(request, env);
     }
+    if (url.pathname === "/api/admin/promo/delete" && request.method === "POST") {
+      return handleAdminPromoDelete(request, env);
+    }
     if (url.pathname === "/api/admin/promo/list" && request.method === "POST") {
       return handleAdminPromoList(request, env);
     }
@@ -2021,6 +2024,25 @@ async function handleAdminPromoList(request, env) {
     "SELECT code, reward, currency, max_uses, uses_count, expires_at FROM promo_codes ORDER BY code ASC"
   ).all();
   return jsonResponse({ codes: result.results || [] });
+}
+
+// /api/admin/promo/delete — removes only the code's own row (one write). Its redemption records stay: they are
+// read only for this code, so they cost nothing, and if the same code is created again, users who already used it
+// still cannot use it twice. Rewards already given stay with the users
+async function handleAdminPromoDelete(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "invalid_body" }, 400);
+  }
+  const auth = await authenticateAdmin(request, env, body);
+  if (!auth.ok) return auth.response;
+  const code = typeof body.code === "string" ? body.code.trim().toUpperCase() : "";
+  if (!code) return jsonResponse({ error: "missing_code" }, 400);
+  const result = await env.DB.prepare("DELETE FROM promo_codes WHERE code = ?").bind(code).run();
+  if (!result.meta || result.meta.changes === 0) return jsonResponse({ error: "not_found" }, 404);
+  return jsonResponse({ ok: true });
 }
 
 // /api/admin/ambassador/grant
