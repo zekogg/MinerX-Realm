@@ -3665,7 +3665,9 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   color:#d8b4fe; transition:opacity .2s ease;
 }
 .pf-toggle-btn svg{ width:calc(17px * var(--s)); height:calc(17px * var(--s)); }
-.pf-toggle-btn span{ font-size:calc(8.5px * var(--s)); font-weight:700; }
+/* the label takes the button's width, so a translation only gets smaller when it does not fit the button */
+.pf-toggle-btn span{ display:block; width:100%; text-align:center; white-space:nowrap; font-size:calc(8.5px * var(--s)); font-weight:700; }
+.pf-toggle-btn--silver{ background:rgba(203,213,225,.08); border-color:rgba(203,213,225,.45); color:#d9dee6; }
 .pf-toggle-btn.is-off{ opacity:.4; background:rgba(255,255,255,.04); border-color:var(--stone-border-2); color:var(--ink-faint); }
 
 /* Animation Toggle */
@@ -4428,6 +4430,7 @@ body.reduce-motion .firefly{
     <section class="page" id="page-wallet">
       <div class="page-title">Wallet</div>
       <div class="card wallet-card">
+        <button id="pf-admin-btn" onclick="openAdminPanel()" style="display:none;position:absolute;top:calc(14px * var(--s));left:calc(14px * var(--s));width:calc(28px * var(--s));height:calc(28px * var(--s));border-radius:calc(10px * var(--s));background:rgba(0,0,0,.35);border:1px solid rgba(227,165,66,.35);color:#e3a542;font-size:calc(6px * var(--s));font-weight:700;letter-spacing:-.2px;line-height:1;padding:0;white-space:nowrap;align-items:center;justify-content:center;cursor:pointer;z-index:2;">Admin</button>
         <div class="wallet-card__label">Total balance</div>
         <div class="wallet-balances">
           <div class="wallet-balances__item">
@@ -4836,7 +4839,6 @@ body.reduce-motion .firefly{
       <span class="fp-corner fp-corner--tl"></span>
       <span class="fp-corner fp-corner--tr"></span>
       <button class="modal-close pf-close" onclick="closeModal('modal-profile')">✕</button>
-      <button id="pf-admin-btn" onclick="openAdminPanel()" style="display:none;position:absolute;top:calc(14px * var(--s));left:calc(14px * var(--s));width:calc(28px * var(--s));height:calc(28px * var(--s));border-radius:calc(10px * var(--s));background:rgba(0,0,0,.35);border:1px solid rgba(227,165,66,.35);color:#e3a542;font-size:calc(6px * var(--s));font-weight:700;letter-spacing:-.2px;line-height:1;padding:0;white-space:nowrap;align-items:center;justify-content:center;cursor:pointer;z-index:2;">Admin</button>
       <div class="pf-scroll">
         <div class="pf-avatar-wrap">
           <div class="pf-avatar">
@@ -4852,7 +4854,11 @@ body.reduce-motion .firefly{
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 L3 14h7l-1 8 10-12h-7z"/></svg>
             <span>Animation</span>
           </button>
-          <button class="pf-toggle-btn" onclick="copyTelegramId(this)">
+          <button class="pf-toggle-btn" id="pf-music-toggle-btn" onclick="toggleMusicPref()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+            <span>Music</span>
+          </button>
+          <button class="pf-toggle-btn pf-toggle-btn--silver" onclick="copyTelegramId(this)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
             <span>Copy ID</span>
           </button>
@@ -5492,6 +5498,88 @@ function toggleAnimationsPref(){
   applyAnimationsPref(next);
 }
 applyAnimationsPref(areAnimationsEnabled());
+
+// Background Music: a gapless loop through Web Audio (a gain node also works on iPhone, where audio.volume
+// is ignored), capped at 70% of the device volume. Loaded only once the player taps (browsers allow sound
+// only after a tap), paused while the app is hidden, on by default and switchable in Profile
+var MUSIC_URL = '/App%20Music%20(Loop)%20.mp3?v=1';
+var MUSIC_MAX_VOLUME = 0.7;
+var MUSIC_PREF_KEY = 'mx_music_enabled';
+var musicCtx = null, musicGain = null, musicSource = null, musicLoading = false;
+function isMusicEnabled(){
+  try{ return localStorage.getItem(MUSIC_PREF_KEY) !== '0'; }catch(e){ return true; }
+}
+function renderMusicToggle(){
+  var btn = document.getElementById('pf-music-toggle-btn');
+  if (btn) btn.classList.toggle('is-off', !isMusicEnabled());
+}
+function musicFadeTo(target, seconds){
+  if (!musicCtx || !musicGain) return;
+  var now = musicCtx.currentTime;
+  musicGain.gain.cancelScheduledValues(now);
+  musicGain.gain.setValueAtTime(musicGain.gain.value, now);
+  musicGain.gain.linearRampToValueAtTime(target, now + seconds);
+}
+function startMusic(){
+  if (!isMusicEnabled() || document.hidden) return;
+  var AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  if (!musicCtx){
+    try{
+      musicCtx = new AC();
+      musicGain = musicCtx.createGain();
+      musicGain.gain.value = 0;
+      musicGain.connect(musicCtx.destination);
+    }catch(e){ musicCtx = null; return; }
+  }
+  if (musicCtx.state === 'suspended') musicCtx.resume().catch(function(){});
+  if (musicSource){ musicFadeTo(MUSIC_MAX_VOLUME, 1); return; }
+  if (musicLoading) return;
+  musicLoading = true;
+  fetch(MUSIC_URL)
+    .then(function(res){ if (!res.ok) throw new Error('music ' + res.status); return res.arrayBuffer(); })
+    .then(function(data){
+      return new Promise(function(resolve, reject){ musicCtx.decodeAudioData(data, resolve, reject); });
+    })
+    .then(function(buffer){
+      musicLoading = false;
+      if (musicSource) return;
+      musicSource = musicCtx.createBufferSource();
+      musicSource.buffer = buffer;
+      musicSource.loop = true;
+      musicSource.connect(musicGain);
+      musicSource.start(0);
+      if (isMusicEnabled() && !document.hidden) musicFadeTo(MUSIC_MAX_VOLUME, 2);
+      else musicCtx.suspend().catch(function(){});
+    })
+    .catch(function(err){ musicLoading = false; console.error('music failed:', err); });
+}
+function stopMusic(){
+  if (!musicCtx) return;
+  musicFadeTo(0, 0.4);
+  setTimeout(function(){
+    if (musicCtx && (!isMusicEnabled() || document.hidden)) musicCtx.suspend().catch(function(){});
+  }, 450);
+}
+function toggleMusicPref(){
+  var next = !isMusicEnabled();
+  try{ localStorage.setItem(MUSIC_PREF_KEY, next ? '1' : '0'); }catch(e){}
+  renderMusicToggle();
+  if (next) startMusic(); else stopMusic();
+}
+(function(){
+  // a tap starts it, and restarts it if the system paused it (some phones only allow resuming on a tap)
+  function onTap(){
+    if (isMusicEnabled() && (!musicCtx || musicCtx.state !== 'running')) startMusic();
+  }
+  document.addEventListener('pointerdown', onTap, true);
+  document.addEventListener('touchend', onTap, true);
+  document.addEventListener('visibilitychange', function(){
+    if (!musicCtx) return;
+    if (document.hidden) stopMusic(); else startMusic();
+  });
+  renderMusicToggle();
+})();
 
 // Maintenance Mode
 var MAINTENANCE_MODE = false;
