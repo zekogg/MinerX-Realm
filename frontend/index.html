@@ -4848,12 +4848,12 @@ body.reduce-motion .firefly{
         <button class="modal-close" onclick="closeModal('modal-withdraw-req')">✕</button>
       </div>
       <div class="wd-req">
-        <div class="wd-req__label"><span>Watch 10 Ads</span><span>10</span></div>
-        <div class="wd-req__track"><div class="wd-req__fill" style="width:0%"></div></div>
+        <div class="wd-req__label"><span id="wd-req-ads-label">Watch 15 Ads Today</span><span id="wd-req-ads-count" data-no-i18n>0/15</span></div>
+        <div class="wd-req__track"><div class="wd-req__fill" id="wd-req-ads-fill" style="width:0%"></div></div>
       </div>
       <div class="wd-req">
-        <div class="wd-req__label"><span>Active Referral</span><span>1</span></div>
-        <div class="wd-req__track"><div class="wd-req__fill" style="width:0%"></div></div>
+        <div class="wd-req__label"><span>Active Referral</span><span id="wd-req-ref-count" data-no-i18n>0/1</span></div>
+        <div class="wd-req__track"><div class="wd-req__fill" id="wd-req-ref-fill" style="width:0%"></div></div>
       </div>
     </div>
   </div>
@@ -5281,7 +5281,7 @@ body.reduce-motion .firefly{
       <div class="modal-field-label"><span>Amount to be received:</span></div>
       <div class="modal-plain-box has-gram" style="display:flex;align-items:center;gap:calc(6px * var(--s));"><span id="withdraw-output">0.0000</span> Gram <img draggable="false" loading="lazy" src="/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:calc(16px * var(--s));height:calc(16px * var(--s));flex-shrink:0;"></div>
       <div class="wd-req">
-        <div class="wd-req__label"><span>Min Withdraw : <span id="withdraw-min-label">0.1</span></span></div>
+        <div class="wd-req__label"><span>Min Withdraw : <span id="withdraw-min-label">0.05</span></span></div>
       </div>
       <button class="modal-cta" id="withdraw-cta" onclick="submitWithdrawRequest()" disabled>Withdraw</button>
       <div class="modal-footnote">
@@ -7310,7 +7310,21 @@ function applyProfileData(data){
   var withdrawEl = document.getElementById('pf-stat-withdraw');
   if (withdrawEl) withdrawEl.textContent = Number(data.total_withdraw_gram).toFixed(3) + ' Gram';
 }
-function openWithdrawReqModal(){
+// The To Withdraw window: shown when Withdraw is pressed with enough Gram but the server says the requirements are
+// not met, with that answer's own counts (today's ads and active referrals)
+function openWithdrawReqModal(d){
+  var adsReq = d.ads_required || 15, adsNow = Math.min(d.ads_today || 0, adsReq);
+  var refReq = d.referrals_required || 1, refNow = Math.min(d.active_referrals || 0, refReq);
+  var adsLabel = document.getElementById('wd-req-ads-label');
+  if (adsLabel) adsLabel.textContent = 'Watch ' + adsReq + ' Ads Today';
+  var adsCount = document.getElementById('wd-req-ads-count');
+  if (adsCount) adsCount.textContent = adsNow + '/' + adsReq;
+  var adsFill = document.getElementById('wd-req-ads-fill');
+  if (adsFill) adsFill.style.width = (adsNow / adsReq * 100) + '%';
+  var refCount = document.getElementById('wd-req-ref-count');
+  if (refCount) refCount.textContent = refNow + '/' + refReq;
+  var refFill = document.getElementById('wd-req-ref-fill');
+  if (refFill) refFill.style.width = (refNow / refReq * 100) + '%';
   openModal('modal-withdraw-req');
 }
 function openUpgradePetModal(petId){
@@ -9524,7 +9538,7 @@ function pollDepositStatus(initData){
 
 // Withdraw
 var WITHDRAW_FEE_RATE = 0.05;
-var WITHDRAW_MIN_GRAM = 0.1;
+var WITHDRAW_MIN_GRAM = 0.05;
 var NEXT_WITHDRAW_ALLOWED_AT = null;
 var withdrawCooldownTimer = null;
 var withdrawBusy = false;
@@ -9613,6 +9627,8 @@ function submitWithdrawRequest(){
         showBuyErrorToast('Minimum ' + (data.minimum || WITHDRAW_MIN_GRAM) + ' Gram', { title: 'Cannot Withdraw', icon: PRIZE_ICON_URLS.gram });
       } else if (data.error === 'insufficient_funds'){
         showBuyErrorToast('Not enough Gram', { title: 'Cannot Withdraw', icon: PRIZE_ICON_URLS.gram });
+      } else if (data.error === 'requirements_not_met'){
+        openWithdrawReqModal(data);
       } else if (data.error === 'cooldown_active'){
         NEXT_WITHDRAW_ALLOWED_AT = data.next_allowed_at;
         refreshWithdrawCooldown();

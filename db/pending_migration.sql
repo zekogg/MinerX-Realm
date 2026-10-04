@@ -237,3 +237,7 @@ ALTER TABLE users ADD COLUMN locked_coins REAL DEFAULT 0;
 
 -- Previous Winners: الفائزون المدفوع لهم في كل توزيع أسبوعي (JSON)، يُعرضون حتى التوزيع التالي.
 ALTER TABLE leaderboard_payouts ADD COLUMN winners TEXT;
+
+-- Withdraw requirements: ads watched today (every ad, the gates included), restarted by the first ad of a new UTC day
+ALTER TABLE users ADD COLUMN ads_today INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN ads_today_date TEXT;

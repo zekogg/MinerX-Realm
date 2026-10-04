@@ -39,7 +39,14 @@ const DEPOSIT_CHECK_FIRST_DELAY_MS = 5_000;
 const DEPOSIT_CHECK_RETRY_DELAY_MS = 15_000;
 
 // Withdraw config
-const WITHDRAW_MIN_GRAM = 0.1;
+const WITHDRAW_MIN_GRAM = 0.05;
+// to withdraw: this many ads watched today (every ad, the gates included; the day starts at 00:00 UTC) and this many
+// active referrals at any time (once reached, it stays reached)
+const WITHDRAW_DAILY_ADS = 15;
+const WITHDRAW_ACTIVE_REFERRALS = 1;
+// Today's ad count rides on the same write as the lifetime count: it restarts by itself on the first ad of a new
+// UTC day (date('now') is the UTC date, like todayUTC()), so nothing has to reset it at midnight
+const ADS_TODAY_PLUS_ONE = "ads_today = CASE WHEN ads_today_date = date('now') THEN ads_today + 1 ELSE 1 END, ads_today_date = date('now')";
 const WITHDRAW_FEE_RATE = 0.05;
 const WITHDRAW_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const ADMIN_TELEGRAM_ID = 1018495986;
@@ -1373,8 +1380,10 @@ async function handleWithdrawRequest(request, env) {
   const reserveStmt = env.DB.prepare(
     `UPDATE users SET gram = gram - ?, last_withdraw_request_at = ?
      WHERE telegram_id = ? AND gram >= ? AND banned_at IS NULL
-       AND (last_withdraw_request_at IS NULL OR last_withdraw_request_at <= ?)`
-  ).bind(amountGram, now, telegramId, amountGram, cooldownCutoff);
+       AND (last_withdraw_request_at IS NULL OR last_withdraw_request_at <= ?)
+       AND (CASE WHEN ads_today_date = date('now') THEN ads_today ELSE 0 END) >= ?
+       AND active_referrals_count >= ?`
+  ).bind(amountGram, now, telegramId, amountGram, cooldownCutoff, WITHDRAW_DAILY_ADS, WITHDRAW_ACTIVE_REFERRALS);
   // changes() is the row count of reserveStmt just before it in the batch, so a refused request records nothing
   const insertStmt = env.DB.prepare(
     `INSERT INTO withdrawals
@@ -1392,7 +1401,7 @@ async function handleWithdrawRequest(request, env) {
   const [reserveResult, insertResult] = batchResults;
   if (!reserveResult.meta || reserveResult.meta.changes === 0) {
     const user = await env.DB.prepare(
-      "SELECT gram, last_withdraw_request_at, banned_at FROM users WHERE telegram_id = ?"
+      "SELECT gram, last_withdraw_request_at, banned_at, ads_today, ads_today_date, active_referrals_count FROM users WHERE telegram_id = ?"
     ).bind(telegramId).first();
     if (user && user.banned_at) {
       return jsonResponse({ error: "banned" }, 403);
@@ -1401,6 +1410,19 @@ async function handleWithdrawRequest(request, env) {
       return jsonResponse({
         error: "cooldown_active",
         next_allowed_at: user.last_withdraw_request_at + WITHDRAW_COOLDOWN_MS
+      }, 400);
+    }
+    if (!user || !(user.gram >= amountGram)) {
+      return jsonResponse({ error: "insufficient_funds" }, 400);
+    }
+    // enough Gram: the requirements are what is missing (shown in the To Withdraw window)
+    const adsToday = user.ads_today_date === todayUTC() ? (user.ads_today || 0) : 0;
+    const activeReferrals = user.active_referrals_count || 0;
+    if (adsToday < WITHDRAW_DAILY_ADS || activeReferrals < WITHDRAW_ACTIVE_REFERRALS) {
+      return jsonResponse({
+        error: "requirements_not_met",
+        ads_today: adsToday, ads_required: WITHDRAW_DAILY_ADS,
+        active_referrals: activeReferrals, referrals_required: WITHDRAW_ACTIVE_REFERRALS
       }, 400);
     }
     return jsonResponse({ error: "insufficient_funds" }, 400);
@@ -1512,7 +1534,7 @@ async function handleAdsReward(url, env) {
   const newCount = countToday + 1;
   // reward and ad counters in one write; RETURNING gives the new lifetime count without a second read
   const updated = await env.DB.prepare(
-    `UPDATE users SET coins = coins + ?, adsgram_task_count = ?, adsgram_task_date = ?, lifetime_ads_watched = COALESCE(lifetime_ads_watched, 0) + 1, weekly_ads_watched = weekly_ads_watched + 1
+    `UPDATE users SET coins = coins + ?, adsgram_task_count = ?, adsgram_task_date = ?, lifetime_ads_watched = COALESCE(lifetime_ads_watched, 0) + 1, weekly_ads_watched = weekly_ads_watched + 1, ${ADS_TODAY_PLUS_ONE}
      WHERE telegram_id = ? AND (adsgram_task_date IS NULL OR adsgram_task_date <> ? OR adsgram_task_count = ?)
      RETURNING lifetime_ads_watched, referred_by`
   ).bind(ADS_TASK_REWARD_COINS, newCount, today, telegramId, today, countToday).first();
@@ -1526,7 +1548,7 @@ async function handleAdsReward(url, env) {
 async function bumpLifetimeAdsWatched(env, telegramId) {
   // one write; RETURNING gives the new lifetime count without a separate read
   const updated = await env.DB.prepare(
-    `UPDATE users SET lifetime_ads_watched = COALESCE(lifetime_ads_watched, 0) + 1, weekly_ads_watched = weekly_ads_watched + 1
+    `UPDATE users SET lifetime_ads_watched = COALESCE(lifetime_ads_watched, 0) + 1, weekly_ads_watched = weekly_ads_watched + 1, ${ADS_TODAY_PLUS_ONE}
      WHERE telegram_id = ?
      RETURNING lifetime_ads_watched, referred_by`
   ).bind(telegramId).first();
@@ -2312,7 +2334,7 @@ async function handleBonusAdReward(telegramId, env) {
   const newCount = countToday + 1;
   // reward and ad counters in one write; RETURNING gives the new lifetime count without a second read
   const updated = await env.DB.prepare(
-    `UPDATE users SET coins = coins + ?, bonus_ad_count_today = ?, bonus_ad_date = ?, bonus_ad_last_watched_at = ?, lifetime_ads_watched = COALESCE(lifetime_ads_watched, 0) + 1, weekly_ads_watched = weekly_ads_watched + 1
+    `UPDATE users SET coins = coins + ?, bonus_ad_count_today = ?, bonus_ad_date = ?, bonus_ad_last_watched_at = ?, lifetime_ads_watched = COALESCE(lifetime_ads_watched, 0) + 1, weekly_ads_watched = weekly_ads_watched + 1, ${ADS_TODAY_PLUS_ONE}
      WHERE telegram_id = ?
        AND (bonus_ad_last_watched_at IS NULL OR bonus_ad_last_watched_at = ?)
        AND (bonus_ad_date IS NULL OR bonus_ad_date <> ? OR bonus_ad_count_today = ?)
@@ -2352,7 +2374,7 @@ async function handleGigapubPostback(url, env) {
   const newCount = countToday + 1;
   // reward and ad counters in one write; RETURNING gives the new lifetime count without a second read
   const updated = await env.DB.prepare(
-    `UPDATE users SET coins = coins + ?, gigapub_task_count = ?, gigapub_task_date = ?, lifetime_ads_watched = COALESCE(lifetime_ads_watched, 0) + 1, weekly_ads_watched = weekly_ads_watched + 1
+    `UPDATE users SET coins = coins + ?, gigapub_task_count = ?, gigapub_task_date = ?, lifetime_ads_watched = COALESCE(lifetime_ads_watched, 0) + 1, weekly_ads_watched = weekly_ads_watched + 1, ${ADS_TODAY_PLUS_ONE}
      WHERE telegram_id = ? AND (gigapub_task_date IS NULL OR gigapub_task_date <> ? OR gigapub_task_count = ?)
      RETURNING lifetime_ads_watched, referred_by`
   ).bind(GIGAPUB_REWARD_COINS, newCount, today, telegramId, today, countToday).first();
@@ -2415,10 +2437,11 @@ async function handleClientAdRewards(request, env) {
     }
     // rewards and every ad counter in one write; RETURNING gives the new totals without a second read
     const updated = await env.DB.prepare(
-      `UPDATE users SET coins = coins + ?, ${sets.join(", ")}, lifetime_ads_watched = COALESCE(lifetime_ads_watched, 0) + ?, weekly_ads_watched = weekly_ads_watched + ?
+      `UPDATE users SET coins = coins + ?, ${sets.join(", ")}, lifetime_ads_watched = COALESCE(lifetime_ads_watched, 0) + ?, weekly_ads_watched = weekly_ads_watched + ?,
+         ads_today = CASE WHEN ads_today_date = date('now') THEN ads_today + ? ELSE ? END, ads_today_date = date('now')
        WHERE telegram_id = ? AND ${guards.join(" AND ")}
        RETURNING coins, lifetime_ads_watched, referred_by`
-    ).bind(coinsAdded, ...setArgs, adsAdded, adsAdded, telegramId, ...guardArgs).first();
+    ).bind(coinsAdded, ...setArgs, adsAdded, adsAdded, adsAdded, adsAdded, telegramId, ...guardArgs).first();
     if (!updated) continue;
     await activateReferralOnLifetimeAds(env, telegramId, updated.referred_by, updated.lifetime_ads_watched);
     result.coins = updated.coins;
