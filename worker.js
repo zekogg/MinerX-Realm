@@ -74,6 +74,14 @@ const GUARDIAN_ADS_THRESHOLD = 4000;
 const GUARDIAN_SPEED = 50;
 const HAPPY_DOG_FRIENDS_THRESHOLD = 100;
 const HAPPY_DOG_SPEED = 40;
+// Friends milestone missions: active friends needed and the coin reward. Fixed values, so they live here instead of
+// being read from a table on every request; each has its users.milestone_<friends>_claimed column
+const FRIEND_MILESTONES = [
+  { friends: 10, reward: 5000 },
+  { friends: 25, reward: 10000 },
+  { friends: 50, reward: 20000 },
+  { friends: 100, reward: 50000 }
+];
 
 // Check-in config
 const CHECKIN_TASK_REWARDS = { 1: 10, 2: 10, 3: 20, 4: 20 };
@@ -2484,17 +2492,16 @@ async function handleFriendsClaimMilestone(request, env) {
   if (!auth.ok) return auth.response;
   const { telegramId } = auth;
   const tier = Number(body.tier);
-  const milestone = await env.DB.prepare(
-    "SELECT friends_required, reward FROM milestone_missions WHERE friends_required = ?"
-  ).bind(tier).first();
+  const milestone = FRIEND_MILESTONES.find((m) => m.friends === tier);
   if (!milestone) {
     return jsonResponse({ error: "invalid_tier" }, 400);
   }
-  const column = `milestone_${milestone.friends_required}_claimed`;
+  // the column name comes from the fixed list above, never from the request
+  const column = `milestone_${milestone.friends}_claimed`;
   const claimStmt = await env.DB.prepare(
     `UPDATE users SET coins = coins + ?, ${column} = 1
      WHERE telegram_id = ? AND active_referrals_count >= ? AND ${column} = 0`
-  ).bind(milestone.reward, telegramId, milestone.friends_required).run();
+  ).bind(milestone.reward, telegramId, milestone.friends).run();
   if (!claimStmt.meta || claimStmt.meta.changes === 0) {
     return jsonResponse({ error: "not_eligible" }, 400);
   }
@@ -2509,19 +2516,15 @@ async function handleFriendsMilestones(request, env) {
   const auth = await authenticateRequest(request, env);
   if (!auth.ok) return auth.response;
   const { telegramId } = auth;
-  const [user, milestonesResult] = await Promise.all([
-    env.DB.prepare(
-      "SELECT milestone_10_claimed, milestone_25_claimed, milestone_50_claimed, milestone_100_claimed FROM users WHERE telegram_id = ?"
-    ).bind(telegramId).first(),
-    env.DB.prepare(
-      "SELECT friends_required, reward FROM milestone_missions ORDER BY friends_required ASC"
-    ).all()
-  ]);
+  // one row read: the user's claimed flags; the missions themselves are the fixed list above
+  const user = await env.DB.prepare(
+    "SELECT milestone_10_claimed, milestone_25_claimed, milestone_50_claimed, milestone_100_claimed FROM users WHERE telegram_id = ?"
+  ).bind(telegramId).first();
   if (!user) return jsonResponse({ error: "user_not_found" }, 404);
-  const milestones = (milestonesResult.results || []).map((m) => ({
-    count: m.friends_required,
+  const milestones = FRIEND_MILESTONES.map((m) => ({
+    count: m.friends,
     reward: m.reward,
-    claimed: !!user[`milestone_${m.friends_required}_claimed`]
+    claimed: !!user[`milestone_${m.friends}_claimed`]
   }));
   return jsonResponse({ milestones });
 }
