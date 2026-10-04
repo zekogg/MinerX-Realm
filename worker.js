@@ -959,19 +959,15 @@ async function handleStorageClaim(request, env) {
     }, 400);
   }
   const nowIso = new Date().toISOString();
-  const resetResult = await env.DB.prepare(
-    "UPDATE users SET last_claim_at = ? WHERE telegram_id = ? AND last_claim_at = ?"
-  ).bind(nowIso, telegramId, row.last_claim_at).run();
-  if (!resetResult.meta || resetResult.meta.changes === 0) {
+  // reset and credit in one write, so neither can happen without the other; RETURNING gives the new balance
+  const updatedUser = await env.DB.prepare(
+    `UPDATE users SET last_claim_at = ?, coins = coins + ?
+     WHERE telegram_id = ? AND last_claim_at = ?
+     RETURNING coins`
+  ).bind(nowIso, accrued, telegramId, row.last_claim_at).first();
+  if (!updatedUser) {
     return jsonResponse({ error: "already_claimed" }, 409);
   }
-  const creditStmt = env.DB.prepare(
-    "UPDATE users SET coins = coins + ? WHERE telegram_id = ?"
-  ).bind(accrued, telegramId);
-  await creditStmt.run();
-  const updatedUser = await env.DB.prepare(
-    "SELECT coins FROM users WHERE telegram_id = ?"
-  ).bind(telegramId).first();
   return jsonResponse({
     claimed_amount: accrued,
     coins: updatedUser.coins,
@@ -2553,16 +2549,14 @@ async function handleFriendsClaimMilestone(request, env) {
   }
   // the column name comes from the fixed list above, never from the request
   const column = `milestone_${milestone.friends}_claimed`;
-  const claimStmt = await env.DB.prepare(
+  const user = await env.DB.prepare(
     `UPDATE users SET coins = coins + ?, ${column} = 1
-     WHERE telegram_id = ? AND active_referrals_count >= ? AND ${column} = 0`
-  ).bind(milestone.reward, telegramId, milestone.friends).run();
-  if (!claimStmt.meta || claimStmt.meta.changes === 0) {
+     WHERE telegram_id = ? AND active_referrals_count >= ? AND ${column} = 0
+     RETURNING coins`
+  ).bind(milestone.reward, telegramId, milestone.friends).first();
+  if (!user) {
     return jsonResponse({ error: "not_eligible" }, 400);
   }
-  const user = await env.DB.prepare(
-    "SELECT coins FROM users WHERE telegram_id = ?"
-  ).bind(telegramId).first();
   return jsonResponse({ reward: milestone.reward, coins: user.coins });
 }
 
@@ -2665,15 +2659,14 @@ async function handleCheckinClaim(request, env) {
     return jsonResponse({ error: "not_verified" }, 400);
   }
   const today = todayUTC();
-  const updateStmt = env.DB.prepare(
+  const user = await env.DB.prepare(
     `UPDATE users SET coins = coins + ?, ${column} = ?
-     WHERE telegram_id = ? AND (${column} IS NULL OR ${column} <> ?)`
-  ).bind(reward, today, telegramId, today);
-  const result = await updateStmt.run();
-  if (!result.meta || result.meta.changes === 0) {
+     WHERE telegram_id = ? AND (${column} IS NULL OR ${column} <> ?)
+     RETURNING coins`
+  ).bind(reward, today, telegramId, today).first();
+  if (!user) {
     return jsonResponse({ error: "already_claimed_today" }, 409);
   }
-  const user = await env.DB.prepare("SELECT coins FROM users WHERE telegram_id = ?").bind(telegramId).first();
   return jsonResponse({ reward, coins: user.coins });
 }
 
@@ -2749,8 +2742,7 @@ async function handleTasksClaim(request, env) {
     ).bind(telegramId, taskId).run();
     return jsonResponse({ error: "task_full" }, 400);
   }
-  await env.DB.prepare("UPDATE users SET coins = coins + ? WHERE telegram_id = ?").bind(task.reward_coins, telegramId).run();
-  const user = await env.DB.prepare("SELECT coins FROM users WHERE telegram_id = ?").bind(telegramId).first();
+  const user = await env.DB.prepare("UPDATE users SET coins = coins + ? WHERE telegram_id = ? RETURNING coins").bind(task.reward_coins, telegramId).first();
   return jsonResponse({ reward: task.reward_coins, coins: user.coins });
 }
 async function checkChannelMembership(env, channelId, telegramId) {
@@ -2832,14 +2824,15 @@ async function handleComboCheck(request, env) {
     return jsonResponse({ error: "no_attempts_left" }, 409);
   }
   const isCorrect = guess.join(",") === combo.card_order;
-  const claimResult = await env.DB.prepare(
+  const user = await env.DB.prepare(
     `UPDATE users SET combo_date = ?, combo_attempts_used = ?, combo_solved = ?, coins = coins + ?
-     WHERE telegram_id = ? AND combo_date IS ? AND combo_attempts_used IS ? AND combo_solved IS ?`
+     WHERE telegram_id = ? AND combo_date IS ? AND combo_attempts_used IS ? AND combo_solved IS ?
+     RETURNING coins`
   ).bind(
     today, attemptsUsed + 1, isCorrect ? 1 : 0, isCorrect ? COMBO_REWARD_COINS : 0,
     telegramId, comboRow.combo_date, comboRow.combo_attempts_used, comboRow.combo_solved
-  ).run();
-  if (!claimResult.meta || claimResult.meta.changes === 0) {
+  ).first();
+  if (!user) {
     return jsonResponse({ error: "no_attempts_left" }, 409);
   }
   const newAttemptsUsed = attemptsUsed + 1;
@@ -2850,9 +2843,6 @@ async function handleComboCheck(request, env) {
       attempts_left: COMBO_MAX_ATTEMPTS - newAttemptsUsed
     });
   }
-  const user = await env.DB.prepare(
-    "SELECT coins FROM users WHERE telegram_id = ?"
-  ).bind(telegramId).first();
   return jsonResponse({
     correct: true,
     reward: COMBO_REWARD_COINS,
