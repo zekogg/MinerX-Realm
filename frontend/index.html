@@ -7114,7 +7114,13 @@ function setLeaderboardPreviousOpen(open){
   var btn = document.getElementById('lb-prev-btn');
   var sheet = document.querySelector('#modal-leaderboard .lb-sheet');
   var scroller = document.querySelector('#modal-leaderboard .lb-scroll');
-  if (sheet) sheet.classList.toggle('is-prev-open', open);
+  // the sheet sits on the bottom of the screen: if it got shorter (a short dropdown in place of a long board)
+  // its top, and the history button with it, would drop. It keeps at least its closed height while open
+  if (sheet){
+    if (open && !sheet.classList.contains('is-prev-open')) sheet.style.minHeight = 'min(' + sheet.getBoundingClientRect().height + 'px, 80vh)';
+    else if (!open) sheet.style.minHeight = '';
+    sheet.classList.toggle('is-prev-open', open);
+  }
   if (panel) panel.classList.toggle('is-open', open);
   if (btn) btn.classList.toggle('is-open', open);
   if (open){
