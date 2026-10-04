@@ -3231,13 +3231,19 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   opacity:0; visibility:hidden; transform:translateY(calc(-6px * var(--s)));
   transition:opacity .18s ease, transform .18s ease, visibility 0s linear .18s;
 }
-/* while the dropdown is open the sheet is tall enough for it, even when this week's board is still empty */
-.lb-sheet.is-prev-open{ min-height:78vh; }
+/* while the dropdown is open it takes the board's place in the sheet, so the sheet fits it whatever the
+   board's length (an empty new week included) and nothing is cut off */
+.lb-sheet.is-prev-open .lb-top{ flex-wrap:wrap; }
+.lb-sheet.is-prev-open .lb-prev{ position:static; flex-basis:100%; margin-top:calc(42px * var(--s)); }
+.lb-sheet.is-prev-open .lb-prev-btn{ top:0; transform:none; }
+.lb-sheet.is-prev-open .lb-tabs,
+.lb-sheet.is-prev-open .lb-panel,
+.lb-sheet.is-prev-open .lb-panel.is-active{ display:none; }
 /* and only "Weekly Leaderboard" stays above it: the schedule lines and the countdown belong to the
    coming payout, not to the previous winners. display:none keeps them out of the translation fitting */
 .lb-sheet.is-prev-open .modal-head__sub,
 .lb-sheet.is-prev-open .modal-head__sub2{ display:none; }
-.lb-sheet.is-prev-open .lb-rewards-badge{ visibility:hidden; }
+.lb-sheet.is-prev-open .lb-rewards-badge{ display:none; }
 .lb-prev.is-open{ opacity:1; visibility:visible; transform:translateY(0); transition:opacity .18s ease, transform .18s ease, visibility 0s; }
 .lb-prev__head{ display:flex; align-items:baseline; justify-content:space-between; gap:calc(8px * var(--s)); margin-bottom:calc(10px * var(--s)); }
 .lb-prev__title{ font-family:var(--font-display); font-weight:800; font-size:calc(13px * var(--s)); color:#f0d878; }
@@ -7084,18 +7090,24 @@ function renderLeaderboardPrevious(data){
     ? '<div class="lb-prev__section">By Ads</div>' + lbPrevListHtml('ads', data.ads) +
       '<div class="lb-prev__section">By Referrals</div>' + lbPrevListHtml('referrals', data.referrals)
     : '<div class="lb-prev__empty">No winners yet</div>';
+  fitLeaderboardPrevious();
 }
 function formatDateDDMMYYYYClient(ms){
   var d = new Date(ms);
   return String(d.getUTCDate()).padStart(2, '0') + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + d.getUTCFullYear();
 }
-// The dropdown takes the space between the Rewards row and the bottom of the sheet and scrolls inside it
+// The dropdown shows up to 5 winners at once and scrolls inside itself for the rest
+var LB_PREV_VISIBLE_ROWS = 5;
 function fitLeaderboardPrevious(){
   var panel = document.getElementById('lb-prev');
-  var scroller = document.querySelector('#modal-leaderboard .lb-scroll');
-  if (!panel || !scroller || !panel.classList.contains('is-open')) return;
-  var room = scroller.getBoundingClientRect().bottom - panel.getBoundingClientRect().top - 12;
-  panel.style.maxHeight = Math.max(160, Math.floor(room)) + 'px';
+  if (!panel || !panel.classList.contains('is-open')) return;
+  panel.style.maxHeight = '';
+  var rows = panel.querySelectorAll('.lb-row');
+  if (rows.length <= LB_PREV_VISIBLE_ROWS) return;
+  var top = panel.getBoundingClientRect().top - panel.scrollTop;
+  var lastBottom = rows[LB_PREV_VISIBLE_ROWS - 1].getBoundingClientRect().bottom;
+  var padBottom = parseFloat(getComputedStyle(panel).paddingBottom) || 0;
+  panel.style.maxHeight = Math.ceil(lastBottom - top + padBottom) + 'px';
 }
 function setLeaderboardPreviousOpen(open){
   var panel = document.getElementById('lb-prev');
@@ -7107,9 +7119,9 @@ function setLeaderboardPreviousOpen(open){
   if (btn) btn.classList.toggle('is-open', open);
   if (open){
     if (scroller) scroller.scrollTop = 0;
+    var panelEl = document.getElementById('lb-prev');
+    if (panelEl) panelEl.scrollTop = 0;
     fitLeaderboardPrevious();
-    // the sheet grows with a transition; fit again once it has settled
-    setTimeout(fitLeaderboardPrevious, 350);
   }
 }
 window.addEventListener('resize', fitLeaderboardPrevious);
