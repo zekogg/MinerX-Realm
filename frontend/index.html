@@ -1393,9 +1393,22 @@ html[data-lang="ar"] b, html[data-lang="ar"] strong, html[data-lang="fa"] b, htm
   position:relative;
   aspect-ratio:1;
   display:flex; flex-direction:column; align-items:center; justify-content:center; gap:calc(10px * var(--s));
-  border:1px solid var(--stone-border);
-  background:rgba(236,107,179,.04);
+  /* a pink light behind the ticket (its centre is 43.5px from the padding edge) with rays and sparkles, on a
+     solid dark fill; the 1px border keeps its place and the frame below is drawn over it */
+  border:1px solid transparent;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cdefs%3E%3CradialGradient id='g'%3E%3Cstop offset='0' stop-color='%23ff9ad5' stop-opacity='0.72'/%3E%3Cstop offset='0.32' stop-color='%23ec6bb3' stop-opacity='0.42'/%3E%3Cstop offset='0.66' stop-color='%23b0307a' stop-opacity='0.14'/%3E%3Cstop offset='1' stop-color='%23b0307a' stop-opacity='0'/%3E%3C/radialGradient%3E%3CradialGradient id='f'%3E%3Cstop offset='.12' stop-color='%23fff'/%3E%3Cstop offset='.5' stop-color='%23fff' stop-opacity='.45'/%3E%3Cstop offset='.9' stop-color='%23fff' stop-opacity='0'/%3E%3C/radialGradient%3E%3Cmask id='m'%3E%3Crect width='200' height='200' fill='url%28%23f%29'/%3E%3C/mask%3E%3C/defs%3E%3Ccircle cx='100' cy='100' r='100' fill='url%28%23g%29'/%3E%3Cpath d='M100 100L91.2 -19.7L108.8 -19.7ZM100 100L132.7 -15.5L149.2 -9.5ZM100 100L170.2 2.7L183.7 14.0ZM100 100L199.2 32.5L208.0 47.8ZM100 100L216.3 70.6L219.4 87.9ZM100 100L219.4 112.1L216.3 129.4ZM100 100L208.0 152.2L199.2 167.5ZM100 100L183.7 186.0L170.2 197.3ZM100 100L149.2 209.5L132.7 215.5ZM100 100L108.8 219.7L91.2 219.7ZM100 100L67.3 215.5L50.8 209.5ZM100 100L29.8 197.3L16.3 186.0ZM100 100L0.8 167.5L-8.0 152.2ZM100 100L-16.3 129.4L-19.4 112.1ZM100 100L-19.4 87.9L-16.3 70.6ZM100 100L-8.0 47.8L0.8 32.5ZM100 100L16.3 14.0L29.8 2.7ZM100 100L50.8 -9.5L67.3 -15.5Z' fill='%23ffc2e4' opacity='0.2' mask='url%28%23m%29'/%3E%3Cpath d='M58 64Q59.68 68.32 64 70Q59.68 71.68 58 76Q56.32 71.68 52 70Q56.32 68.32 58 64Z' fill='%23ffe1f2' opacity='0.95'/%3E%3Cpath d='M144 57Q145.40 60.60 149 62Q145.40 63.40 144 67Q142.60 63.40 139 62Q142.60 60.60 144 57Z' fill='%23ffb3dd' opacity='0.9'/%3E%3Cpath d='M160 100.5Q160.98 103.02 163.5 104Q160.98 104.98 160 107.5Q159.02 104.98 156.5 104Q159.02 103.02 160 100.5Z' fill='%23ffe08a' opacity='0.85'/%3E%3Cpath d='M40 106.5Q40.98 109.02 43.5 110Q40.98 110.98 40 113.5Q39.02 110.98 36.5 110Q39.02 109.02 40 106.5Z' fill='%23ffb3dd' opacity='0.8'/%3E%3Cpath d='M80 53.2Q80.78 55.22 82.8 56Q80.78 56.78 80 58.8Q79.22 56.78 77.2 56Q79.22 55.22 80 53.2Z' fill='%23ffffff' opacity='0.8'/%3E%3Cpath d='M128 93.5Q128.70 95.30 130.5 96Q128.70 96.70 128 98.5Q127.30 96.70 125.5 96Q127.30 95.30 128 93.5Z' fill='%23ffe1f2' opacity='0.75'/%3E%3C/svg%3E") 50% calc(-41.5px * var(--s)) / calc(170px * var(--s)) calc(170px * var(--s)) no-repeat,
+    radial-gradient(62% calc(80px * var(--s)) at 50% 0%, rgba(236,107,179,.20), rgba(236,107,179,.06) 55%, transparent 100%),
+    #18122a;
   padding:calc(12px * var(--s));
+}
+/* the frame: solid pink on the top edge, dimming down the sides to a dark plum at the bottom */
+.promo-card::after{
+  content:""; position:absolute; inset:-1px; border-radius:inherit; padding:calc(1.25px * var(--s)); pointer-events:none;
+  background:linear-gradient(180deg, #f7a8d4, #c0619a 22%, #5a3550 60%, #3a2c3e);
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
 }
 .promo-card__icon-title{ display:flex; flex-direction:column; align-items:center; gap:calc(6px * var(--s)); text-align:center; }
 .promo-card__icon-art{ width:calc(32.5px * var(--s)); height:calc(32.5px * var(--s)); object-fit:contain; flex-shrink:0; }
@@ -2824,7 +2837,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .earn-hero::before{ background:linear-gradient(90deg, transparent, #8a6d1f 15%, #f0d878 50%, #d4af37 85%, transparent); box-shadow:0 0 calc(7px * var(--s)) #e3a542aa; }
 .storage-card::before{ background:linear-gradient(90deg, transparent, #e3a542, transparent); box-shadow:0 0 calc(6px * var(--s)) #e3a542aa; }
 .streak-card::before{ background:linear-gradient(90deg, transparent, #ff8a3d, transparent); box-shadow:0 0 calc(6px * var(--s)) #ff8a3daa; }
-.promo-card::before{ background:linear-gradient(90deg, transparent, #ec6bb3, transparent); box-shadow:0 0 calc(6px * var(--s)) #ec6bb3aa; }
+.promo-card::before{ display:none; }
 .chest-card::before{ display:none; }
 .spin-card::before{ background:linear-gradient(90deg, transparent, #4a9eff, transparent); box-shadow:0 0 calc(6px * var(--s)) #4a9effaa; }
 .gift-pick-card::before{ background:linear-gradient(90deg, transparent, #21D3ED, transparent); box-shadow:0 0 calc(6px * var(--s)) #21D3EDaa; }
