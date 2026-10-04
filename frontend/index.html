@@ -1345,10 +1345,21 @@ html[data-lang="ar"] b, html[data-lang="ar"] strong, html[data-lang="fa"] b, htm
 .streak-card{
   position:relative;
   margin-top:calc(14px * var(--s));
+  /* an orange light behind the chest, anchored to the bottom-left corner it sits in (36px from both padding
+     edges), with rays and sparkles, on a solid dark fill; the frame below is drawn over the 1px border */
+  border:1px solid transparent;
   background:
-    radial-gradient(62% calc(80px * var(--s)) at 50% 0%, rgba(255,138,61,.36), rgba(255,138,61,.12) 55%, transparent 100%),
-    radial-gradient(100% calc(46px * var(--s)) at 50% 0%, rgba(255,138,61,.14), transparent 100%),
-    var(--stone);
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cdefs%3E%3CradialGradient id='g'%3E%3Cstop offset='0' stop-color='%23ffc46b' stop-opacity='.72'/%3E%3Cstop offset='.3' stop-color='%23ff8a3d' stop-opacity='.42'/%3E%3Cstop offset='.64' stop-color='%23d9542d' stop-opacity='.14'/%3E%3Cstop offset='1' stop-color='%23d9542d' stop-opacity='0'/%3E%3C/radialGradient%3E%3CradialGradient id='f'%3E%3Cstop offset='.12' stop-color='%23fff'/%3E%3Cstop offset='.5' stop-color='%23fff' stop-opacity='.45'/%3E%3Cstop offset='.9' stop-color='%23fff' stop-opacity='0'/%3E%3C/radialGradient%3E%3Cmask id='m'%3E%3Crect width='200' height='200' fill='url%28%23f%29'/%3E%3C/mask%3E%3C/defs%3E%3Ccircle cx='100' cy='100' r='100' fill='url%28%23g%29'/%3E%3Cpath d='M100 100L90.5 -29.7L109.5 -29.7ZM100 100L135.4 -25.1L153.3 -18.6ZM100 100L176.0 -5.4L190.6 6.8ZM100 100L207.5 26.9L217.0 43.4ZM100 100L226.0 68.1L229.3 86.9ZM100 100L229.3 113.1L226.0 131.9ZM100 100L217.0 156.6L207.5 173.1ZM100 100L190.6 193.2L176.0 205.4ZM100 100L153.3 218.6L135.4 225.1ZM100 100L109.5 229.7L90.5 229.7ZM100 100L64.6 225.1L46.7 218.6ZM100 100L24.0 205.4L9.4 193.2ZM100 100L-7.5 173.1L-17.0 156.6ZM100 100L-26.0 131.9L-29.3 113.1ZM100 100L-29.3 86.9L-26.0 68.1ZM100 100L-17.0 43.4L-7.5 26.9ZM100 100L9.4 6.8L24.0 -5.4ZM100 100L46.7 -18.6L64.6 -25.1Z' fill='%23ffcf8a' opacity='.22' mask='url%28%23m%29'/%3E%3Cpath d='M70 72.4Q71.01 74.99 73.6 76Q71.01 77.01 70 79.6Q68.99 77.01 66.4 76Q68.99 74.99 70 72.4Z' fill='%23ffe9a8' opacity='0.92'/%3E%3Cpath d='M130 72.4Q131.01 74.99 133.6 76Q131.01 77.01 130 79.6Q128.99 77.01 126.4 76Q128.99 74.99 130 72.4Z' fill='%23ffe9a8' opacity='0.92'/%3E%3Cpath d='M70 127.2Q70.78 129.22 72.8 130Q70.78 130.78 70 132.8Q69.22 130.78 67.2 130Q69.22 129.22 70 127.2Z' fill='%23ffb070' opacity='0.85'/%3E%3Cpath d='M130 127.2Q130.78 129.22 132.8 130Q130.78 130.78 130 132.8Q129.22 130.78 127.2 130Q129.22 129.22 130 127.2Z' fill='%23ffb070' opacity='0.85'/%3E%3C/svg%3E") left calc(-49px * var(--s)) bottom calc(-49px * var(--s)) / calc(170px * var(--s)) calc(170px * var(--s)) no-repeat,
+    radial-gradient(62% calc(80px * var(--s)) at 50% 0%, rgba(255,138,61,.18), rgba(255,138,61,.05) 55%, transparent 100%),
+    #18122a;
+}
+/* the frame: solid orange on the top edge, dimming down the sides to a dark brown at the bottom */
+.streak-card::after{
+  content:""; position:absolute; inset:-1px; border-radius:inherit; padding:calc(1.25px * var(--s)); pointer-events:none;
+  background:linear-gradient(180deg, #ffb27a, #c4683f 22%, #5a3a3a 60%, #3a2c3e);
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
 }
 .streak-card__head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:calc(14px * var(--s)); }
 .streak-card__title{ display:flex; align-items:center; gap:calc(6px * var(--s)); font-weight:800; font-size:calc(14px * var(--s)); }
@@ -1367,7 +1378,8 @@ html[data-lang="ar"] b, html[data-lang="ar"] strong, html[data-lang="fa"] b, htm
 .streak-days__day.is-active .d-val{ color:var(--c-streakcard-day-text); }
 .streak-chest{ display:flex; align-items:center; justify-content:space-between; gap:calc(10px * var(--s)); }
 .streak-chest__left{ display:flex; align-items:center; gap:calc(10px * var(--s)); }
-.streak-chest__icon{ width:calc(40px * var(--s)); height:calc(40px * var(--s)); flex-shrink:0; object-fit:contain; }
+/* drawn 15% bigger without taking more room, so nothing around it moves */
+.streak-chest__icon{ width:calc(40px * var(--s)); height:calc(40px * var(--s)); flex-shrink:0; object-fit:contain; transform:scale(1.15); }
 .streak-chest__label{ font-size:calc(10px * var(--s)); color:var(--ink-faint); }
 .streak-chest__timer{
   display:flex; align-items:center; gap:calc(4px * var(--s));
@@ -2858,7 +2870,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .mystery-box::before{ background:linear-gradient(90deg, transparent, #4a9eff, transparent); box-shadow:0 0 calc(6px * var(--s)) #4a9effaa; }
 .earn-hero::before{ background:linear-gradient(90deg, transparent, #8a6d1f 15%, #f0d878 50%, #d4af37 85%, transparent); box-shadow:0 0 calc(7px * var(--s)) #e3a542aa; }
 .storage-card::before{ background:linear-gradient(90deg, transparent, #e3a542, transparent); box-shadow:0 0 calc(6px * var(--s)) #e3a542aa; }
-.streak-card::before{ background:linear-gradient(90deg, transparent, #ff8a3d, transparent); box-shadow:0 0 calc(6px * var(--s)) #ff8a3daa; }
+.streak-card::before{ display:none; }
 .promo-card::before{ display:none; }
 .chest-card::before{ display:none; }
 .spin-card::before{ display:none; }
