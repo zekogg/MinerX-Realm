@@ -1477,26 +1477,15 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 /* Chest */
 .chest-card{
   margin-top:calc(12px * var(--s)); position:relative;
+  /* a warm light behind the bag (its centre is 61.5px from the padding edge): glow, fading rays and sparkles,
+     all in one static picture; the solid dark fill keeps the page from showing through */
   background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cdefs%3E%3CradialGradient id='g'%3E%3Cstop offset='0' stop-color='%23ffd36b' stop-opacity='.78'/%3E%3Cstop offset='.32' stop-color='%23ff9a3d' stop-opacity='.46'/%3E%3Cstop offset='.66' stop-color='%23e0482d' stop-opacity='.16'/%3E%3Cstop offset='1' stop-color='%23e0482d' stop-opacity='0'/%3E%3C/radialGradient%3E%3CradialGradient id='f'%3E%3Cstop offset='.12' stop-color='%23fff'/%3E%3Cstop offset='.5' stop-color='%23fff' stop-opacity='.45'/%3E%3Cstop offset='.9' stop-color='%23fff' stop-opacity='0'/%3E%3C/radialGradient%3E%3Cmask id='m'%3E%3Crect width='200' height='200' fill='url%28%23f%29'/%3E%3C/mask%3E%3C/defs%3E%3Ccircle cx='100' cy='100' r='100' fill='url%28%23g%29'/%3E%3Cpath d='M100 100L91.2 -19.7L108.8 -19.7ZM100 100L132.7 -15.5L149.2 -9.5ZM100 100L170.2 2.7L183.7 14.0ZM100 100L199.2 32.5L208.0 47.8ZM100 100L216.3 70.6L219.4 87.9ZM100 100L219.4 112.1L216.3 129.4ZM100 100L208.0 152.2L199.2 167.5ZM100 100L183.7 186.0L170.2 197.3ZM100 100L149.2 209.5L132.7 215.5ZM100 100L108.8 219.7L91.2 219.7ZM100 100L67.3 215.5L50.8 209.5ZM100 100L29.8 197.3L16.3 186.0ZM100 100L0.8 167.5L-8.0 152.2ZM100 100L-16.3 129.4L-19.4 112.1ZM100 100L-19.4 87.9L-16.3 70.6ZM100 100L-8.0 47.8L0.8 32.5ZM100 100L16.3 14.0L29.8 2.7ZM100 100L50.8 -9.5L67.3 -15.5Z' fill='%23ffd27a' opacity='.2' mask='url%28%23m%29'/%3E%3Cpath d='M152 55Q153.96 60.04 159 62Q153.96 63.96 152 69Q150.04 63.96 145 62Q150.04 60.04 152 55Z' fill='%23ffe9a8' opacity='0.95'/%3E%3Cpath d='M170 96.5Q171.26 99.74 174.5 101Q171.26 102.26 170 105.5Q168.74 102.26 165.5 101Q168.74 99.74 170 96.5Z' fill='%23ffd27a' opacity='0.9'/%3E%3Cpath d='M153 129Q154.4 132.6 158 134Q154.4 135.4 153 139Q151.6 135.4 148 134Q151.6 132.6 153 129Z' fill='%23ff9d5c' opacity='0.9'/%3E%3Cpath d='M60 57.5Q61.26 60.74 64.5 62Q61.26 63.26 60 66.5Q58.74 63.26 55.5 62Q58.74 60.74 60 57.5Z' fill='%23ffcf7a' opacity='0.85'/%3E%3Cpath d='M126 54.5Q126.98 57.02 129.5 58Q126.98 58.98 126 61.5Q125.02 58.98 122.5 58Q125.02 57.02 126 54.5Z' fill='%23fff1c4' opacity='0.85'/%3E%3Cpath d='M184 71Q184.84 73.16 187 74Q184.84 74.84 184 77Q183.16 74.84 181 74Q183.16 73.16 184 71Z' fill='%23ffe0a0' opacity='0.75'/%3E%3C/svg%3E") calc(-53.5px * var(--s)) calc(-53.5px * var(--s)) / calc(230px * var(--s)) calc(230px * var(--s)) no-repeat,
     radial-gradient(62% calc(80px * var(--s)) at 50% 0%, rgba(33,211,237,.36), rgba(33,211,237,.12) 55%, transparent 100%),
     radial-gradient(100% calc(46px * var(--s)) at 50% 0%, rgba(33,211,237,.14), transparent 100%),
-    linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,0) 45%, rgba(0,0,0,.3)),
-    var(--stone);
-  /* the 1px border keeps its place; the drawn rim below replaces its flat colour */
-  border:1px solid transparent;
-  box-shadow:
-    inset 0 calc(1.5px * var(--s)) 0 rgba(255,255,255,.16),
-    inset 0 calc(-14px * var(--s)) calc(24px * var(--s)) calc(-14px * var(--s)) rgba(0,0,0,.45),
-    0 calc(16px * var(--s)) calc(30px * var(--s)) calc(-10px * var(--s)) rgba(0,0,0,.85),
-    0 calc(-2px * var(--s)) calc(18px * var(--s)) calc(-6px * var(--s)) rgba(33,211,237,.28);
-}
-/* rim light: brighter on the top edge, fading down the sides */
-.chest-card::after{
-  content:""; position:absolute; inset:-1px; border-radius:inherit; padding:calc(1.5px * var(--s)); pointer-events:none;
-  background:linear-gradient(180deg, rgba(103,232,249,.95), rgba(33,211,237,.45) 30%, rgba(196,181,253,.18) 65%, rgba(196,181,253,.10));
-  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite:xor;
-  mask:linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+    radial-gradient(calc(260px * var(--s)) calc(190px * var(--s)) at calc(61.5px * var(--s)) calc(61.5px * var(--s)), rgba(224,96,45,.22), transparent 70%),
+    #18122a;
+  border:1px solid var(--stone-border);
 }
 .chest-card__help{
   position:absolute; top:calc(12px * var(--s)); right:calc(12px * var(--s));
