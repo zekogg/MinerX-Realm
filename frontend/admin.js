@@ -392,9 +392,21 @@ function renderAdminPromoList(codes){
           '<div style="font-size:calc(12px * var(--s));font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtmlClient(c.code) + '</div>' +
           '<div style="font-size:calc(10px * var(--s));color:var(--ink-dim);">+' + Number(c.reward) + ' ' + (c.currency === 'gram' ? 'Gram' : 'Coins') + ' · ' + usesText + '</div>' +
         '</div>' +
+        '<div class="ap-task-actions">' +
+          '<span data-code="' + escapeHtmlClient(c.code) + '" onclick="adminDeletePromo(this.dataset.code)" title="Delete">🗑</span>' +
+        '</div>' +
       '</div>'
     );
   }).join('');
+}
+function adminDeletePromo(code){
+  if (!window.confirm('Delete the code ' + code + '?\nUsers who already used it keep their reward and cannot use it again if it is created again.')) return;
+  adminApiPost('/api/admin/promo/delete', { code: code }, function(){
+    adminToast('Code deleted');
+    adminFetchPromoList();
+  }, function(err){
+    adminToast(err.error === 'not_found' ? 'Code not found' : 'Failed to delete code');
+  });
 }
 function adminCreatePromo(){
   var code = document.getElementById('ap-promo-code').value.trim();

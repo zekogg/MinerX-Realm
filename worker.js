@@ -39,7 +39,14 @@ const DEPOSIT_CHECK_FIRST_DELAY_MS = 5_000;
 const DEPOSIT_CHECK_RETRY_DELAY_MS = 15_000;
 
 // Withdraw config
-const WITHDRAW_MIN_GRAM = 0.1;
+const WITHDRAW_MIN_GRAM = 0.05;
+// to withdraw: this many ads watched today (every ad, the gates included; the day starts at 00:00 UTC) and this many
+// active referrals at any time (once reached, it stays reached)
+const WITHDRAW_DAILY_ADS = 15;
+const WITHDRAW_ACTIVE_REFERRALS = 1;
+// Today's ad count rides on the same write as the lifetime count: it restarts by itself on the first ad of a new
+// UTC day (date('now') is the UTC date, like todayUTC()), so nothing has to reset it at midnight
+const ADS_TODAY_PLUS_ONE = "ads_today = CASE WHEN ads_today_date = date('now') THEN ads_today + 1 ELSE 1 END, ads_today_date = date('now')";
 const WITHDRAW_FEE_RATE = 0.05;
 const WITHDRAW_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const ADMIN_TELEGRAM_ID = 1018495986;
@@ -406,6 +413,9 @@ async function routeRequest(request, env, url) {
     }
     if (url.pathname === "/api/admin/promo/create" && request.method === "POST") {
       return handleAdminPromoCreate(request, env);
+    }
+    if (url.pathname === "/api/admin/promo/delete" && request.method === "POST") {
+      return handleAdminPromoDelete(request, env);
     }
     if (url.pathname === "/api/admin/promo/list" && request.method === "POST") {
       return handleAdminPromoList(request, env);
@@ -1050,31 +1060,41 @@ async function handlePromoRedeem(request, env) {
   if (promo.expires_at && Date.now() > Date.parse(promo.expires_at)) {
     return jsonResponse({ error: "code_expired" }, 400);
   }
-  try {
-    await env.DB.prepare(
-      "INSERT INTO promo_redemptions (telegram_id, code) VALUES (?, ?)"
-    ).bind(telegramId, code).run();
-  } catch (e) {
-    return jsonResponse({ error: "already_redeemed" }, 409);
-  }
-  const counterResult = await env.DB.prepare(
-    `UPDATE promo_codes SET uses_count = uses_count + 1
-     WHERE code = ? AND (max_uses IS NULL OR uses_count < max_uses)`
-  ).bind(code).run();
-  if (!counterResult.meta || counterResult.meta.changes === 0) {
-    await env.DB.prepare(
-      "DELETE FROM promo_redemptions WHERE telegram_id = ? AND code = ?"
-    ).bind(telegramId, code).run();
-    return jsonResponse({ error: "code_exhausted" }, 400);
-  }
+  // One transaction, all or nothing: the redemption is recorded only if this user has not used the code and it
+  // has uses left; the counter and the reward each follow only if the statement before them changed a row.
+  // (user, code) is the table's primary key, so the same user can never be recorded twice.
   const column = promo.currency === "gram" ? "gram" : "coins";
-  const creditStmt = env.DB.prepare(
-    `UPDATE users SET ${column} = ${column} + ? WHERE telegram_id = ?`
-  ).bind(promo.reward, telegramId);
-  await creditStmt.run();
-  const updatedUser = await env.DB.prepare(
-    "SELECT coins, gram FROM users WHERE telegram_id = ?"
-  ).bind(telegramId).first();
+  let results;
+  try {
+    results = await env.DB.batch([
+      env.DB.prepare(
+        `INSERT OR IGNORE INTO promo_redemptions (telegram_id, code)
+         SELECT ?, ? WHERE EXISTS (
+           SELECT 1 FROM promo_codes WHERE code = ? AND (max_uses IS NULL OR uses_count < max_uses)
+         ) AND EXISTS (SELECT 1 FROM users WHERE telegram_id = ?)`
+      ).bind(telegramId, code, code, telegramId),
+      env.DB.prepare(
+        "UPDATE promo_codes SET uses_count = uses_count + 1 WHERE code = ? AND changes() = 1"
+      ).bind(code),
+      env.DB.prepare(
+        `UPDATE users SET ${column} = ${column} + ? WHERE telegram_id = ? AND changes() = 1`
+      ).bind(promo.reward, telegramId),
+      env.DB.prepare("SELECT coins, gram FROM users WHERE telegram_id = ?").bind(telegramId)
+    ]);
+  } catch (e) {
+    console.error("promo redeem batch failed:", e?.message || e);
+    return jsonResponse({ error: "server_error" }, 500);
+  }
+  if (!results[2].meta || results[2].meta.changes !== 1) {
+    // nothing was recorded: either this user already used the code, or it has no uses left
+    const used = await env.DB.prepare(
+      "SELECT 1 FROM promo_redemptions WHERE telegram_id = ? AND code = ?"
+    ).bind(telegramId, code).first();
+    return used
+      ? jsonResponse({ error: "already_redeemed" }, 409)
+      : jsonResponse({ error: "code_exhausted" }, 400);
+  }
+  const updatedUser = (results[3].results || [])[0];
   return jsonResponse({
     reward: promo.reward,
     currency: column,
@@ -1360,8 +1380,10 @@ async function handleWithdrawRequest(request, env) {
   const reserveStmt = env.DB.prepare(
     `UPDATE users SET gram = gram - ?, last_withdraw_request_at = ?
      WHERE telegram_id = ? AND gram >= ? AND banned_at IS NULL
-       AND (last_withdraw_request_at IS NULL OR last_withdraw_request_at <= ?)`
-  ).bind(amountGram, now, telegramId, amountGram, cooldownCutoff);
+       AND (last_withdraw_request_at IS NULL OR last_withdraw_request_at <= ?)
+       AND (CASE WHEN ads_today_date = date('now') THEN ads_today ELSE 0 END) >= ?
+       AND active_referrals_count >= ?`
+  ).bind(amountGram, now, telegramId, amountGram, cooldownCutoff, WITHDRAW_DAILY_ADS, WITHDRAW_ACTIVE_REFERRALS);
   // changes() is the row count of reserveStmt just before it in the batch, so a refused request records nothing
   const insertStmt = env.DB.prepare(
     `INSERT INTO withdrawals
@@ -1379,7 +1401,7 @@ async function handleWithdrawRequest(request, env) {
   const [reserveResult, insertResult] = batchResults;
   if (!reserveResult.meta || reserveResult.meta.changes === 0) {
     const user = await env.DB.prepare(
-      "SELECT gram, last_withdraw_request_at, banned_at FROM users WHERE telegram_id = ?"
+      "SELECT gram, last_withdraw_request_at, banned_at, ads_today, ads_today_date, active_referrals_count FROM users WHERE telegram_id = ?"
     ).bind(telegramId).first();
     if (user && user.banned_at) {
       return jsonResponse({ error: "banned" }, 403);
@@ -1388,6 +1410,19 @@ async function handleWithdrawRequest(request, env) {
       return jsonResponse({
         error: "cooldown_active",
         next_allowed_at: user.last_withdraw_request_at + WITHDRAW_COOLDOWN_MS
+      }, 400);
+    }
+    if (!user || !(user.gram >= amountGram)) {
+      return jsonResponse({ error: "insufficient_funds" }, 400);
+    }
+    // enough Gram: the requirements are what is missing (shown in the To Withdraw window)
+    const adsToday = user.ads_today_date === todayUTC() ? (user.ads_today || 0) : 0;
+    const activeReferrals = user.active_referrals_count || 0;
+    if (adsToday < WITHDRAW_DAILY_ADS || activeReferrals < WITHDRAW_ACTIVE_REFERRALS) {
+      return jsonResponse({
+        error: "requirements_not_met",
+        ads_today: adsToday, ads_required: WITHDRAW_DAILY_ADS,
+        active_referrals: activeReferrals, referrals_required: WITHDRAW_ACTIVE_REFERRALS
       }, 400);
     }
     return jsonResponse({ error: "insufficient_funds" }, 400);
@@ -1499,7 +1534,7 @@ async function handleAdsReward(url, env) {
   const newCount = countToday + 1;
   // reward and ad counters in one write; RETURNING gives the new lifetime count without a second read
   const updated = await env.DB.prepare(
-    `UPDATE users SET coins = coins + ?, adsgram_task_count = ?, adsgram_task_date = ?, lifetime_ads_watched = COALESCE(lifetime_ads_watched, 0) + 1, weekly_ads_watched = weekly_ads_watched + 1
+    `UPDATE users SET coins = coins + ?, adsgram_task_count = ?, adsgram_task_date = ?, lifetime_ads_watched = COALESCE(lifetime_ads_watched, 0) + 1, weekly_ads_watched = weekly_ads_watched + 1, ${ADS_TODAY_PLUS_ONE}
      WHERE telegram_id = ? AND (adsgram_task_date IS NULL OR adsgram_task_date <> ? OR adsgram_task_count = ?)
      RETURNING lifetime_ads_watched, referred_by`
   ).bind(ADS_TASK_REWARD_COINS, newCount, today, telegramId, today, countToday).first();
@@ -1513,7 +1548,7 @@ async function handleAdsReward(url, env) {
 async function bumpLifetimeAdsWatched(env, telegramId) {
   // one write; RETURNING gives the new lifetime count without a separate read
   const updated = await env.DB.prepare(
-    `UPDATE users SET lifetime_ads_watched = COALESCE(lifetime_ads_watched, 0) + 1, weekly_ads_watched = weekly_ads_watched + 1
+    `UPDATE users SET lifetime_ads_watched = COALESCE(lifetime_ads_watched, 0) + 1, weekly_ads_watched = weekly_ads_watched + 1, ${ADS_TODAY_PLUS_ONE}
      WHERE telegram_id = ?
      RETURNING lifetime_ads_watched, referred_by`
   ).bind(telegramId).first();
@@ -2013,6 +2048,25 @@ async function handleAdminPromoList(request, env) {
   return jsonResponse({ codes: result.results || [] });
 }
 
+// /api/admin/promo/delete — removes only the code's own row (one write). Its redemption records stay: they are
+// read only for this code, so they cost nothing, and if the same code is created again, users who already used it
+// still cannot use it twice. Rewards already given stay with the users
+async function handleAdminPromoDelete(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "invalid_body" }, 400);
+  }
+  const auth = await authenticateAdmin(request, env, body);
+  if (!auth.ok) return auth.response;
+  const code = typeof body.code === "string" ? body.code.trim().toUpperCase() : "";
+  if (!code) return jsonResponse({ error: "missing_code" }, 400);
+  const result = await env.DB.prepare("DELETE FROM promo_codes WHERE code = ?").bind(code).run();
+  if (!result.meta || result.meta.changes === 0) return jsonResponse({ error: "not_found" }, 404);
+  return jsonResponse({ ok: true });
+}
+
 // /api/admin/ambassador/grant
 async function handleAdminAmbassadorGrant(request, env) {
   let body;
@@ -2280,7 +2334,7 @@ async function handleBonusAdReward(telegramId, env) {
   const newCount = countToday + 1;
   // reward and ad counters in one write; RETURNING gives the new lifetime count without a second read
   const updated = await env.DB.prepare(
-    `UPDATE users SET coins = coins + ?, bonus_ad_count_today = ?, bonus_ad_date = ?, bonus_ad_last_watched_at = ?, lifetime_ads_watched = COALESCE(lifetime_ads_watched, 0) + 1, weekly_ads_watched = weekly_ads_watched + 1
+    `UPDATE users SET coins = coins + ?, bonus_ad_count_today = ?, bonus_ad_date = ?, bonus_ad_last_watched_at = ?, lifetime_ads_watched = COALESCE(lifetime_ads_watched, 0) + 1, weekly_ads_watched = weekly_ads_watched + 1, ${ADS_TODAY_PLUS_ONE}
      WHERE telegram_id = ?
        AND (bonus_ad_last_watched_at IS NULL OR bonus_ad_last_watched_at = ?)
        AND (bonus_ad_date IS NULL OR bonus_ad_date <> ? OR bonus_ad_count_today = ?)
@@ -2320,7 +2374,7 @@ async function handleGigapubPostback(url, env) {
   const newCount = countToday + 1;
   // reward and ad counters in one write; RETURNING gives the new lifetime count without a second read
   const updated = await env.DB.prepare(
-    `UPDATE users SET coins = coins + ?, gigapub_task_count = ?, gigapub_task_date = ?, lifetime_ads_watched = COALESCE(lifetime_ads_watched, 0) + 1, weekly_ads_watched = weekly_ads_watched + 1
+    `UPDATE users SET coins = coins + ?, gigapub_task_count = ?, gigapub_task_date = ?, lifetime_ads_watched = COALESCE(lifetime_ads_watched, 0) + 1, weekly_ads_watched = weekly_ads_watched + 1, ${ADS_TODAY_PLUS_ONE}
      WHERE telegram_id = ? AND (gigapub_task_date IS NULL OR gigapub_task_date <> ? OR gigapub_task_count = ?)
      RETURNING lifetime_ads_watched, referred_by`
   ).bind(GIGAPUB_REWARD_COINS, newCount, today, telegramId, today, countToday).first();
@@ -2383,10 +2437,11 @@ async function handleClientAdRewards(request, env) {
     }
     // rewards and every ad counter in one write; RETURNING gives the new totals without a second read
     const updated = await env.DB.prepare(
-      `UPDATE users SET coins = coins + ?, ${sets.join(", ")}, lifetime_ads_watched = COALESCE(lifetime_ads_watched, 0) + ?, weekly_ads_watched = weekly_ads_watched + ?
+      `UPDATE users SET coins = coins + ?, ${sets.join(", ")}, lifetime_ads_watched = COALESCE(lifetime_ads_watched, 0) + ?, weekly_ads_watched = weekly_ads_watched + ?,
+         ads_today = CASE WHEN ads_today_date = date('now') THEN ads_today + ? ELSE ? END, ads_today_date = date('now')
        WHERE telegram_id = ? AND ${guards.join(" AND ")}
        RETURNING coins, lifetime_ads_watched, referred_by`
-    ).bind(coinsAdded, ...setArgs, adsAdded, adsAdded, telegramId, ...guardArgs).first();
+    ).bind(coinsAdded, ...setArgs, adsAdded, adsAdded, adsAdded, adsAdded, telegramId, ...guardArgs).first();
     if (!updated) continue;
     await activateReferralOnLifetimeAds(env, telegramId, updated.referred_by, updated.lifetime_ads_watched);
     result.coins = updated.coins;
