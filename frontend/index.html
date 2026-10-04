@@ -620,13 +620,8 @@ function i18nPick(ev, code){
   --c-reward-tier-icon-bolt:   #a56cf0;
   --c-reward-tier-icon-bag:    #a56cf0;
   --c-reward-tier-val:         #e3a542;
-  --c-reward-tier-border:      rgba(165,108,240,.5);
-  --c-wallet-glow:        rgba(139,92,246,.16);
   --c-royal-purple-1:     #4b2e83;
   --c-royal-purple-2:     #8b5cf6;
-  --c-royal-blue-1:       #1e3a8a;
-  --c-royal-blue-2:       #3b5bdb;
-  --c-small-card-border:  #c9834a;
   --c-btn-withdraw-1:     #d9634f;
   --c-btn-withdraw-2:     #9c3e2f;
   --c-btn-withdraw-text:  #fdf2ef;
@@ -1242,12 +1237,7 @@ html[data-lang="ar"] b, html[data-lang="ar"] strong, html[data-lang="fa"] b, htm
   padding:calc(10px * var(--s)) calc(12px * var(--s));
   text-align:start;
 }
-.earn-hero .stat-box{ padding:calc(7px * var(--s)) calc(8px * var(--s)); border-color:var(--stone-border-2); }
-.earn-hero .stat-box::before{
-  left:31%; right:31%;
-  background:linear-gradient(90deg, #8a6d1f 0%, #f0d878 50%, #d4af37 100%);
-  box-shadow:0 0 calc(5px * var(--s)) rgba(212,175,55,.6);
-}
+.earn-hero .stat-box{ padding:calc(7px * var(--s)) calc(8px * var(--s)); }
 .stat-box__label{ font-size:calc(11px * var(--s)); color:var(--ink-faint); }
 .earn-hero .stat-box__label{ font-size:calc(8px * var(--s)); color:var(--ink-dim); font-weight:700; }
 .stat-box__val{ font-family:var(--font-display); font-size:calc(17px * var(--s)); font-weight:700; margin-top:calc(2px * var(--s)); }
@@ -1444,7 +1434,6 @@ html[data-lang="ar"] b, html[data-lang="ar"] strong, html[data-lang="fa"] b, htm
 .mystery-box{
   position:relative;
   display:flex; flex-direction:column; align-items:center; gap:calc(8px * var(--s));
-  border:1px solid var(--stone-border);
   padding:calc(14px * var(--s)) calc(10px * var(--s)) calc(10px * var(--s));
 }
 .mystery-box__label{
@@ -1793,11 +1782,6 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 }
 .free-pet-box{
   position:relative;
-  background:
-    radial-gradient(62% calc(80px * var(--s)) at 50% 0%, rgba(165,108,240,.36), rgba(165,108,240,.12) 55%, transparent 100%),
-    radial-gradient(100% calc(46px * var(--s)) at 50% 0%, rgba(165,108,240,.14), transparent 100%),
-    var(--stone);
-  border:1px solid var(--stone-border);
   margin-bottom:calc(12px * var(--s));
 }
 .free-pet-box__top{ display:flex; align-items:flex-start; gap:calc(10px * var(--s)); }
@@ -1860,10 +1844,6 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .invite-box{
   position:relative;
   padding:calc(18px * var(--s)); text-align:center;
-  background:
-    radial-gradient(62% calc(80px * var(--s)) at 50% 0%, rgba(139,92,246,.36), rgba(139,92,246,.12) 55%, transparent 100%),
-    radial-gradient(100% calc(46px * var(--s)) at 50% 0%, rgba(139,92,246,.14), transparent 100%),
-    var(--stone);
 }
 .invite-box__gift{ width:calc(44px * var(--s)); height:calc(44px * var(--s)); margin:0 auto calc(8px * var(--s)); object-fit:contain; }
 .invite-box__title{ font-weight:800; font-size:calc(11.5px * var(--s)); letter-spacing:.6px; text-transform:uppercase; color:var(--ink-dim); margin-bottom:calc(8px * var(--s)); }
@@ -1944,7 +1924,6 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   text-align:center;
   padding:calc(12px * var(--s)) calc(8px * var(--s));
 }
-.reward-tier.is-featured{ border-color:var(--c-reward-tier-border); }
 .reward-tier__icon{ width:calc(26px * var(--s)); height:calc(26px * var(--s)); margin:0 auto calc(5px * var(--s)); }
 .reward-tier__val{
   font-family:var(--font-display); font-weight:800; font-size:calc(19px * var(--s));
@@ -1954,8 +1933,6 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .reward-note{
   position:relative;
   display:flex; align-items:flex-start; gap:calc(10px * var(--s));
-  border:1px solid var(--c-reward-tier-border);
-  background:rgba(165,108,240,.05);
   border-radius:var(--radius-md);
   padding:calc(14px * var(--s)) calc(16px * var(--s));
   backdrop-filter:blur(var(--glass-blur));
@@ -1978,7 +1955,6 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   color:var(--ink-faint); margin:calc(14px * var(--s)) 0 calc(8px * var(--s));
 }
 .milestone-mission{
-  background:var(--stone); border:1px solid var(--stone-border);
   border-radius:var(--radius-sm); padding:calc(10px * var(--s)) calc(12px * var(--s)); margin-bottom:calc(8px * var(--s));
 }
 .milestone-mission__head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:calc(6px * var(--s)); }
@@ -2010,10 +1986,6 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .wallet-card{
   position:relative;
   padding:calc(22px * var(--s)) calc(20px * var(--s)); text-align:center;
-  background:
-    radial-gradient(62% calc(80px * var(--s)) at 50% 0%, rgba(139,92,246,.36), rgba(139,92,246,.12) 55%, transparent 100%),
-    radial-gradient(100% calc(46px * var(--s)) at 50% 0%, rgba(139,92,246,.14), transparent 100%),
-    var(--stone);
   box-shadow:var(--shadow-deep);
 }
 .wallet-card__label{ font-size:calc(12.5px * var(--s)); font-weight:700; color:var(--ink-dim); letter-spacing:.3px; }
@@ -2857,45 +2829,17 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .pod.is-active .pod__inner{ box-shadow:inset 0 0 0 calc(2px * var(--s)) var(--pod-c1); }
 
 /* Card Shine Bar */
-.streak-card::before, .promo-card::before, .chest-card::before, .spin-card::before,
-.gift-pick-card::before, .free-pet-box::before, .ad-task::before, .invite-box::before,
-.wallet-card::before, .stat-box::before, .reward-tier::before, .earn-hero::before,
-.storage-card::before, .mystery-box::before,
-.tx.is-pos::before, .tx.is-neg::before, .friend-row::before{
+.earn-hero::before, .storage-card::before{
   content:"";
   position:absolute; top:0; left:12%; right:12%; height:calc(2px * var(--s));
   border-radius:calc(2px * var(--s));
   pointer-events:none;
 }
-.mystery-box::before{ background:linear-gradient(90deg, transparent, #4a9eff, transparent); box-shadow:0 0 calc(6px * var(--s)) #4a9effaa; }
 .earn-hero::before{ background:linear-gradient(90deg, transparent, #8a6d1f 15%, #f0d878 50%, #d4af37 85%, transparent); box-shadow:0 0 calc(7px * var(--s)) #e3a542aa; }
 .storage-card::before{ background:linear-gradient(90deg, transparent, #e3a542, transparent); box-shadow:0 0 calc(6px * var(--s)) #e3a542aa; }
-.streak-card::before{ display:none; }
-.promo-card::before{ display:none; }
-.chest-card::before{ display:none; }
-.spin-card::before{ display:none; }
-.gift-pick-card::before{ display:none; }
-.free-pet-box::before{ background:linear-gradient(90deg, transparent, #a56cf0, transparent); box-shadow:0 0 calc(6px * var(--s)) #a56cf0aa; }
-.ad-task::before{ background:linear-gradient(90deg, transparent, #4a9eff, transparent); box-shadow:0 0 calc(6px * var(--s)) #4a9effaa; }
-.invite-box::before, .wallet-card::before{ background:linear-gradient(90deg, transparent, var(--c-royal-purple-1), var(--c-royal-purple-2), transparent); box-shadow:0 0 calc(7px * var(--s)) #8b5cf6aa; }
-.stat-box::before, .reward-tier::before{ background:linear-gradient(90deg, transparent, var(--c-small-card-border), transparent); box-shadow:0 0 calc(5px * var(--s)) #c9834a99; }
-.reward-tier:first-child::before{ background:linear-gradient(90deg, transparent, var(--c-reward-tier-icon-person), transparent); box-shadow:0 0 calc(5px * var(--s)) #4a9eff99; }
-.friend-stats .stat-box::before,
-.reward-tiers .reward-tier::before{
-  background:linear-gradient(90deg, transparent, var(--c-royal-blue-1), var(--c-royal-blue-2), transparent);
-  box-shadow:0 0 calc(6px * var(--s)) #3b5bdbaa;
-}
-.reward-tiers .reward-tier.is-featured::before{
-  background:linear-gradient(90deg, transparent, var(--c-royal-purple-1), var(--c-royal-purple-2), transparent);
-  box-shadow:0 0 calc(6px * var(--s)) #8b5cf6aa;
-}
-.tx.is-pos::before{ background:linear-gradient(90deg, transparent, var(--success), transparent); box-shadow:0 0 calc(5px * var(--s)) #6fbf7399; }
-.tx.is-neg::before{ background:linear-gradient(90deg, transparent, var(--danger), transparent); box-shadow:0 0 calc(5px * var(--s)) #d9634f99; }
-.friend-row::before{ background:linear-gradient(90deg, transparent, #38bdf8, transparent); box-shadow:0 0 calc(5px * var(--s)) #38bdf899; }
 
 /* Premium cards (no picture to light): a solid dark fill with a soft glow from the top edge, and a solid frame
-   (the card's colour on the top edge, dimming down the sides) drawn over the 1px border in place of the fading
-   top line. Each card keeps its colour through --pf-rgb (glow), --pf-top and --pf-mid (frame) */
+   (the card's colour on the top edge, dimming down the sides) drawn over the 1px border. Each card keeps its colour through --pf-rgb (glow), --pf-top and --pf-mid (frame) */
 .mystery-box, .free-pet-box, .ad-task, .partner-task, .invite-box, .wallet-card,
 #page-friends .stat-box, .earn-hero .stat-box, .reward-tiers .reward-tier, .reward-note, .milestone-mission, .friend-row, .tx.is-pos, .tx.is-neg{
   border:1px solid transparent;
@@ -2912,8 +2856,6 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   -webkit-mask-composite:xor;
   mask:linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
 }
-.mystery-box::before, .free-pet-box::before, .ad-task::before, .invite-box::before, .wallet-card::before,
-#page-friends .stat-box::before, .earn-hero .stat-box::before, .reward-tiers .reward-tier::before, .friend-row::before, .tx.is-pos::before, .tx.is-neg::before{ display:none; }
 /* blue: Daily Combo and the task cards */
 .mystery-box, .ad-task, .partner-task{ --pf-rgb:74,158,255; --pf-top:#8cc4ff; --pf-mid:#3f7fd6; }
 /* purple: Get A Free Pet */
