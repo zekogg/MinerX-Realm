@@ -3228,7 +3228,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 
 /* Withdraw Requirements Modal */
 .wd-req{ margin-bottom:calc(7px * var(--s)); }
-.wd-req__label{ display:flex; justify-content:space-between; font-size:calc(8.5px * var(--s)); color:var(--ink-dim); font-weight:700; margin-bottom:calc(3px * var(--s)); }
+.wd-req__label{ display:flex; justify-content:space-between; font-size:calc(13px * var(--s)); color:var(--ink-dim); font-weight:700; margin-bottom:calc(5px * var(--s)); }
 .wd-req__track{ height:calc(4px * var(--s)); border-radius:calc(999px * var(--s)); background:var(--stone-2); border:1px solid var(--stone-border); overflow:hidden; }
 .wd-req__fill{ height:100%; border-radius:calc(999px * var(--s)); background:linear-gradient(90deg, var(--c-btn-withdraw-1), var(--c-btn-withdraw-2)); }
 .wd-req-sheet{
@@ -4885,7 +4885,7 @@ body.reduce-motion .firefly{
         <div class="wd-req__track"><div class="wd-req__fill" id="wd-req-ads-fill" style="width:0%"></div></div>
       </div>
       <div class="wd-req">
-        <div class="wd-req__label"><span>Active Referral</span><span id="wd-req-ref-count" data-no-i18n>0/1</span></div>
+        <div class="wd-req__label"><span id="wd-req-ref-label">1 Active Referral</span><span id="wd-req-ref-count" data-no-i18n>0/1</span></div>
         <div class="wd-req__track"><div class="wd-req__fill" id="wd-req-ref-fill" style="width:0%"></div></div>
       </div>
     </div>
@@ -7314,6 +7314,8 @@ function openWithdrawReqModal(d){
   if (adsCount) adsCount.textContent = adsNow + '/' + adsReq;
   var adsFill = document.getElementById('wd-req-ads-fill');
   if (adsFill) adsFill.style.width = (adsNow / adsReq * 100) + '%';
+  var refLabel = document.getElementById('wd-req-ref-label');
+  if (refLabel) refLabel.textContent = refReq + ' Active Referral';
   var refCount = document.getElementById('wd-req-ref-count');
   if (refCount) refCount.textContent = refNow + '/' + refReq;
   var refFill = document.getElementById('wd-req-ref-fill');
