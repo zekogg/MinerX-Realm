@@ -61,6 +61,7 @@ CREATE TABLE users (
   locked_coins REAL DEFAULT 0,
   ads_today INTEGER NOT NULL DEFAULT 0,
   ads_today_date TEXT,
+  checkin5_claimed_date TEXT,
   FOREIGN KEY (referred_by) REFERENCES users(telegram_id)
 );
 

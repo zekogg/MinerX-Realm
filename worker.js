@@ -91,7 +91,8 @@ const FRIEND_MILESTONES = [
 ];
 
 // Check-in config
-const CHECKIN_TASK_REWARDS = { 1: 10, 2: 10, 3: 20, 4: 20 };
+const CHECKIN_TASK_REWARDS = { 1: 10, 2: 10, 3: 20, 4: 20, 5: 5 };
+const CHECKIN_PARTNER_CHANNEL = "@XTreasuryX";
 
 // Bonus AD Every 1H config
 const BONUS_AD_REWARD_COINS = 15;
@@ -388,7 +389,7 @@ async function handleGetUser(request, env) {
            u.adsgram_task_count, u.adsgram_task_date,
            u.invites_count, u.active_referrals_count, u.referral_pending_earnings,
            u.milestone_10_claimed, u.milestone_25_claimed, u.milestone_50_claimed, u.milestone_100_claimed,
-           u.checkin1_claimed_date, u.checkin2_claimed_date, u.checkin3_claimed_date, u.checkin4_claimed_date,
+           u.checkin1_claimed_date, u.checkin2_claimed_date, u.checkin3_claimed_date, u.checkin4_claimed_date, u.checkin5_claimed_date,
            u.bonus_ad_count_today, u.bonus_ad_date, u.bonus_ad_last_watched_at,
            u.gigapub_task_count, u.gigapub_task_date, u.photo_url,
            u.monetix_task_count, u.monetix_task_date, u.onclicka_task_count, u.onclicka_task_date, u.lifetime_ads_watched,
@@ -465,7 +466,8 @@ async function handleGetUser(request, env) {
     1: user.checkin1_claimed_date === today,
     2: user.checkin2_claimed_date === today,
     3: user.checkin3_claimed_date === today,
-    4: user.checkin4_claimed_date === today
+    4: user.checkin4_claimed_date === today,
+    5: user.checkin5_claimed_date === today
   };
   view.checkin_rewards = CHECKIN_TASK_REWARDS;
   view.bonus_ad_watched_today = user.bonus_ad_date === today ? (user.bonus_ad_count_today || 0) : 0;
@@ -2614,6 +2616,9 @@ async function handleCheckinClaim(request, env) {
     return jsonResponse({ error: "not_verified" }, 400);
   }
   if (task === 4 && !(await verifyBioContainsReferralLink(env, telegramId))) {
+    return jsonResponse({ error: "not_verified" }, 400);
+  }
+  if (task === 5 && !(await checkChannelMembership(env, CHECKIN_PARTNER_CHANNEL, telegramId))) {
     return jsonResponse({ error: "not_verified" }, 400);
   }
   const today = todayUTC();
