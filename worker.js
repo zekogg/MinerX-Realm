@@ -200,84 +200,7 @@ export default {
   },
   async fetch(request, env) {
     const url = new URL(request.url);
-
-    // Admin D1 debug stats
-    const dbStats = { queries: 0, rows_read: 0, rows_written: 0, rows_read_exact: true };
-    let isAdminDebug = false;
-    if (request.method === "POST") {
-      try {
-        const peekBody = await request.clone().json();
-        if (peekBody && peekBody.initData && await validateInitData(peekBody.initData, env.BOT_TOKEN)) {
-          const tgUser = JSON.parse(new URLSearchParams(peekBody.initData).get("user") || "null");
-          if (tgUser && tgUser.id === ADMIN_TELEGRAM_ID) isAdminDebug = true;
-        }
-      } catch (e) {   }
-    }
-    let dbEnv = env;
-    if (isAdminDebug) {
-      const REAL_STMT = Symbol("realStmt");
-      const wrapStatement = (stmt) => new Proxy(stmt, {
-        get(target, prop) {
-          if (prop === REAL_STMT) return target;
-          if (prop === "bind") return (...args) => wrapStatement(target.bind(...args));
-          if (prop === "run" || prop === "all") {
-            return async (...args) => {
-              const result = await target[prop](...args);
-              dbStats.queries++;
-              if (result && result.meta) {
-                dbStats.rows_read += result.meta.rows_read || 0;
-                dbStats.rows_written += result.meta.rows_written || 0;
-              }
-              return result;
-            };
-          }
-          if (prop === "first" || prop === "raw") {
-            return async (...args) => {
-              dbStats.queries++;
-              dbStats.rows_read_exact = false;
-              return target[prop](...args);
-            };
-          }
-          return target[prop];
-        }
-      });
-      dbEnv = new Proxy(env, {
-        get(target, prop) {
-          if (prop !== "DB") return target[prop];
-          return new Proxy(target.DB, {
-            get(dbTarget, dbProp) {
-              if (dbProp === "prepare") return (sql) => wrapStatement(dbTarget.prepare(sql));
-              if (dbProp === "batch") {
-                return async (stmts) => {
-                  const realStmts = stmts.map((s) => (s && s[REAL_STMT]) ? s[REAL_STMT] : s);
-                  const results = await dbTarget.batch(realStmts);
-                  dbStats.queries += stmts.length;
-                  for (const r of results) {
-                    if (r && r.meta) {
-                      dbStats.rows_read += r.meta.rows_read || 0;
-                      dbStats.rows_written += r.meta.rows_written || 0;
-                    }
-                  }
-                  return results;
-                };
-              }
-              return dbTarget[dbProp];
-            }
-          });
-        }
-      });
-    }
-    const response = await routeRequest(request, dbEnv, url);
-    if (!isAdminDebug) return response;
-    try {
-      const ct = response.headers.get("content-type") || "";
-      if (!ct.includes("application/json")) return response;
-      const data = await response.clone().json();
-      data._debug = { route: url.pathname, ...dbStats };
-      return new Response(JSON.stringify(data), { status: response.status, headers: response.headers });
-    } catch (e) {
-      return response;
-    }
+    return routeRequest(request, env, url);
   }
 };
 async function routeRequest(request, env, url) {
@@ -3092,12 +3015,24 @@ async function handleTelegram(request, env) {
   if (request.method !== "POST") {
     return new Response("OK");
   }
-  const update = await request.json();
-  const message = update.message;
-  if (message && message.text === "/start") {
-    await sendWelcomeMessage(env, message.chat.id);
+  // Telegram sends the secret set with setWebhook (secret_token) in this header on every update; anything without it
+  // did not come from Telegram
+  if (env.TELEGRAM_WEBHOOK_SECRET && request.headers.get("X-Telegram-Bot-Api-Secret-Token") !== env.TELEGRAM_WEBHOOK_SECRET) {
+    return new Response("forbidden", { status: 403 });
   }
-  if (update.callback_query) {
+  let update;
+  try {
+    update = await request.json();
+  } catch (e) {
+    return new Response("OK");
+  }
+  const message = update && update.message;
+  if (message && message.text === "/start") {
+    try {
+      await sendWelcomeMessage(env, message.chat.id);
+    } catch (e) {   }
+  }
+  if (update && update.callback_query) {
     await handleWithdrawCallback(update.callback_query, env);
   }
   return new Response("OK");
