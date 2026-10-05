@@ -8924,7 +8924,7 @@ function openAdminPanel(){
 }
 
 // Friends
-var friendsState = { invites: 0, active: 0, pendingEarnings: 0, minClaim: 5000, milestones: [], claimBusy: false };
+var friendsState = { invites: 0, active: 0, pendingEarnings: 0, minClaim: 2000, milestones: [], claimBusy: false };
 var friendsListState = { loaded: false, page: 0, pages: {}, hasMore: false, busy: false };
 function formatFriendsAmount(value){
   value = Number(value) || 0;
@@ -8958,7 +8958,7 @@ function applyFriendsState(data){
   friendsState.invites = data.invites || 0;
   friendsState.active = data.active || 0;
   friendsState.pendingEarnings = data.pending_earnings || 0;
-  friendsState.minClaim = data.min_claim || 5000;
+  friendsState.minClaim = data.min_claim || 2000;
   renderFriendsStats();
 }
 var friendsMilestonesFetched = false;
