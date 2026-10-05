@@ -244,3 +244,6 @@ ALTER TABLE users ADD COLUMN ads_today_date TEXT;
 
 -- قائمة الأصدقاء: فهرس بنفس ترتيب العرض (النشطون أولاً ثم الأحدث)، فتقرأ كل صفحة أصدقاءها فقط بدل كل أصدقاء الداعي.
 CREATE INDEX IF NOT EXISTS idx_referrals_referrer_active ON referrals(referrer_id, is_active DESC, invited_at DESC);
+
+-- زيادة السرعة اليومية (Dancing Bear / The Cat): فهرس يجعل مهمة منتصف الليل تقرأ مالكي هذين الحيوانين فقط بدل جدول user_pets كله.
+CREATE INDEX IF NOT EXISTS idx_user_pets_boost ON user_pets(pet_id, daily_boost_days);
