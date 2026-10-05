@@ -412,8 +412,8 @@ async function handleGetUser(request, env) {
     if (referredBy) {
       signupStmts.push(
         env.DB.prepare(
-          "INSERT OR IGNORE INTO referrals (referrer_id, referred_id, invited_at) SELECT ?, ?, ? WHERE changes() = 1 AND EXISTS (SELECT 1 FROM users WHERE telegram_id = ?)"
-        ).bind(referredBy, telegramId, Date.now(), referredBy),
+          "INSERT OR IGNORE INTO referrals (referrer_id, referred_id, invited_at, earned_coins) SELECT ?, ?, ?, ? WHERE changes() = 1 AND EXISTS (SELECT 1 FROM users WHERE telegram_id = ?)"
+        ).bind(referredBy, telegramId, Date.now(), REFERRAL_SIGNUP_BONUS_COINS, referredBy),
         env.DB.prepare(
           "UPDATE users SET referral_pending_earnings = referral_pending_earnings + ?, invites_count = invites_count + 1 WHERE telegram_id = ? AND changes() = 1"
         ).bind(REFERRAL_SIGNUP_BONUS_COINS, referredBy)
