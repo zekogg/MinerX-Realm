@@ -69,7 +69,7 @@ const ADS_TASK_DAILY_LIMIT = 10;
 const REFERRAL_SIGNUP_BONUS_COINS = 20;
 const REFERRAL_ACTIVE_BONUS_COINS = 180;
 const REFERRAL_DEPOSIT_COMMISSION_RATE = 0.05;
-const REFERRAL_MIN_CLAIM_COINS = 5000;
+const REFERRAL_MIN_CLAIM_COINS = 2000;
 const ACTIVE_FRIEND_ADS_THRESHOLD = 10;
 
 // Weekly Leaderboard config
@@ -401,17 +401,19 @@ async function handleGetUser(request, env) {
   if (!user) {
     // the new account and its referral are one batch, so the link and the inviter's bonus are never lost; OR IGNORE
     // lets two first opens at the same moment both go through, and changes() (the row count of the statement just
-    // before) makes only the one that created the account record the referral
+    // before) makes only the one that created the account record the referral. An inviter with no account (a mistyped
+    // or deleted link) is dropped: referred_by is stored only when that user exists, and the referral and the bonus
+    // follow it, so the foreign keys never fail the signup
     const signupStmts = [
       env.DB.prepare(
-        "INSERT OR IGNORE INTO users (telegram_id, username, referred_by, created_at, photo_url, device_id) VALUES (?, ?, ?, ?, ?, ?)"
+        "INSERT OR IGNORE INTO users (telegram_id, username, referred_by, created_at, photo_url, device_id) VALUES (?, ?, (SELECT telegram_id FROM users WHERE telegram_id = ?), ?, ?, ?)"
       ).bind(telegramId, username, referredBy, Date.now(), photoUrl, deviceId)
     ];
     if (referredBy) {
       signupStmts.push(
         env.DB.prepare(
-          "INSERT OR IGNORE INTO referrals (referrer_id, referred_id, invited_at) SELECT ?, ?, ? WHERE changes() = 1"
-        ).bind(referredBy, telegramId, Date.now()),
+          "INSERT OR IGNORE INTO referrals (referrer_id, referred_id, invited_at) SELECT ?, ?, ? WHERE changes() = 1 AND EXISTS (SELECT 1 FROM users WHERE telegram_id = ?)"
+        ).bind(referredBy, telegramId, Date.now(), referredBy),
         env.DB.prepare(
           "UPDATE users SET referral_pending_earnings = referral_pending_earnings + ?, invites_count = invites_count + 1 WHERE telegram_id = ? AND changes() = 1"
         ).bind(REFERRAL_SIGNUP_BONUS_COINS, referredBy)
