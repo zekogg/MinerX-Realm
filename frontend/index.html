@@ -1826,6 +1826,8 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   background:var(--stone-2); display:flex; align-items:center; justify-content:center;
 }
 .ad-task__icon svg{ width:calc(13px * var(--s)); height:calc(13px * var(--s)); }
+.ad-task__emoji{ font-size:calc(15px * var(--s)); line-height:1; }
+.partner-task__btn:disabled:not(.is-claimed){ opacity:.5; }
 .ad-task__title{ font-weight:800; font-size:calc(10.8px * var(--s)); line-height:1.3; }
 .ad-task__meta{ display:flex; align-items:center; gap:calc(4px * var(--s)); flex-wrap:wrap; }
 .ad-task__meta svg{ width:calc(10px * var(--s)); height:calc(10px * var(--s)); }
@@ -4273,6 +4275,21 @@ body.reduce-motion .firefly{
             <button class="ad-task__watch partner-task__btn" id="checkin-btn-2" onclick="onCheckinShareClick(2)">Go</button>
           </div>
           <div class="card partner-task">
+            <div class="ad-task__icon"><span class="ad-task__emoji">🤝</span></div>
+            <div class="partner-task__body">
+              <div class="ad-task__title">Check Our Partner Channel</div>
+              <div class="ad-task__meta">
+                <img draggable="false" loading="lazy" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:calc(18px * var(--s));height:calc(18px * var(--s));flex-shrink:0;vertical-align:middle;">
+                <span class="ad-task__reward">+5</span>
+                <span class="ad-task__avail">Available</span>
+              </div>
+            </div>
+            <div class="partner-task__actions">
+              <button class="checkin-copy-btn" onclick="onCheckinJoinClick(5, 'https://t.me/XTreasuryX')">Join</button>
+              <button class="ad-task__watch partner-task__btn" id="checkin-btn-5" onclick="onCheckinVerifyClick(5)" disabled>Check</button>
+            </div>
+          </div>
+          <div class="card partner-task">
             <div class="ad-task__icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="var(--c-ad-watch-1)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4 L20 10 L10 20 L4 20 L4 14 Z"/></svg>
             </div>
@@ -4291,7 +4308,7 @@ body.reduce-motion .firefly{
           </div>
           <div class="card partner-task">
             <div class="ad-task__icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="var(--c-ad-watch-1)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4 L20 10 L10 20 L4 20 L4 14 Z"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--c-ad-watch-1)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>
             </div>
             <div class="partner-task__body">
               <div class="ad-task__title">Put Your Link In Bio</div>
@@ -8598,26 +8615,44 @@ window.addEventListener('pagehide', function(){ sendClientAdRewards(true); });
 
 // Check-in
 var checkinState = {
-  claimedToday: { 1: false, 2: false, 3: false, 4: false },
-  rewards: { 1: 10, 2: 10, 3: 20, 4: 20 },
-  ready: { 1: false, 2: false, 3: false, 4: false },
-  busy: { 1: false, 2: false, 3: false, 4: false }
+  claimedToday: { 1: false, 2: false, 3: false, 4: false, 5: false },
+  rewards: { 1: 10, 2: 10, 3: 20, 4: 20, 5: 5 },
+  ready: { 1: false, 2: false, 3: false, 4: false, 5: false },
+  busy: { 1: false, 2: false, 3: false, 4: false, 5: false }
 };
+// Check on the partner channel task unlocks only after Join is tapped that UTC day (kept on the device, no request)
+var CHECKIN_JOIN_KEY = 'checkin_join_date_';
+function checkinUtcDate(){ return new Date(serverNow()).toISOString().slice(0, 10); }
+function isCheckinJoinedToday(task){
+  try{ return localStorage.getItem(CHECKIN_JOIN_KEY + task) === checkinUtcDate(); }catch(e){ return false; }
+}
+var checkinJoinedInMemory = {};
+function onCheckinJoinClick(task, telegramLink){
+  var tg = window.Telegram && window.Telegram.WebApp;
+  if (tg && tg.openTelegramLink){
+    tg.openTelegramLink(telegramLink);
+  } else {
+    window.open(telegramLink, '_blank');
+  }
+  checkinJoinedInMemory[task] = checkinUtcDate();
+  try{ localStorage.setItem(CHECKIN_JOIN_KEY + task, checkinUtcDate()); }catch(e){   }
+  renderCheckinButton(task);
+}
 var checkinCountdownTimers = { 1: null, 2: null };
 function applyCheckinState(claimedToday, rewards){
   checkinState.claimedToday = claimedToday || checkinState.claimedToday;
   checkinState.rewards = rewards || checkinState.rewards;
-  for (var t = 1; t <= 4; t++){
+  for (var t = 1; t <= 5; t++){
     if (checkinState.claimedToday[t]) checkinState.ready[t] = false;
+    renderCheckinButton(t);
   }
-  renderCheckinButton(1);
-  renderCheckinButton(2);
-  renderCheckinButton(3);
-  renderCheckinButton(4);
 }
 function renderCheckinButton(task){
   var btn = document.getElementById('checkin-btn-' + task);
   if (!btn) return;
+  if (task === 5){
+    btn.disabled = !checkinState.claimedToday[task] && checkinJoinedInMemory[task] !== checkinUtcDate() && !isCheckinJoinedToday(task);
+  }
   if (checkinState.claimedToday[task]){
     btn.textContent = 'Claimed';
     btn.classList.remove('is-ready');
@@ -8636,7 +8671,7 @@ function renderCheckinButton(task){
     return;
   }
   btn.classList.remove('is-ready');
-  btn.textContent = (task === 3 || task === 4) ? 'Check' : 'Go';
+  btn.textContent = (task === 3 || task === 4 || task === 5) ? 'Check' : 'Go';
 }
 function startCheckinCountdown(task){
   clearInterval(checkinCountdownTimers[task]);
