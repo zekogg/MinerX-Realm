@@ -427,9 +427,15 @@ async function handleGetUser(request, env) {
     }
     user = await env.DB.prepare(userQuery).bind(telegramId).first();
   } else {
-    if (photoUrl && photoUrl !== user.photo_url) {
-      await env.DB.prepare("UPDATE users SET photo_url = ? WHERE telegram_id = ?").bind(photoUrl, telegramId).run();
-      user.photo_url = photoUrl;
+    // the name and photo follow the Telegram account (shown on the leaderboard, friends lists and admin panel); one
+    // write, and only when one of them changed
+    const nameChanged = username && username !== user.username;
+    const photoChanged = photoUrl && photoUrl !== user.photo_url;
+    if (nameChanged || photoChanged) {
+      await env.DB.prepare("UPDATE users SET username = COALESCE(?, username), photo_url = COALESCE(?, photo_url) WHERE telegram_id = ?")
+        .bind(nameChanged ? username : null, photoChanged ? photoUrl : null, telegramId).run();
+      if (nameChanged) user.username = username;
+      if (photoChanged) user.photo_url = photoUrl;
     }
     // written once and never replaced, so accounts linked before a storage wipe stay linked
     if (deviceId && !user.device_id) {
