@@ -39,7 +39,7 @@ const DEPOSIT_CHECK_FIRST_DELAY_MS = 5_000;
 const DEPOSIT_CHECK_RETRY_DELAY_MS = 15_000;
 
 // Withdraw config
-const WITHDRAW_MIN_GRAM = 0.05;
+const WITHDRAW_MIN_GRAM = 0.1;
 // to withdraw: this many ads watched today (every ad, the gates included; the day starts at 00:00 UTC) and this many
 // active referrals at any time (once reached, it stays reached)
 const WITHDRAW_DAILY_ADS = 15;
@@ -69,12 +69,12 @@ const ADS_TASK_DAILY_LIMIT = 10;
 const REFERRAL_SIGNUP_BONUS_COINS = 20;
 const REFERRAL_ACTIVE_BONUS_COINS = 180;
 const REFERRAL_DEPOSIT_COMMISSION_RATE = 0.05;
-const REFERRAL_MIN_CLAIM_COINS = 2000;
+const REFERRAL_MIN_CLAIM_COINS = 1000;
 const ACTIVE_FRIEND_ADS_THRESHOLD = 10;
 
 // Weekly Leaderboard config
 const LEADERBOARD_RANK_LIMIT = 20;
-const LEADERBOARD_PRIZES = [20000, 15000, 10000, 5000, 5000, 5000, 5000, 5000, 5000, 5000];
+const LEADERBOARD_PRIZES = [5000, 3750, 2500, 1250, 1250, 1250, 1250, 1250, 1250, 1250];
 
 // Active friend threshold config
 const GUARDIAN_ADS_THRESHOLD = 4000;
@@ -427,9 +427,15 @@ async function handleGetUser(request, env) {
     }
     user = await env.DB.prepare(userQuery).bind(telegramId).first();
   } else {
-    if (photoUrl && photoUrl !== user.photo_url) {
-      await env.DB.prepare("UPDATE users SET photo_url = ? WHERE telegram_id = ?").bind(photoUrl, telegramId).run();
-      user.photo_url = photoUrl;
+    // the name and photo follow the Telegram account (shown on the leaderboard, friends lists and admin panel); one
+    // write, and only when one of them changed
+    const nameChanged = username && username !== user.username;
+    const photoChanged = photoUrl && photoUrl !== user.photo_url;
+    if (nameChanged || photoChanged) {
+      await env.DB.prepare("UPDATE users SET username = COALESCE(?, username), photo_url = COALESCE(?, photo_url) WHERE telegram_id = ?")
+        .bind(nameChanged ? username : null, photoChanged ? photoUrl : null, telegramId).run();
+      if (nameChanged) user.username = username;
+      if (photoChanged) user.photo_url = photoUrl;
     }
     // written once and never replaced, so accounts linked before a storage wipe stay linked
     if (deviceId && !user.device_id) {

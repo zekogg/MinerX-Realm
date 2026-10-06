@@ -5314,7 +5314,7 @@ body.reduce-motion .firefly{
       <div class="modal-field-label"><span>Amount to be received:</span></div>
       <div class="modal-plain-box has-gram" style="display:flex;align-items:center;gap:calc(6px * var(--s));"><span id="withdraw-output">0.0000</span> Gram <img draggable="false" loading="lazy" src="/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:calc(16px * var(--s));height:calc(16px * var(--s));flex-shrink:0;"></div>
       <div class="wd-req">
-        <div class="wd-req__label"><span>Min Withdraw : <span id="withdraw-min-label">0.05</span></span></div>
+        <div class="wd-req__label"><span>Min Withdraw : <span id="withdraw-min-label">0.1</span></span></div>
       </div>
       <button class="modal-cta" id="withdraw-cta" onclick="submitWithdrawRequest()" disabled>Withdraw</button>
       <div class="modal-footnote">
@@ -8926,7 +8926,7 @@ function openAdminPanel(){
 }
 
 // Friends
-var friendsState = { invites: 0, active: 0, pendingEarnings: 0, minClaim: 2000, milestones: [], claimBusy: false };
+var friendsState = { invites: 0, active: 0, pendingEarnings: 0, minClaim: 1000, milestones: [], claimBusy: false };
 var friendsListState = { loaded: false, page: 0, pages: {}, hasMore: false, busy: false };
 function formatFriendsAmount(value){
   value = Number(value) || 0;
@@ -8960,7 +8960,7 @@ function applyFriendsState(data){
   friendsState.invites = data.invites || 0;
   friendsState.active = data.active || 0;
   friendsState.pendingEarnings = data.pending_earnings || 0;
-  friendsState.minClaim = data.min_claim || 2000;
+  friendsState.minClaim = data.min_claim || 1000;
   renderFriendsStats();
 }
 var friendsMilestonesFetched = false;
@@ -9544,7 +9544,7 @@ function pollDepositStatus(initData){
 
 // Withdraw
 var WITHDRAW_FEE_RATE = 0.05;
-var WITHDRAW_MIN_GRAM = 0.05;
+var WITHDRAW_MIN_GRAM = 0.1;
 var NEXT_WITHDRAW_ALLOWED_AT = null;
 var withdrawCooldownTimer = null;
 var withdrawBusy = false;
