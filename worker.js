@@ -39,7 +39,7 @@ const DEPOSIT_CHECK_FIRST_DELAY_MS = 5_000;
 const DEPOSIT_CHECK_RETRY_DELAY_MS = 15_000;
 
 // Withdraw config
-const WITHDRAW_MIN_GRAM = 0.05;
+const WITHDRAW_MIN_GRAM = 0.1;
 // to withdraw: this many ads watched today (every ad, the gates included; the day starts at 00:00 UTC) and this many
 // active referrals at any time (once reached, it stays reached)
 const WITHDRAW_DAILY_ADS = 15;
