@@ -7417,7 +7417,7 @@ function renderHappyDogUI(){
   var progressBadge = document.getElementById('hd-progress-badge');
   if (progressBadge) progressBadge.textContent = '(' + happyDogState.activeFriends + '/' + happyDogState.threshold + ') Active';
   var speedEl = document.getElementById('hd-speed-value');
-  if (speedEl) speedEl.textContent = happyDogState.claimed ? '40/hr' : '??/hr';
+  if (speedEl) speedEl.textContent = happyDogState.claimed ? '25/hr' : '??/hr';
   var cardBtn = document.getElementById('hd-claim-btn');
   var modalBtn = document.getElementById('fp-claim-btn');
   [cardBtn, modalBtn].forEach(function(btn){
