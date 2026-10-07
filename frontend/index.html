@@ -7784,10 +7784,16 @@ function onComboCheckClick(){
   }
   comboState.busy = true;
   renderComboCheckButton();
+  runAdGate(function(){ runComboCheckRequest(initData, order); }, function(){
+    comboState.busy = false;
+    renderComboCheckButton();
+  }, { noConfetti: true });
+}
+function runComboCheckRequest(initData, order){
   fetch('/api/combo/check', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData: initData, order: order })
+    body: JSON.stringify({ initData: initData, order: order, gate_ad: takeGateAd() })
   })
   .then(function(res){ return res.json(); })
   .then(function(data){
@@ -7824,6 +7830,9 @@ function onComboCheckClick(){
     console.error('combo check failed:', err);
     comboState.busy = false;
     renderComboCheckButton();
+  })
+  .finally(function(){
+    hideAdLoadingOverlay();
   });
 }
 
@@ -8214,30 +8223,31 @@ function setAdLoadingOverlayVia(providerName){
   var el = document.getElementById('ad-loading-overlay-via');
   if (el) el.textContent = 'via ' + providerName;
 }
-function runAdGate(onSuccess, onFail){
+// opts.noConfetti: the action may still fail after the ad (Daily Combo), so its own result decides the confetti
+function runAdGate(onSuccess, onFail, opts){
   showAdLoadingOverlay();
   setAdLoadingOverlayVia('GigaPub');
   if (gigapubReady && typeof window.showGiga === 'function'){
     window.showGiga({ showTag: GIGAPUB_GATE_PLACEMENT }).then(function(){
       setAdLoadingOverlayVerifying();
-      triggerConfetti();
+      if (!(opts && opts.noConfetti)) triggerConfetti();
       onSuccess();
     }).catch(function(){
-      runAdGateOnclickaFallback(onSuccess, onFail);
+      runAdGateOnclickaFallback(onSuccess, onFail, opts);
     });
     return;
   }
-  runAdGateOnclickaFallback(onSuccess, onFail);
+  runAdGateOnclickaFallback(onSuccess, onFail, opts);
 }
 // Second choice after GigaPub; counted like the Monetix gate (lifetime ads only), never against the OnClicka daily task
-function runAdGateOnclickaFallback(onSuccess, onFail){
+function runAdGateOnclickaFallback(onSuccess, onFail, opts){
   setAdLoadingOverlayVia('OnClicka');
   var settled = false;
   var fallBack = function(detail){
     if (settled) return;
     settled = true;
     clearTimeout(safetyTimer);
-    runAdGateMonetixFallback(onSuccess, onFail);
+    runAdGateMonetixFallback(onSuccess, onFail, opts);
   };
   // show() only settles when the ad ends, so the safety timer covers a whole video
   var safetyTimer = setTimeout(function(){ fallBack('no answer from the SDK'); }, ONCLICKA_MAX_WAIT_MS);
@@ -8249,16 +8259,16 @@ function runAdGateOnclickaFallback(onSuccess, onFail){
       clearTimeout(safetyTimer);
       setAdLoadingOverlayVerifying();
       reportGateAdWatched();
-      triggerConfetti();
+      if (!(opts && opts.noConfetti)) triggerConfetti();
       onSuccess();
     }, fallBack);
   }, fallBack);
 }
-function runAdGateMonetixFallback(onSuccess, onFail){
+function runAdGateMonetixFallback(onSuccess, onFail, opts){
   setAdLoadingOverlayVia('Monetix');
   if (!isMonetixSdkReady()){
     waitForAdSdk(isMonetixSdkReady).then(function(ready){
-      if (ready){ runAdGateMonetixFallback(onSuccess, onFail); return; }
+      if (ready){ runAdGateMonetixFallback(onSuccess, onFail, opts); return; }
       hideAdLoadingOverlay();
       showBuyErrorToast('Ad not available right now', { title: 'Ad Required' });
       if (onFail) onFail();
@@ -8286,7 +8296,7 @@ function runAdGateMonetixFallback(onSuccess, onFail){
     if (res && (res.status === 'completed' || res.status === 'closed')){
       setAdLoadingOverlayVerifying();
       reportGateAdWatched();
-      triggerConfetti();
+      if (!(opts && opts.noConfetti)) triggerConfetti();
       onSuccess();
     } else {
       hideAdLoadingOverlay();

@@ -268,7 +268,7 @@ async function routeRequest(request, env, url) {
       return handleWalletHistory(request, env);
     }
     if (url.pathname === "/api/combo/check" && request.method === "POST") {
-      return handleComboCheck(request, env);
+      return withGateAd(request, env, handleComboCheck);
     }
     if (url.pathname === "/api/ads/reward" && request.method === "GET") {
       return handleAdsReward(url, env);
