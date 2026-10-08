@@ -8769,17 +8769,74 @@ function onCheckinClaimClick(task){
 }
 
 // Partner / Special Tasks
+// Join opens the link; Check unlocks 3 s after it (counted only while the app is visible, so it waits for the
+// return from the channel) and claims. The server checks the channel membership when the bot is an admin there.
+// A "not a member" answer locks Check until Join again, and from the second one on also for 60 s; a failed check
+// (Telegram not answering) waits 10 s, or Telegram's own retry time, without needing Join again. Kept per task on the
+// device (tasks are one-time), no request.
 var adminTasksState = { special: [], partner: [] };
 var adminTasksBusy = {};
-var adminTasksReady = {};
-var adminTasksCountdown = {};
-var adminTasksCountdownTimers = {};
-var ADMIN_TASK_COUNTDOWN_SECONDS = 10;
+var adminTaskJoinDelay = {};
+var adminTasksTicker = null;
+var ADMIN_TASK_JOIN_DELAY_MS = 3000;
+var ADMIN_TASK_REJECT_COOLDOWN_MS = 60000;
+var ADMIN_TASK_RETRY_COOLDOWN_MS = 10000;
+var ADMIN_TASK_STATE_KEY = 'mx_task_';
+function adminTaskGet(taskId){
+  try{ return JSON.parse(localStorage.getItem(ADMIN_TASK_STATE_KEY + taskId) || 'null') || {}; }catch(e){ return {}; }
+}
+function adminTaskSet(taskId, st){
+  try{ localStorage.setItem(ADMIN_TASK_STATE_KEY + taskId, JSON.stringify(st)); }catch(e){   }
+}
+function adminTaskClear(taskId){
+  try{ localStorage.removeItem(ADMIN_TASK_STATE_KEY + taskId); }catch(e){   }
+  delete adminTaskJoinDelay[taskId];
+}
+function adminTaskCooldownLeft(st){
+  return Math.max(0, Math.ceil(((st.until || 0) - Date.now()) / 1000));
+}
+// the Check button: its label and whether it can be pressed
+function adminTaskCheckView(taskId){
+  var st = adminTaskGet(taskId);
+  var cooldown = adminTaskCooldownLeft(st);
+  if (cooldown > 0) return { label: String(cooldown), enabled: false };
+  if (!st.joined) return { label: 'Check', enabled: false };
+  var delay = adminTaskJoinDelay[taskId];
+  if (delay > 0) return { label: String(Math.ceil(delay / 1000)), enabled: false };
+  return { label: 'Check', enabled: !adminTasksBusy[taskId] };
+}
+function adminTasksNeedTicker(){
+  var sections = ['partner', 'special'];
+  for (var i = 0; i < sections.length; i++){
+    var tasks = adminTasksState[sections[i]] || [];
+    for (var j = 0; j < tasks.length; j++){
+      var id = tasks[j].id;
+      if (adminTaskJoinDelay[id] > 0 || adminTaskCooldownLeft(adminTaskGet(id)) > 0) return true;
+    }
+  }
+  return false;
+}
+function ensureAdminTasksTicker(){
+  if (adminTasksTicker || !adminTasksNeedTicker()) return;
+  adminTasksTicker = setInterval(function(){
+    var visible = document.visibilityState !== 'hidden';
+    Object.keys(adminTaskJoinDelay).forEach(function(id){
+      if (visible && adminTaskJoinDelay[id] > 0) adminTaskJoinDelay[id] = Math.max(0, adminTaskJoinDelay[id] - 1000);
+    });
+    renderAdminTasks('partner');
+    renderAdminTasks('special');
+    if (!adminTasksNeedTicker()){
+      clearInterval(adminTasksTicker);
+      adminTasksTicker = null;
+    }
+  }, 1000);
+}
 function fetchAdminTasks(section){
   var cached = localCacheGet('tasks_' + section);
   if (cached){
     adminTasksState[section] = cached;
     renderAdminTasks(section);
+    ensureAdminTasksTicker();
     return;
   }
   var initData = getTelegramInitData();
@@ -8796,6 +8853,7 @@ function fetchAdminTasks(section){
     adminTasksState[section] = data.tasks || [];
     localCacheSet('tasks_' + section, adminTasksState[section]);
     renderAdminTasks(section);
+    ensureAdminTasksTicker();
   })
   .catch(function(err){
     console.error('fetch admin tasks (' + section + ') failed:', err);
@@ -8820,6 +8878,7 @@ function renderAdminTasks(section){
     var descHtml = t.description
       ? '<div class="ad-task__desc" style="font-size:calc(10px * var(--s));color:var(--ink-dim);margin-top:calc(2px * var(--s));">' + escapeHtmlClient(t.description) + '</div>'
       : '';
+    var check = adminTaskCheckView(t.id);
     return (
       '<div class="card partner-task">' +
         '<div class="ad-task__icon">' + iconHtml + '</div>' +
@@ -8832,49 +8891,40 @@ function renderAdminTasks(section){
             '<span class="ad-task__avail">Available</span>' +
           '</div>' +
         '</div>' +
-        '<button class="ad-task__watch partner-task__btn' + (adminTasksReady[t.id] ? ' is-ready' : '') + '" ' +
-          'onclick="onAdminTaskClick(' + Number(t.id) + ', \'' + section + '\')">' + adminTaskButtonLabel(t) + '</button>' +
+        '<div class="partner-task__actions">' +
+          '<button class="checkin-copy-btn" onclick="onAdminTaskJoinClick(' + Number(t.id) + ', \'' + section + '\')">Join</button>' +
+          '<button class="ad-task__watch partner-task__btn"' + (check.enabled ? '' : ' disabled') + ' ' +
+            'onclick="onAdminTaskCheckClick(' + Number(t.id) + ', \'' + section + '\')">' + check.label + '</button>' +
+        '</div>' +
       '</div>'
     );
   }).join('');
 }
-function adminTaskButtonLabel(t){
-  if (typeof adminTasksCountdown[t.id] === 'number') return String(adminTasksCountdown[t.id]);
-  if (adminTasksReady[t.id]) return 'Claim';
-  return 'Go';
-}
-function startAdminTaskCountdown(taskId, section){
-  clearInterval(adminTasksCountdownTimers[taskId]);
-  adminTasksCountdown[taskId] = ADMIN_TASK_COUNTDOWN_SECONDS;
-  renderAdminTasks(section);
-  adminTasksCountdownTimers[taskId] = setInterval(function(){
-    adminTasksCountdown[taskId]--;
-    if (adminTasksCountdown[taskId] <= 0){
-      clearInterval(adminTasksCountdownTimers[taskId]);
-      delete adminTasksCountdown[taskId];
-      adminTasksReady[taskId] = true;
-    }
-    renderAdminTasks(section);
-  }, 1000);
-}
-function onAdminTaskClick(taskId, section){
+function onAdminTaskJoinClick(taskId, section){
   var task = (adminTasksState[section] || []).find(function(t){ return t.id === taskId; });
-  if (!task || adminTasksBusy[taskId] || typeof adminTasksCountdown[taskId] === 'number') return;
-  if (!adminTasksReady[taskId]){
+  if (!task) return;
+  if (task.link){
     var tg = window.Telegram && window.Telegram.WebApp;
-    if (task.link){
-      if (tg && tg.openTelegramLink && task.link.indexOf('t.me') !== -1){
-        tg.openTelegramLink(task.link);
-      } else {
-        window.open(task.link, '_blank');
-      }
+    if (tg && tg.openTelegramLink && task.link.indexOf('t.me') !== -1){
+      tg.openTelegramLink(task.link);
+    } else {
+      window.open(task.link, '_blank');
     }
-    startAdminTaskCountdown(taskId, section);
-    return;
   }
+  var st = adminTaskGet(taskId);
+  st.joined = true;
+  adminTaskSet(taskId, st);
+  adminTaskJoinDelay[taskId] = ADMIN_TASK_JOIN_DELAY_MS;
+  renderAdminTasks(section);
+  ensureAdminTasksTicker();
+}
+function onAdminTaskCheckClick(taskId, section){
+  var task = (adminTasksState[section] || []).find(function(t){ return t.id === taskId; });
+  if (!task || !adminTaskCheckView(taskId).enabled) return;
   var initData = getTelegramInitData();
   if (!initData) return;
   adminTasksBusy[taskId] = true;
+  renderAdminTasks(section);
   fetch('/api/tasks/claim', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -8884,21 +8934,32 @@ function onAdminTaskClick(taskId, section){
   .then(function(r){
     adminTasksBusy[taskId] = false;
     if (!r.ok){
+      var st = adminTaskGet(taskId);
       if (r.data.error === 'not_member'){
+        st.rejects = (st.rejects || 0) + 1;
+        st.joined = false;
+        st.until = st.rejects >= 2 ? Date.now() + ADMIN_TASK_REJECT_COOLDOWN_MS : 0;
+        adminTaskSet(taskId, st);
         showBuyErrorToast('Join the channel first, then try again', { title: 'Task' });
+      } else if (r.data.error === 'verify_failed'){
+        var wait = Number(r.data.retry_after) > 0 ? Number(r.data.retry_after) * 1000 : ADMIN_TASK_RETRY_COOLDOWN_MS;
+        st.until = Date.now() + wait;
+        adminTaskSet(taskId, st);
+        showBuyErrorToast('Try again later', { title: 'Task' });
       } else if (r.data.error === 'task_full'){
         showBuyErrorToast('This task is no longer available', { title: 'Task' });
       } else if (r.data.error !== 'already_claimed'){
         showBuyErrorToast('Try again later', { title: 'Task' });
       }
+      renderAdminTasks(section);
+      ensureAdminTasksTicker();
       return;
     }
     var list = adminTasksState[section] || [];
     var idx = list.indexOf(task);
     if (idx !== -1) list.splice(idx, 1);
     localCacheSet('tasks_' + section, list);
-    delete adminTasksReady[taskId];
-    delete adminTasksCountdown[taskId];
+    adminTaskClear(taskId);
     updateBalanceDisplay({ coins: r.data.coins, gram: CURRENT_GRAM_BALANCE , locked_coins: r.data.locked_coins });
     showAppToast({ title: 'Task Reward', icon: PRIZE_ICON_URLS.coins, amount: '+' + r.data.reward + ' Coins' });
     renderAdminTasks(section);
@@ -8906,6 +8967,7 @@ function onAdminTaskClick(taskId, section){
   .catch(function(err){
     console.error('admin task claim failed:', err);
     adminTasksBusy[taskId] = false;
+    renderAdminTasks(section);
   });
 }
 
