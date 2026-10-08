@@ -92,6 +92,7 @@ const FRIEND_MILESTONES = [
 
 // Check-in config
 const CHECKIN_TASK_REWARDS = { 1: 10, 2: 10, 3: 20, 4: 20, 5: 5 };
+const CHECKIN_NEWS_CHANNEL = "@MinerXRealmNews";
 const CHECKIN_PARTNER_CHANNEL = "@XTreasuryX";
 
 // Bonus AD Every 1H config
@@ -2620,6 +2621,9 @@ async function handleCheckinClaim(request, env) {
     return jsonResponse({ error: "invalid_task" }, 400);
   }
   const column = `checkin${task}_claimed_date`;
+  if (task === 1 && !(await checkChannelMembership(env, CHECKIN_NEWS_CHANNEL, telegramId))) {
+    return jsonResponse({ error: "not_verified" }, 400);
+  }
   if (task === 3 && !verifyNameContainsBotMention(auth)) {
     return jsonResponse({ error: "not_verified" }, 400);
   }

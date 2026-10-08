@@ -4251,14 +4251,17 @@ body.reduce-motion .firefly{
               <svg viewBox="0 0 24 24" fill="none" stroke="var(--c-ad-watch-1)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 8.6c0-2.5-2-4.4-4.4-4.4-1.6 0-3 .8-3.8 2.1-.8-1.3-2.2-2.1-3.8-2.1-2.4 0-4.4 2-4.4 4.4 0 4.5 8.2 9.9 8.2 9.9s8.2-5.4 8.2-9.9z"/></svg>
             </div>
             <div class="partner-task__body">
-              <div class="ad-task__title">React To The Latest Post</div>
+              <div class="ad-task__title">Join &amp; React To The Latest Post</div>
               <div class="ad-task__meta">
                 <img draggable="false" loading="lazy" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:calc(18px * var(--s));height:calc(18px * var(--s));flex-shrink:0;vertical-align:middle;">
                 <span class="ad-task__reward">+10</span>
                 <span class="ad-task__avail">Available</span>
               </div>
             </div>
-            <button class="ad-task__watch partner-task__btn" id="checkin-btn-1" onclick="onCheckinGoClick(1, 'https://t.me/MinerXRealmNews')">Go</button>
+            <div class="partner-task__actions">
+              <button class="checkin-copy-btn" onclick="onCheckinJoinClick(1, 'https://t.me/MinerXRealmNews')">Join</button>
+              <button class="ad-task__watch partner-task__btn" id="checkin-btn-1" onclick="onCheckinVerifyClick(1)" disabled>Check</button>
+            </div>
           </div>
           <div class="card partner-task">
             <div class="ad-task__icon">
@@ -8632,7 +8635,9 @@ var checkinState = {
   ready: { 1: false, 2: false, 3: false, 4: false, 5: false },
   busy: { 1: false, 2: false, 3: false, 4: false, 5: false }
 };
-// Check on the partner channel task unlocks only after Join is tapped that UTC day (kept on the device, no request)
+// Check on the channel tasks (1: news channel, 5: partner channel) unlocks only after Join is tapped that UTC day
+// (kept on the device, no request)
+var CHECKIN_JOIN_TASKS = { 1: true, 5: true };
 var CHECKIN_JOIN_KEY = 'checkin_join_date_';
 function checkinUtcDate(){ return new Date(serverNow()).toISOString().slice(0, 10); }
 function isCheckinJoinedToday(task){
@@ -8650,7 +8655,7 @@ function onCheckinJoinClick(task, telegramLink){
   try{ localStorage.setItem(CHECKIN_JOIN_KEY + task, checkinUtcDate()); }catch(e){   }
   renderCheckinButton(task);
 }
-var checkinCountdownTimers = { 1: null, 2: null };
+var checkinCountdownTimers = { 2: null };
 function applyCheckinState(claimedToday, rewards){
   checkinState.claimedToday = claimedToday || checkinState.claimedToday;
   checkinState.rewards = rewards || checkinState.rewards;
@@ -8662,7 +8667,7 @@ function applyCheckinState(claimedToday, rewards){
 function renderCheckinButton(task){
   var btn = document.getElementById('checkin-btn-' + task);
   if (!btn) return;
-  if (task === 5){
+  if (CHECKIN_JOIN_TASKS[task]){
     btn.disabled = !checkinState.claimedToday[task] && checkinJoinedInMemory[task] !== checkinUtcDate() && !isCheckinJoinedToday(task);
   }
   if (checkinState.claimedToday[task]){
@@ -8683,7 +8688,7 @@ function renderCheckinButton(task){
     return;
   }
   btn.classList.remove('is-ready');
-  btn.textContent = (task === 3 || task === 4 || task === 5) ? 'Check' : 'Go';
+  btn.textContent = task === 2 ? 'Go' : 'Check';
 }
 function startCheckinCountdown(task){
   clearInterval(checkinCountdownTimers[task]);
@@ -8701,20 +8706,6 @@ function startCheckinCountdown(task){
     }
     if (btn) btn.textContent = String(remaining);
   }, 1000);
-}
-function onCheckinGoClick(task, telegramLink){
-  if (checkinState.claimedToday[task] || checkinState.busy[task]) return;
-  if (checkinState.ready[task]){
-    onCheckinClaimClick(task);
-    return;
-  }
-  var tg = window.Telegram && window.Telegram.WebApp;
-  if (tg && tg.openTelegramLink){
-    tg.openTelegramLink(telegramLink);
-  } else {
-    window.open(telegramLink, '_blank');
-  }
-  startCheckinCountdown(task);
 }
 function onCheckinShareClick(task){
   if (checkinState.claimedToday[task] || checkinState.busy[task]) return;
