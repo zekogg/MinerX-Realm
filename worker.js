@@ -2690,15 +2690,20 @@ async function handleTasksClaim(request, env) {
   const { telegramId } = auth;
   const taskId = Number(body.task_id);
   const task = await env.DB.prepare(
-    "SELECT id, reward_coins, channel_id, max_claims, claims_count FROM admin_tasks WHERE id = ? AND is_active = 1"
+    "SELECT id, reward_coins, link, channel_id, max_claims, claims_count FROM admin_tasks WHERE id = ? AND is_active = 1"
   ).bind(taskId).first();
   if (!task) {
     return jsonResponse({ error: "invalid_task" }, 400);
   }
-  if (task.channel_id) {
-    const isMember = await checkChannelMembership(env, task.channel_id, telegramId);
-    if (!isMember) {
+  const channel = task.channel_id || taskChannelFromLink(task.link);
+  if (channel) {
+    // a channel where the bot is not an admin can't be checked, so the task is accepted as before
+    const membership = await getTaskChannelMembership(env, channel, telegramId);
+    if (membership.state === "not_member") {
       return jsonResponse({ error: "not_member" }, 400);
+    }
+    if (membership.state === "retry") {
+      return jsonResponse({ error: "verify_failed", retry_after: membership.retryAfter || null }, 503);
     }
   }
   // one batch: the claim row only while the task has room, then the counter and the reward, each only when the
@@ -2730,6 +2735,60 @@ async function checkChannelMembership(env, channelId, telegramId) {
     console.error("getChatMember check failed:", e?.message || e);
     return false;
   }
+}
+
+// Partner/Special task channel: the public @username of a t.me link (a post link or a ?start link still names it).
+// Private invite links (+ / joinchat), folders and bots have none, so those tasks are not checked.
+const TASK_LINK_PATTERN = /^(?:https?:\/\/)?(?:www\.)?(?:t|telegram)\.me\/([A-Za-z][A-Za-z0-9_]{3,31})(?:[/?#].*)?$/i;
+function taskChannelFromLink(link) {
+  const match = typeof link === "string" ? link.trim().match(TASK_LINK_PATTERN) : null;
+  if (!match) return null;
+  const username = match[1];
+  if (/bot$/i.test(username) || /^(joinchat|addlist|share|proxy|socks|addstickers|addemoji|iv)$/i.test(username)) return null;
+  return "@" + username;
+}
+const TASK_VERIFY_TIMEOUT_MS = 4000;
+const TASK_VERIFY_RETRY_DELAY_MS = 500;
+async function fetchChatMemberOnce(env, chat, telegramId) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TASK_VERIFY_TIMEOUT_MS);
+  try {
+    const res = await fetch(telegramApiUrl(env, "getChatMember", { chat_id: chat, user_id: telegramId }), { signal: controller.signal });
+    let data = null;
+    try { data = await res.json(); } catch (e) {   }
+    if (data && data.ok) {
+      const member = data.result || {};
+      if (member.status === "member" || member.status === "administrator" || member.status === "creator") return { state: "member" };
+      if (member.status === "restricted") return { state: member.is_member ? "member" : "not_member" };
+      return { state: "not_member" };
+    }
+    if (data && data.error_code === 429) {
+      return { state: "rate_limited", retryAfter: Number(data.parameters && data.parameters.retry_after) || 10 };
+    }
+    if (data && (data.error_code === 400 || data.error_code === 403)) {
+      const description = String(data.description || "").toLowerCase();
+      if (description.includes("user not found") || description.includes("participant_id_invalid")) return { state: "not_member" };
+      // the bot is not an admin there (member list is inaccessible / chat not found / not a member / kicked)
+      return { state: "unverifiable" };
+    }
+    return { state: "retry" };
+  } catch (e) {
+    return { state: "retry" };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+// member / not_member / unverifiable, or retry (with retryAfter seconds when Telegram set one) once a second attempt
+// inside the same request has failed too: a dropped connection, a timeout, a 5xx or a rate limit of a second or less
+async function getTaskChannelMembership(env, chat, telegramId) {
+  let result = await fetchChatMemberOnce(env, chat, telegramId);
+  const quickRateLimit = result.state === "rate_limited" && result.retryAfter <= 1;
+  if (result.state === "retry" || quickRateLimit) {
+    await new Promise((resolve) => setTimeout(resolve, quickRateLimit ? result.retryAfter * 1000 : TASK_VERIFY_RETRY_DELAY_MS));
+    result = await fetchChatMemberOnce(env, chat, telegramId);
+  }
+  if (result.state === "rate_limited") return { state: "retry", retryAfter: result.retryAfter };
+  return result;
 }
 
 // Daily Combo generation (cron)
