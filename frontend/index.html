@@ -1878,23 +1878,18 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   color:#c9b8ff; background:rgba(150,120,255,.18); border:1px solid rgba(150,120,255,.35);
 }
 .sp-task__item{
-  display:flex; align-items:center; justify-content:space-between; gap:calc(10px * var(--s));
+  display:flex; flex-direction:column; align-items:stretch;
   padding:calc(8px * var(--s)) calc(10px * var(--s)); border-radius:calc(11px * var(--s));
   background:var(--stone-2); border:1px solid var(--stone-border);
 }
 .sp-task__item > [hidden]{ display:none; }
 .sp-task__slot{ width:100%; }
 .sp-task__slot.is-pending{ height:0; overflow:hidden; opacity:0; pointer-events:none; }
-/* Adsgram's task element: its --adsgram-task-* variables size the advertiser's image, title and button area;
-   the font is the app's, and our slotted buttons fill that area with their text centred */
+/* Adsgram's task element: the app's font; its --adsgram-task-* sizes are set on the element in plain px
+   (sponsoredTaskLook), and our slotted buttons fill its button area with their text centred */
 .sp-task__ad{
   display:block; width:100%;
   font-family:var(--font-body); font-weight:800; color:var(--ink);
-  --adsgram-task-font-size:calc(10.5px * var(--s));
-  --adsgram-task-icon-size:calc(32px * var(--s));
-  --adsgram-task-icon-border-radius:calc(9px * var(--s));
-  --adsgram-task-icon-title-gap:calc(10px * var(--s));
-  --adsgram-task-button-width:calc(66px * var(--s));
 }
 .sp-task__ad [slot="button"], .sp-task__ad [slot="claim"], .sp-task__ad [slot="done"]{
   display:flex; align-items:center; justify-content:center;
@@ -1913,6 +1908,8 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 @keyframes sp-sk-shine{ from{ background-position:200% 0; } to{ background-position:-200% 0; } }
 .sp-sk__msg{ font-weight:800; font-size:calc(10px * var(--s)); color:var(--ink-dim); }
 .sp-sk__meta{ display:flex; align-items:center; gap:calc(5px * var(--s)); }
+/* same width as Adsgram's button area, so Start does not move when the task appears */
+.sp-sk .partner-task__btn{ width:calc(66px * var(--s)); padding-left:0; padding-right:0; flex-shrink:0; }
 .sp-task__reward{ display:inline-flex; align-items:center; gap:calc(5px * var(--s)); }
 .ad-task__watch.is-ready{
   background:linear-gradient(135deg, #6fbf73, #2f7d3f);
@@ -8342,12 +8339,24 @@ function loadSponsoredTask(){
     if (sponsoredState.view === 'loading' && !sponsoredTaskEl) mountSponsoredTask();
   });
 }
+// Adsgram's sizes for the advertiser's image, title and button area, set on the element in plain px from the
+// UI scale (as Adsgram's own integrations do): calc() values in a stylesheet were not taken by the element
+function sponsoredTaskLook(el){
+  var scale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--s')) || 1;
+  var px = function(n){ return (Math.round(n * scale * 10) / 10) + 'px'; };
+  el.style.setProperty('--adsgram-task-font-size', px(10.5));
+  el.style.setProperty('--adsgram-task-icon-size', px(32));
+  el.style.setProperty('--adsgram-task-icon-border-radius', px(9));
+  el.style.setProperty('--adsgram-task-icon-title-gap', px(10));
+  el.style.setProperty('--adsgram-task-button-width', px(66));
+}
 function mountSponsoredTask(){
   var slot = document.getElementById('sp-task-slot');
   var el = document.createElement('adsgram-task');
   el.className = 'sp-task__ad';
   el.setAttribute('data-block-id', SPONSORED_TASK_BLOCK_ID);
   el.setAttribute('data-debug', String(ADSGRAM_DEBUG));
+  sponsoredTaskLook(el);
   el.innerHTML =
     '<span slot="reward" class="sp-task__reward">' +
       '<img draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:calc(18px * var(--s));height:calc(18px * var(--s));flex-shrink:0;">' +
