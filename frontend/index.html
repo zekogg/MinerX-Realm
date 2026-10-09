@@ -4183,7 +4183,7 @@ body.reduce-motion .firefly{
           <div class="ad-task__divider"></div>
           <div class="ad-task__footer">
             <button class="ad-task__watch" id="bonus-ad-watch-btn" onclick="onWatchBonusAdClick()">Watch</button>
-            <span class="ad-task__counter" id="bonus-ad-counter">0 / 5</span>
+            <span class="ad-task__counter" id="bonus-ad-counter">0 / 8</span>
           </div>
         </div>
         <div class="card ad-task">
@@ -7915,10 +7915,10 @@ function onWatchAdsgramClick(){
 }
 
 // Bonus AD Every 1H
-var BONUS_AD_BLOCK_ID = 'REPLACE_WITH_NEW_ADSGRAM_BLOCK_ID';
+var BONUS_AD_BLOCK_ID = '52885';
 var bonusAdsgramController = null;
 var BONUS_AD_COOLDOWN_MS = 60 * 60 * 1000;
-var bonusAdState = { watchedToday: 0, dailyLimit: 5, rewardCoins: 15, busy: false, nextAvailableAt: 0 };
+var bonusAdState = { watchedToday: 0, dailyLimit: 8, rewardCoins: 15, busy: false, nextAvailableAt: 0 };
 var bonusAdCountdownTimer = null;
 function isValidAdsgramBlockId(id){
   return /^(\d+|int-\d+)$/.test(String(id));
@@ -7943,7 +7943,7 @@ document.addEventListener('DOMContentLoaded', function(){
 });
 function applyBonusAdState(data){
   bonusAdState.watchedToday = data.watched_today || 0;
-  bonusAdState.dailyLimit = data.daily_limit || 5;
+  bonusAdState.dailyLimit = data.daily_limit || 8;
   bonusAdState.rewardCoins = data.reward_coins || 15;
   bonusAdState.nextAvailableAt = data.next_available_at || 0;
   startBonusAdCountdown();
@@ -7989,17 +7989,7 @@ function startBonusAdCountdown(){
 }
 function onWatchBonusAdClick(){
   if (!bonusAdsgramController){
-    if (!isValidAdsgramBlockId(BONUS_AD_BLOCK_ID) || bonusAdState.busy){
-      if (!bonusAdState.busy) showBuyErrorToast('Coming Soon', { title: 'Bonus Ad' });
-      return;
-    }
-    bonusAdState.busy = true;
-    waitForAdSdk(function(){ initBonusAdsgramController(); return !!bonusAdsgramController; }).then(function(ready){
-      bonusAdState.busy = false;
-      renderBonusAdButton();
-      if (ready) onWatchBonusAdClick();
-      else showBuyErrorToast('Ad not available right now', { title: 'Bonus Ad' });
-    });
+    showBuyErrorToast('Coming Soon', { title: 'Bonus AD Every 1H' });
     return;
   }
   if (bonusAdState.busy) return;
@@ -8010,20 +8000,24 @@ function onWatchBonusAdClick(){
   if (serverNow() < bonusAdState.nextAvailableAt) return;
   bonusAdState.busy = true;
   renderBonusAdButton();
+  showAdLoadingOverlay();
+  setAdLoadingOverlayVia('Adsgram');
   pauseAdVerification();
   bonusAdsgramController.show().then(function(){
+    hideAdLoadingOverlay();
     bonusAdState.busy = false;
     bonusAdState.watchedToday++;
     bonusAdState.nextAvailableAt = serverNow() + BONUS_AD_COOLDOWN_MS;
     creditAdRewardOptimistically(bonusAdState.rewardCoins);
-    showAppToast({ title: 'Bonus Ad Reward', icon: PRIZE_ICON_URLS.coins, amount: '+' + bonusAdState.rewardCoins + ' Coins' });
+    showAppToast({ title: 'Bonus AD Every 1H', icon: PRIZE_ICON_URLS.coins, amount: '+' + bonusAdState.rewardCoins + ' Coins' });
     triggerConfetti();
     startBonusAdCountdown();
     scheduleAdVerification(true);
   }).catch(function(){
+    hideAdLoadingOverlay();
     bonusAdState.busy = false;
     renderBonusAdButton();
-    showBuyErrorToast('Ad was not completed', { title: 'Bonus Ad' });
+    showBuyErrorToast('Ad was not completed', { title: 'Bonus AD Every 1H' });
     scheduleAdVerification(false);
   });
 }
