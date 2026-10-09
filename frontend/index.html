@@ -7937,6 +7937,7 @@ initBonusAdsgramController();
 document.addEventListener('DOMContentLoaded', function(){
   initAdsgramController();
   initBonusAdsgramController();
+  initGateAdsgramController();
   renderAdsTaskButton();
   renderBonusAdButton();
 });
@@ -8147,6 +8148,19 @@ function onWatchGigapubClick(){
 
 // Ad Gates
 var GIGAPUB_GATE_PLACEMENT = 'gate';
+// Adsgram gate block: second choice after GigaPub; its reward URL ends with &task=gate, so the server
+// counts the ad without coins and without touching the Watch Adsgram Ad daily count
+var GATE_ADSGRAM_BLOCK_ID = '52879';
+var gateAdsgramController = null;
+function initGateAdsgramController(){
+  if (window.Adsgram && !gateAdsgramController && isValidAdsgramBlockId(GATE_ADSGRAM_BLOCK_ID)){
+    try {
+      gateAdsgramController = window.Adsgram.init({ blockId: GATE_ADSGRAM_BLOCK_ID, debug: ADSGRAM_DEBUG });
+    } catch (e){
+      console.error('Gate Adsgram init failed:', e);
+    }
+  }
+}
 function showAdLoadingOverlay(){
   var el = document.getElementById('ad-loading-overlay');
   if (el) el.classList.add('is-visible');
@@ -8179,11 +8193,26 @@ function runAdGate(onSuccess, onFail, opts){
       if (!(opts && opts.noConfetti)) triggerConfetti();
       onSuccess();
     }).catch(function(){
-      runAdGateFailed(onFail, 'Ad was not completed');
+      runAdGateAdsgramFallback(onSuccess, onFail, opts);
     });
     return;
   }
-  runAdGateFailed(onFail, 'Ad not available right now');
+  runAdGateAdsgramFallback(onSuccess, onFail, opts);
+}
+function runAdGateAdsgramFallback(onSuccess, onFail, opts){
+  initGateAdsgramController();
+  if (!gateAdsgramController){
+    runAdGateFailed(onFail, 'Ad not available right now');
+    return;
+  }
+  setAdLoadingOverlayVia('Adsgram');
+  gateAdsgramController.show().then(function(){
+    setAdLoadingOverlayVerifying();
+    if (!(opts && opts.noConfetti)) triggerConfetti();
+    onSuccess();
+  }).catch(function(){
+    runAdGateFailed(onFail, 'Ad was not completed');
+  });
 }
 function runAdGateFailed(onFail, message){
   hideAdLoadingOverlay();

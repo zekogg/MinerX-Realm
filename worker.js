@@ -1443,6 +1443,11 @@ async function handleAdsReward(url, env) {
   if (url.searchParams.get("task") === "bonus_ad") {
     return handleBonusAdReward(telegramId, env);
   }
+  // gate block: counts the ad like a GigaPub gate ad (no coins, not against the task's daily count)
+  if (url.searchParams.get("task") === "gate") {
+    await bumpLifetimeAdsWatched(env, telegramId);
+    return new Response("OK", { status: 200 });
+  }
   const row = await env.DB.prepare(
     "SELECT adsgram_task_count, adsgram_task_date FROM users WHERE telegram_id = ?"
   ).bind(telegramId).first();
