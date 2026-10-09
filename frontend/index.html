@@ -1885,12 +1885,9 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .sp-task__item > [hidden]{ display:none; }
 .sp-task__slot{ width:100%; }
 .sp-task__slot.is-pending{ height:0; overflow:hidden; opacity:0; pointer-events:none; }
-/* Adsgram's task element: the app's font; its --adsgram-task-* sizes are set on the element in plain px
-   (sponsoredTaskLook), and our slotted buttons fill its button area with their text centred */
-.sp-task__ad{
-  display:block; width:100%;
-  font-family:var(--font-body); font-weight:800; color:var(--ink);
-}
+/* Adsgram's task element: its --adsgram-task-* sizes are set on the element in plain px (sponsoredTaskLook);
+   the title keeps Adsgram's own text style, and our slotted buttons fill its button area with their text centred */
+.sp-task__ad{ display:block; width:100%; }
 .sp-task__ad [slot="button"], .sp-task__ad [slot="claim"], .sp-task__ad [slot="done"]{
   display:flex; align-items:center; justify-content:center;
   width:100%; box-sizing:border-box; padding-left:0; padding-right:0; text-align:center;
@@ -8256,6 +8253,7 @@ var SPONSORED_TASK_MIN_LOADING_MS = 2000;
 var SPONSORED_TASK_DONE_SHOW_MS = 5000;
 // Claim counts down this long after Start before it can be tapped (Adsgram still checks the task itself)
 var SPONSORED_TASK_CLAIM_WAIT_S = 5;
+var SPONSORED_TASK_DONE_SHOW_S = SPONSORED_TASK_DONE_SHOW_MS / 1000;
 var sponsoredState = { doneToday: 0, dailyLimit: 10, rewardCoins: 20, loaded: false, opened: false, view: 'loading', lastLoadAt: 0 };
 var sponsoredTaskEl = null;
 var sponsoredReloadTimer = null;
@@ -8306,8 +8304,7 @@ function renderSponsoredTask(){
     return;
   }
   if (sponsoredTaskEl){
-    var counter = sponsoredTaskEl.querySelector('[data-sp-counter]');
-    if (counter) counter.textContent = sponsoredCounterText();
+    setSponsoredCounter(sponsoredTaskEl);
     document.getElementById('sp-task-counter').textContent = sponsoredCounterText();
     return;
   }
@@ -8341,12 +8338,11 @@ function loadSponsoredTask(){
     if (sponsoredState.view === 'loading' && !sponsoredTaskEl) mountSponsoredTask();
   });
 }
-// Adsgram's sizes for the advertiser's image, title and button area, set on the element in plain px from the
+// Adsgram's sizes for the advertiser's image, gap and button area, set on the element in plain px from the
 // UI scale (as Adsgram's own integrations do): calc() values in a stylesheet were not taken by the element
 function sponsoredTaskLook(el){
   var scale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--s')) || 1;
   var px = function(n){ return (Math.round(n * scale * 10) / 10) + 'px'; };
-  el.style.setProperty('--adsgram-task-font-size', px(10.5));
   el.style.setProperty('--adsgram-task-icon-size', px(32));
   el.style.setProperty('--adsgram-task-icon-border-radius', px(9));
   el.style.setProperty('--adsgram-task-icon-title-gap', px(10));
@@ -8368,13 +8364,17 @@ function mountSponsoredTask(){
     '<div slot="button" class="ad-task__watch partner-task__btn">Start</div>' +
     '<div slot="claim" class="ad-task__watch partner-task__btn">Claim</div>' +
     '<div slot="done" class="ad-task__watch partner-task__btn is-claimed">Done</div>';
-  var claimBtn = el.querySelector('[slot="claim"]');
-  el.querySelector('[slot="button"]').addEventListener('click', function(){ startSponsoredClaimWait(el, claimBtn); });
-  // a tap during the countdown stops here, before it reaches Adsgram's element
-  claimBtn.addEventListener('click', function(e){
-    if (!claimBtn.classList.contains('is-waiting')) return;
-    e.stopImmediatePropagation();
-    e.preventDefault();
+  el.__slotNodes = Array.prototype.slice.call(el.children);
+  // taps are watched on the element itself, before Adsgram's handlers run, because Adsgram may draw copies of our
+  // slot nodes (listeners on the nodes themselves never fired); a Claim tap during the countdown stops here
+  el.addEventListener('click', function(e){
+    var part = sponsoredTapPart(e, el);
+    if (part === 'claim' && el.__claimWaiting){
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      return;
+    }
+    if (part === 'button' || (part === null && !el.__claimWaitStarted)) startSponsoredClaimWait(el);
   }, true);
   el.addEventListener('reward', onSponsoredTaskReward);
   el.addEventListener('onBannerNotFound', hideSponsoredTask);
@@ -8400,19 +8400,47 @@ function mountSponsoredTask(){
   slot.appendChild(el);
   if (!window.ResizeObserver){ clearTimeout(sponsoredLoadTimer); setSponsoredView('task'); }
 }
+// which of our slots a tap landed on (the path holds Adsgram's copy or our own node, both carry the slot name)
+function sponsoredTapPart(e, el){
+  var path = e.composedPath ? e.composedPath() : [e.target];
+  for (var i = 0; i < path.length && path[i] !== el; i++){
+    var name = path[i] && path[i].getAttribute && path[i].getAttribute('slot');
+    if (name) return name;
+  }
+  return null;
+}
+// our node for a slot and any copy Adsgram drew of it, so a change shows wherever Adsgram displays it
+function setSponsoredSlot(el, name, text, waiting){
+  var nodes = (el.__slotNodes || []).filter(function(n){ return n.getAttribute('slot') === name; });
+  nodes = nodes.concat(Array.prototype.slice.call(el.querySelectorAll('[slot="' + name + '"]')));
+  if (el.shadowRoot) nodes = nodes.concat(Array.prototype.slice.call(el.shadowRoot.querySelectorAll('[slot="' + name + '"]')));
+  nodes.forEach(function(n){
+    n.textContent = text;
+    if (waiting !== undefined) n.classList.toggle('is-waiting', waiting);
+  });
+}
+// the daily count in our reward slot and in any copy Adsgram drew of it
+function setSponsoredCounter(el){
+  var roots = (el.__slotNodes || []).concat([el], el.shadowRoot ? [el.shadowRoot] : []);
+  roots.forEach(function(root){
+    root.querySelectorAll('[data-sp-counter]').forEach(function(n){ n.textContent = sponsoredCounterText(); });
+  });
+}
 // after Start, Claim shows a countdown and cannot be tapped until it ends (once per task)
-function startSponsoredClaimWait(el, claimBtn){
+function startSponsoredClaimWait(el){
   if (el.__claimWaitStarted) return;
   el.__claimWaitStarted = true;
+  el.__claimWaiting = true;
   var left = SPONSORED_TASK_CLAIM_WAIT_S;
-  claimBtn.classList.add('is-waiting');
-  claimBtn.textContent = String(left);
+  setSponsoredSlot(el, 'claim', String(left), true);
+  // again once Adsgram has drawn Claim for this tap
+  setTimeout(function(){ if (el.__claimWaiting) setSponsoredSlot(el, 'claim', String(left), true); }, 50);
   el.__claimTimer = setInterval(function(){
     left--;
-    if (left > 0){ claimBtn.textContent = String(left); return; }
+    if (left > 0){ setSponsoredSlot(el, 'claim', String(left), true); return; }
     clearInterval(el.__claimTimer);
-    claimBtn.classList.remove('is-waiting');
-    claimBtn.textContent = 'Claim';
+    el.__claimWaiting = false;
+    setSponsoredSlot(el, 'claim', 'Claim', false);
   }, 1000);
 }
 function unmountSponsoredTask(){
@@ -8420,6 +8448,7 @@ function unmountSponsoredTask(){
   clearTimeout(sponsoredLoadTimer);
   if (!sponsoredTaskEl) return;
   clearInterval(sponsoredTaskEl.__claimTimer);
+  clearInterval(sponsoredTaskEl.__doneTimer);
   if (sponsoredTaskEl.__spObserver) sponsoredTaskEl.__spObserver.disconnect();
   sponsoredTaskEl.remove();
   sponsoredTaskEl = null;
@@ -8452,8 +8481,20 @@ function onSponsoredTaskReward(){
   showAppToast({ title: 'Sponsored Task', icon: PRIZE_ICON_URLS.coins, amount: '+' + sponsoredState.rewardCoins + ' Coins' });
   triggerConfetti();
   scheduleAdVerification(true);
-  var counter = sponsoredTaskEl && sponsoredTaskEl.querySelector('[data-sp-counter]');
-  if (counter) counter.textContent = sponsoredCounterText();
+  var el = sponsoredTaskEl;
+  if (el){
+    setSponsoredCounter(el);
+    // Done counts down the seconds until the next task is asked for
+    var left = SPONSORED_TASK_DONE_SHOW_S;
+    setSponsoredSlot(el, 'done', 'Next ' + left);
+    setTimeout(function(){ if (left === SPONSORED_TASK_DONE_SHOW_S) setSponsoredSlot(el, 'done', 'Next ' + left); }, 50);
+    clearInterval(el.__doneTimer);
+    el.__doneTimer = setInterval(function(){
+      left--;
+      if (left > 0) setSponsoredSlot(el, 'done', 'Next ' + left);
+      else clearInterval(el.__doneTimer);
+    }, 1000);
+  }
   // a fresh element asks Adsgram for the next task (Come Back Later when there is none)
   clearTimeout(sponsoredReloadTimer);
   sponsoredReloadTimer = setTimeout(function(){
