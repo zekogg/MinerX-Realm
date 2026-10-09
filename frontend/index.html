@@ -1885,7 +1885,23 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .sp-task__item > [hidden]{ display:none; }
 .sp-task__slot{ width:100%; }
 .sp-task__slot.is-pending{ height:0; overflow:hidden; opacity:0; pointer-events:none; }
-.sp-task__ad{ display:block; width:100%; }
+/* Adsgram's task element: its --adsgram-task-* variables size the advertiser's image, title and button area;
+   the font is the app's, and our slotted buttons fill that area with their text centred */
+.sp-task__ad{
+  display:block; width:100%;
+  font-family:var(--font-body); font-weight:800; color:var(--ink);
+  --adsgram-task-font-size:calc(10.5px * var(--s));
+  --adsgram-task-icon-size:calc(32px * var(--s));
+  --adsgram-task-icon-border-radius:calc(9px * var(--s));
+  --adsgram-task-icon-title-gap:calc(10px * var(--s));
+  --adsgram-task-button-width:calc(66px * var(--s));
+}
+.sp-task__ad [slot="button"], .sp-task__ad [slot="claim"], .sp-task__ad [slot="done"]{
+  display:flex; align-items:center; justify-content:center;
+  width:100%; box-sizing:border-box; padding-left:0; padding-right:0; text-align:center;
+}
+.sp-task__ad [slot="done"]{ opacity:.5; }
+.sp-task__ad [slot="reward"]{ font-weight:normal; }
 .sp-sk{ display:flex; align-items:center; gap:calc(10px * var(--s)); width:100%; }
 .sp-sk__img{ width:calc(32px * var(--s)); height:calc(32px * var(--s)); border-radius:calc(9px * var(--s)); flex-shrink:0; background:rgba(196,181,253,.14); }
 .sp-sk__body{ flex:1; min-width:0; display:flex; flex-direction:column; gap:calc(5px * var(--s)); }
