@@ -6897,7 +6897,7 @@ fetchUserData();
         adminTasksFetched[target] = true;
         fetchAdminTasks(target);
       }
-      if (target === 'checkin') retrySponsoredTask();
+      if (target === 'checkin') onCheckinOpened();
     });
   });
   var copyBtn = document.getElementById('btn-copy-link');
@@ -8247,14 +8247,17 @@ function onWatchGigapubClick(){
 // Sponsored Task (Adsgram Task block, Check in tab): Adsgram picks the advertiser's task and checks it was done.
 // The reward and the counters come only from Adsgram's reward URL (&task=sponsored, 10 a day on the server);
 // the app shows the reward at once and the usual post-ad /api/user check confirms it.
-// Card states: loading (placeholder), task (Adsgram's row), none (Come Back Later) and limit (Come Back Tomorrow);
-// none asks Adsgram again when Check in is opened (Adsgram's servers only, no request to ours)
+// Card states: loading (placeholder), task (Adsgram's row), none (Come Back Later) and limit (Come Back Tomorrow).
+// A task is asked for only once Check in is opened, so Adsgram never loads one the user does not see; none asks
+// again when Check in is opened later (Adsgram's servers only, no request to ours)
 var SPONSORED_TASK_BLOCK_ID = 'task-52985';
 var SPONSORED_TASK_LOAD_TIMEOUT_MS = 15000;
-var SPONSORED_TASK_RETRY_GAP_MS = 30000;
+var SPONSORED_TASK_RETRY_GAP_MS = 60000;
 // the loading row stays at least this long, so a new task is seen arriving
-var SPONSORED_TASK_MIN_LOADING_MS = 1500;
-var sponsoredState = { doneToday: 0, dailyLimit: 10, rewardCoins: 20, loaded: false, view: 'loading', lastLoadAt: 0 };
+var SPONSORED_TASK_MIN_LOADING_MS = 2000;
+// how long Done shows after a claim before the next task is asked for
+var SPONSORED_TASK_DONE_SHOW_MS = 3000;
+var sponsoredState = { doneToday: 0, dailyLimit: 10, rewardCoins: 20, loaded: false, opened: false, view: 'loading', lastLoadAt: 0 };
 var sponsoredTaskEl = null;
 var sponsoredReloadTimer = null;
 var sponsoredLoadTimer = null;
@@ -8316,6 +8319,11 @@ function renderSponsoredTask(){
   }
   if (sponsoredState.view === 'loading' && sponsoredState.lastLoadAt){
     document.getElementById('sp-task-counter').textContent = sponsoredCounterText();
+    return;
+  }
+  // nothing is asked for until Check in has been opened
+  if (!sponsoredState.opened){
+    setSponsoredView('loading');
     return;
   }
   loadSponsoredTask();
@@ -8387,7 +8395,16 @@ function hideSponsoredTask(){
   if (sponsoredState.doneToday >= sponsoredState.dailyLimit) setSponsoredView('limit');
   else setSponsoredView('none');
 }
-// opening Check in asks Adsgram again after a Come Back Later (at most every 30 seconds)
+// the first opening of Check in asks for the first task; later ones ask again after a Come Back Later
+// (at most once a minute)
+function onCheckinOpened(){
+  if (!sponsoredState.opened){
+    sponsoredState.opened = true;
+    renderSponsoredTask();
+    return;
+  }
+  retrySponsoredTask();
+}
 function retrySponsoredTask(){
   if (!sponsoredState.loaded || sponsoredState.view !== 'none') return;
   if (sponsoredState.doneToday >= sponsoredState.dailyLimit) return;
@@ -8411,7 +8428,7 @@ function onSponsoredTaskReward(){
     } else {
       loadSponsoredTask();
     }
-  }, 2500);
+  }, SPONSORED_TASK_DONE_SHOW_MS);
 }
 
 // Ad Gates
