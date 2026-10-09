@@ -1856,6 +1856,37 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   border-color:transparent; text-shadow:none; box-shadow:none; transform:none;
 }
 .ad-task__counter{ font-size:calc(8px * var(--s)); color:var(--ink-faint); flex-shrink:0; }
+/* Sponsored Task: Adsgram renders the advertiser's image and title; the reward and buttons are our slots.
+   The card stays collapsed (is-pending) until the task has content and is hidden when there is none */
+.sp-task{
+  display:flex; flex-direction:column; gap:calc(8px * var(--s));
+  padding:calc(10px * var(--s)) calc(12px * var(--s)); margin-bottom:calc(10px * var(--s));
+  background:linear-gradient(160deg, rgba(150,110,255,.14), rgba(123,140,255,.05) 60%), var(--stone);
+  border-color:rgba(150,110,255,.35);
+}
+.sp-task[hidden]{ display:none; }
+.sp-task.is-pending{ height:0; padding:0; margin:0; border-width:0; overflow:hidden; opacity:0; pointer-events:none; }
+.sp-task__head{ display:flex; align-items:center; gap:calc(8px * var(--s)); }
+.sp-task__icon{
+  width:calc(26px * var(--s)); height:calc(26px * var(--s)); border-radius:calc(8px * var(--s)); flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(180deg, #b192ff, #7c4dff);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.45), 0 calc(2px * var(--s)) 0 #5326c9, 0 0 calc(10px * var(--s)) rgba(140,90,255,.45);
+}
+.sp-task__icon svg{ width:calc(15px * var(--s)); height:calc(15px * var(--s)); }
+.sp-task__title{ font-weight:800; font-size:calc(10.5px * var(--s)); }
+.sp-task__badge{
+  font-size:calc(7px * var(--s)); font-weight:800; padding:calc(1.5px * var(--s)) calc(6px * var(--s)); border-radius:999px;
+  color:#c9b8ff; background:rgba(150,120,255,.18); border:1px solid rgba(150,120,255,.35);
+}
+.sp-task__item{
+  display:flex; align-items:center; justify-content:space-between; gap:calc(10px * var(--s));
+  padding:calc(8px * var(--s)) calc(10px * var(--s)); border-radius:calc(11px * var(--s));
+  background:var(--stone-2); border:1px solid var(--stone-border);
+}
+.sp-task__item[hidden]{ display:none; }
+.sp-task__ad{ display:block; width:100%; }
+.sp-task__reward{ display:inline-flex; align-items:center; gap:calc(5px * var(--s)); }
 .ad-task__watch.is-ready{
   background:linear-gradient(135deg, #6fbf73, #2f7d3f);
   color:#eafdec;
@@ -4225,6 +4256,18 @@ body.reduce-motion .firefly{
       <!-- Check-in Tab -->
       <div class="task-panel" id="task-panel-checkin">
         <div class="task-warning"><span>⚠️ Reset Daily at 00:00 UTC</span></div>
+        <div class="card sp-task" id="sp-task-card" hidden>
+          <div class="sp-task__head">
+            <div class="sp-task__icon"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 6a13 13 0 0 0 8.4-2.8A1 1 0 0 1 21 4v12a1 1 0 0 1-1.6.8A13 13 0 0 0 11 14H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/><path d="M6 14a12 12 0 0 0 2.4 7.2 2 2 0 0 0 3.2-2.4A8 8 0 0 1 10 14"/><path d="M8 6v8"/></svg></div>
+            <div class="sp-task__title">Sponsored Task</div>
+            <span class="sp-task__badge" data-no-i18n>AdsGram</span>
+          </div>
+          <div class="sp-task__item" id="sp-task-slot"></div>
+          <div class="sp-task__item" id="sp-task-limit" hidden>
+            <span class="ad-task__avail">Come Back Tomorrow</span>
+            <span class="ad-task__counter" id="sp-task-limit-counter">10 / 10</span>
+          </div>
+        </div>
         <div class="ad-tasks-grid">
           <div class="card partner-task">
             <div class="ad-task__icon">
@@ -5720,6 +5763,11 @@ function fetchUserData(){
       watched_today: data.user.gigapub_watched_today,
       daily_limit: data.user.gigapub_daily_limit,
       reward_coins: data.user.gigapub_reward_coins
+    });
+    applySponsoredTaskState({
+      done_today: data.user.sponsored_task_done_today,
+      daily_limit: data.user.sponsored_task_daily_limit,
+      reward_coins: data.user.sponsored_task_reward_coins
     });
     setupInviteLink(data.user.telegram_id);
     applyFriendsState({
@@ -8155,6 +8203,123 @@ function onWatchGigapubClick(){
     showBuyErrorToast('Ad was not completed', { title: 'Watch gigapub ads' });
     scheduleAdVerification(false);
   });
+}
+
+// Sponsored Task (Adsgram Task block, Check in tab): Adsgram picks the advertiser's task and checks it was done.
+// The reward and the counters come only from Adsgram's reward URL (&task=sponsored, 10 a day on the server);
+// the app shows the reward at once and the usual post-ad /api/user check confirms it
+var SPONSORED_TASK_BLOCK_ID = 'task-52985';
+var sponsoredState = { doneToday: 0, dailyLimit: 10, rewardCoins: 20, loaded: false, waitingForSdk: false };
+var sponsoredTaskEl = null;
+var sponsoredReloadTimer = null;
+function applySponsoredTaskState(data){
+  sponsoredState.doneToday = data.done_today || 0;
+  sponsoredState.dailyLimit = data.daily_limit || 10;
+  sponsoredState.rewardCoins = data.reward_coins || 20;
+  sponsoredState.loaded = true;
+  renderSponsoredTask();
+}
+function renderSponsoredTask(){
+  var card = document.getElementById('sp-task-card');
+  var limitRow = document.getElementById('sp-task-limit');
+  var slot = document.getElementById('sp-task-slot');
+  if (!card || !sponsoredState.loaded) return;
+  var counterText = sponsoredState.doneToday + ' / ' + sponsoredState.dailyLimit;
+  // past the daily limit no task is loaded, so none can be done without a reward
+  if (sponsoredState.doneToday >= sponsoredState.dailyLimit){
+    unmountSponsoredTask();
+    document.getElementById('sp-task-limit-counter').textContent = counterText;
+    slot.hidden = true;
+    limitRow.hidden = false;
+    card.classList.remove('is-pending');
+    card.hidden = false;
+    return;
+  }
+  limitRow.hidden = true;
+  slot.hidden = false;
+  if (sponsoredTaskEl){
+    var counter = sponsoredTaskEl.querySelector('[data-sp-counter]');
+    if (counter) counter.textContent = counterText;
+    return;
+  }
+  if (!window.customElements) return;
+  if (!customElements.get('adsgram-task')){
+    // the Adsgram SDK defines the element once it has loaded
+    if (!sponsoredState.waitingForSdk){
+      sponsoredState.waitingForSdk = true;
+      customElements.whenDefined('adsgram-task').then(function(){
+        sponsoredState.waitingForSdk = false;
+        renderSponsoredTask();
+      });
+    }
+    return;
+  }
+  mountSponsoredTask(counterText);
+}
+function mountSponsoredTask(counterText){
+  var card = document.getElementById('sp-task-card');
+  var slot = document.getElementById('sp-task-slot');
+  var el = document.createElement('adsgram-task');
+  el.className = 'sp-task__ad';
+  el.setAttribute('data-block-id', SPONSORED_TASK_BLOCK_ID);
+  el.setAttribute('data-debug', String(ADSGRAM_DEBUG));
+  el.innerHTML =
+    '<span slot="reward" class="sp-task__reward">' +
+      '<img draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:calc(18px * var(--s));height:calc(18px * var(--s));flex-shrink:0;">' +
+      '<span class="ad-task__reward">+' + sponsoredState.rewardCoins + '</span>' +
+      '<span class="ad-task__counter" data-sp-counter>' + counterText + '</span>' +
+    '</span>' +
+    '<div slot="button" class="ad-task__watch partner-task__btn">Start</div>' +
+    '<div slot="claim" class="ad-task__watch partner-task__btn">Claim</div>' +
+    '<div slot="done" class="ad-task__watch partner-task__btn is-claimed">Done</div>';
+  el.addEventListener('reward', onSponsoredTaskReward);
+  el.addEventListener('onBannerNotFound', hideSponsoredTask);
+  el.addEventListener('onTooLongSession', hideSponsoredTask);
+  el.addEventListener('onError', function(e){
+    console.warn('Sponsored task error:', e && e.detail);
+    showBuyErrorToast('Complete the task fully, then try again', { title: 'Task not completed' });
+  });
+  // the card opens only once Adsgram has drawn a task, so an empty card never shows
+  card.classList.add('is-pending');
+  card.hidden = false;
+  if (window.ResizeObserver){
+    el.__spObserver = new ResizeObserver(function(){
+      if (el.getBoundingClientRect().height > 0) card.classList.remove('is-pending');
+    });
+    el.__spObserver.observe(el);
+  } else {
+    card.classList.remove('is-pending');
+  }
+  sponsoredTaskEl = el;
+  slot.appendChild(el);
+}
+function unmountSponsoredTask(){
+  clearTimeout(sponsoredReloadTimer);
+  if (!sponsoredTaskEl) return;
+  if (sponsoredTaskEl.__spObserver) sponsoredTaskEl.__spObserver.disconnect();
+  sponsoredTaskEl.remove();
+  sponsoredTaskEl = null;
+}
+// no task for this user right now: the card goes and the list is as before
+function hideSponsoredTask(){
+  unmountSponsoredTask();
+  var card = document.getElementById('sp-task-card');
+  if (card){ card.hidden = true; card.classList.remove('is-pending'); }
+}
+function onSponsoredTaskReward(){
+  sponsoredState.doneToday++;
+  creditAdRewardOptimistically(sponsoredState.rewardCoins);
+  showAppToast({ title: 'Sponsored Task', icon: PRIZE_ICON_URLS.coins, amount: '+' + sponsoredState.rewardCoins + ' Coins' });
+  triggerConfetti();
+  scheduleAdVerification(true);
+  var counter = sponsoredTaskEl && sponsoredTaskEl.querySelector('[data-sp-counter]');
+  if (counter) counter.textContent = sponsoredState.doneToday + ' / ' + sponsoredState.dailyLimit;
+  // a fresh element asks Adsgram for the next task (or hides the card when there is none)
+  clearTimeout(sponsoredReloadTimer);
+  sponsoredReloadTimer = setTimeout(function(){
+    unmountSponsoredTask();
+    renderSponsoredTask();
+  }, 2500);
 }
 
 // Ad Gates
