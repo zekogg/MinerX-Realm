@@ -8252,6 +8252,8 @@ function onWatchGigapubClick(){
 var SPONSORED_TASK_BLOCK_ID = 'task-52985';
 var SPONSORED_TASK_LOAD_TIMEOUT_MS = 15000;
 var SPONSORED_TASK_RETRY_GAP_MS = 30000;
+// the loading row stays at least this long, so a new task is seen arriving
+var SPONSORED_TASK_MIN_LOADING_MS = 1500;
 var sponsoredState = { doneToday: 0, dailyLimit: 10, rewardCoins: 20, loaded: false, view: 'loading', lastLoadAt: 0 };
 var sponsoredTaskEl = null;
 var sponsoredReloadTimer = null;
@@ -8359,7 +8361,10 @@ function mountSponsoredTask(){
     el.__spObserver = new ResizeObserver(function(){
       if (sponsoredTaskEl === el && sponsoredState.view === 'loading' && el.getBoundingClientRect().height > 0){
         clearTimeout(sponsoredLoadTimer);
-        setSponsoredView('task');
+        var wait = SPONSORED_TASK_MIN_LOADING_MS - (Date.now() - sponsoredState.lastLoadAt);
+        sponsoredLoadTimer = setTimeout(function(){
+          if (sponsoredTaskEl === el && sponsoredState.view === 'loading') setSponsoredView('task');
+        }, Math.max(0, wait));
       }
     });
     el.__spObserver.observe(el);
