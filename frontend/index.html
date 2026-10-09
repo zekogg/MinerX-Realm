@@ -4162,12 +4162,12 @@ body.reduce-motion .firefly{
           <div class="ad-task__meta">
             <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:calc(18px * var(--s));height:calc(18px * var(--s));flex-shrink:0;vertical-align:middle;">
             <span class="ad-task__reward">+15 / Ad</span>
-            <span class="ad-task__avail">Coming Soon</span>
+            <span class="ad-task__avail" id="ads-task-avail">Available</span>
           </div>
           <div class="ad-task__divider"></div>
           <div class="ad-task__footer">
-            <button class="ad-task__watch is-claimed">Soon</button>
-            <span class="ad-task__counter">0 / 10</span>
+            <button class="ad-task__watch" id="ads-task-watch-btn" onclick="onWatchAdsgramClick()">Watch</button>
+            <span class="ad-task__counter" id="ads-task-counter">0 / 10</span>
           </div>
         </div>
         <div class="card ad-task">
@@ -7851,6 +7851,11 @@ function renderAdsTaskButton(){
   var counter = domCache.adsTaskCounter;
   var avail = domCache.adsTaskAvail;
   if (counter) counter.textContent = adsTaskState.watchedToday + ' / ' + adsTaskState.dailyLimit;
+  if (!adsgramController){
+    if (avail) avail.textContent = 'Coming Soon';
+    if (btn){ btn.textContent = 'Soon'; btn.classList.add('is-claimed'); }
+    return;
+  }
   if (avail) avail.textContent = adsTaskState.watchedToday >= adsTaskState.dailyLimit ? 'Come Back Tomorrow' : 'Available';
   var cooldownRemaining = Math.ceil((adsTaskState.cooldownUntil - Date.now()) / 1000);
   var inCooldown = cooldownRemaining > 0;
@@ -7877,37 +7882,34 @@ function startAdsTaskCooldown(){
   }, 1000);
 }
 function onWatchAdsgramClick(){
+  if (!adsgramController){
+    showBuyErrorToast('Coming Soon', { title: 'Watch Adsgram Ad' });
+    return;
+  }
   if (adsTaskState.busy || Date.now() < adsTaskState.cooldownUntil) return;
   if (adsTaskState.watchedToday >= adsTaskState.dailyLimit){
     showComeBackTomorrowToast();
     return;
   }
-  if (!adsgramController){
-    adsTaskState.busy = true;
-    renderAdsTaskButton();
-    waitForAdSdk(function(){ initAdsgramController(); return !!adsgramController; }).then(function(ready){
-      adsTaskState.busy = false;
-      renderAdsTaskButton();
-      if (ready) onWatchAdsgramClick();
-      else showBuyErrorToast('Ad not available right now', { title: 'Watch Ad' });
-    });
-    return;
-  }
   adsTaskState.busy = true;
   renderAdsTaskButton();
+  showAdLoadingOverlay();
+  setAdLoadingOverlayVia('Adsgram');
   pauseAdVerification();
   adsgramController.show().then(function(){
+    hideAdLoadingOverlay();
     adsTaskState.busy = false;
     adsTaskState.watchedToday++;
     creditAdRewardOptimistically(adsTaskState.rewardCoins);
-    showAppToast({ title: 'Ad Reward', icon: PRIZE_ICON_URLS.coins, amount: '+' + adsTaskState.rewardCoins + ' Coins' });
+    showAppToast({ title: 'Watch Adsgram Ad', icon: PRIZE_ICON_URLS.coins, amount: '+' + adsTaskState.rewardCoins + ' Coins' });
     triggerConfetti();
     startAdsTaskCooldown();
     scheduleAdVerification(true);
   }).catch(function(){
+    hideAdLoadingOverlay();
     adsTaskState.busy = false;
     renderAdsTaskButton();
-    showBuyErrorToast('Ad was not completed', { title: 'Watch Ad' });
+    showBuyErrorToast('Ad was not completed', { title: 'Watch Adsgram Ad' });
     scheduleAdVerification(false);
   });
 }
@@ -7935,6 +7937,7 @@ initBonusAdsgramController();
 document.addEventListener('DOMContentLoaded', function(){
   initAdsgramController();
   initBonusAdsgramController();
+  renderAdsTaskButton();
   renderBonusAdButton();
 });
 function applyBonusAdState(data){
