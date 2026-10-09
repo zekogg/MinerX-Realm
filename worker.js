@@ -104,6 +104,10 @@ const BONUS_AD_COOLDOWN_MS = 60 * 60 * 1000;
 const GIGAPUB_REWARD_COINS = 15;
 const GIGAPUB_DAILY_LIMIT = 10;
 
+// Sponsored Task (Adsgram Task block) config
+const SPONSORED_TASK_REWARD_COINS = 20;
+const SPONSORED_TASK_DAILY_LIMIT = 10;
+
 // Realm pets & Storage config
 const PETS = {
   duck:         { basespeed: 77,    price: 200000 },
@@ -382,6 +386,7 @@ async function handleGetUser(request, env) {
            u.checkin1_claimed_date, u.checkin2_claimed_date, u.checkin3_claimed_date, u.checkin4_claimed_date, u.checkin5_claimed_date,
            u.bonus_ad_count_today, u.bonus_ad_date, u.bonus_ad_last_watched_at,
            u.gigapub_task_count, u.gigapub_task_date, u.photo_url,
+           u.sponsored_task_count, u.sponsored_task_date,
            u.lifetime_ads_watched,
            u.combo_date, u.combo_attempts_used, u.combo_solved, u.device_id, u.banned_at, u.locked_coins
     FROM users u
@@ -477,6 +482,9 @@ async function handleGetUser(request, env) {
   view.gigapub_watched_today = user.gigapub_task_date === today ? (user.gigapub_task_count || 0) : 0;
   view.gigapub_daily_limit = GIGAPUB_DAILY_LIMIT;
   view.gigapub_reward_coins = GIGAPUB_REWARD_COINS;
+  view.sponsored_task_done_today = user.sponsored_task_date === today ? (user.sponsored_task_count || 0) : 0;
+  view.sponsored_task_daily_limit = SPONSORED_TASK_DAILY_LIMIT;
+  view.sponsored_task_reward_coins = SPONSORED_TASK_REWARD_COINS;
   view.locked_coins = user.locked_coins || 0;
   return jsonResponse({ user: view });
 }
@@ -1448,6 +1456,9 @@ async function handleAdsReward(url, env) {
     await bumpLifetimeAdsWatched(env, telegramId);
     return new Response("OK", { status: 200 });
   }
+  if (url.searchParams.get("task") === "sponsored") {
+    return handleSponsoredTaskReward(telegramId, env);
+  }
   const row = await env.DB.prepare(
     "SELECT adsgram_task_count, adsgram_task_date FROM users WHERE telegram_id = ?"
   ).bind(telegramId).first();
@@ -1469,6 +1480,24 @@ async function handleAdsReward(url, env) {
   if (updated) {
     await activateReferralOnLifetimeAds(env, telegramId, updated.referred_by, updated.lifetime_ads_watched);
   }
+  return new Response("OK", { status: 200 });
+}
+
+// Sponsored Task: Adsgram checks the advertiser's task was done and calls this once per completed task.
+// Reward, daily count and ad counters in one write; the WHERE refuses it past the daily limit, so no read is needed first
+async function handleSponsoredTaskReward(telegramId, env) {
+  const today = todayUTC();
+  const updated = await env.DB.prepare(
+    `UPDATE users SET coins = coins + ?,
+       sponsored_task_count = CASE WHEN sponsored_task_date = ? THEN sponsored_task_count + 1 ELSE 1 END, sponsored_task_date = ?,
+       lifetime_ads_watched = COALESCE(lifetime_ads_watched, 0) + 1, weekly_ads_watched = weekly_ads_watched + 1, ${ADS_TODAY_PLUS_ONE}
+     WHERE telegram_id = ? AND (sponsored_task_date IS NULL OR sponsored_task_date <> ? OR sponsored_task_count < ?)
+     RETURNING lifetime_ads_watched, referred_by`
+  ).bind(SPONSORED_TASK_REWARD_COINS, today, today, telegramId, today, SPONSORED_TASK_DAILY_LIMIT).first();
+  if (!updated) {
+    return new Response("limit reached or user not found", { status: 200 });
+  }
+  await activateReferralOnLifetimeAds(env, telegramId, updated.referred_by, updated.lifetime_ads_watched);
   return new Response("OK", { status: 200 });
 }
 
