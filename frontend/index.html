@@ -4199,7 +4199,7 @@ body.reduce-motion .firefly{
           <div class="ad-task__divider"></div>
           <div class="ad-task__footer">
             <button class="ad-task__watch" id="gigapub-task-watch-btn" onclick="onWatchGigapubClick()">Watch</button>
-            <span class="ad-task__counter" id="gigapub-task-counter">0 / 8</span>
+            <span class="ad-task__counter" id="gigapub-task-counter">0 / 10</span>
           </div>
         </div>
       </div>
@@ -8027,7 +8027,7 @@ function onWatchBonusAdClick(){
 // Watch GigaPub Ads
 var GIGAPUB_PUBLISHER_ID = '8282';
 var gigapubReady = false;
-var gigapubState = { watchedToday: 0, dailyLimit: 8, rewardCoins: 15, busy: false, cooldownUntil: 0 };
+var gigapubState = { watchedToday: 0, dailyLimit: 10, rewardCoins: 15, busy: false, cooldownUntil: 0 };
 var gigapubTaskCooldownTimer = null;
 function isValidGigapubId(id){
   return /^\d+$/.test(String(id));
@@ -8065,7 +8065,7 @@ function loadGigapubScript(){
 loadGigapubScript();
 function applyGigapubState(data){
   gigapubState.watchedToday = data.watched_today || 0;
-  gigapubState.dailyLimit = data.daily_limit || 8;
+  gigapubState.dailyLimit = data.daily_limit || 10;
   gigapubState.rewardCoins = data.reward_coins || 15;
   renderGigapubButton();
 }

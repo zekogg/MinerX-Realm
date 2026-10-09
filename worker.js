@@ -102,7 +102,7 @@ const BONUS_AD_COOLDOWN_MS = 60 * 60 * 1000;
 
 // Watch GigaPub ads config
 const GIGAPUB_REWARD_COINS = 15;
-const GIGAPUB_DAILY_LIMIT = 8;
+const GIGAPUB_DAILY_LIMIT = 10;
 
 // Realm pets & Storage config
 const PETS = {
