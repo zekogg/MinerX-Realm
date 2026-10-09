@@ -97,7 +97,7 @@ const CHECKIN_PARTNER_CHANNEL = "@XTreasuryX";
 
 // Bonus AD Every 1H config
 const BONUS_AD_REWARD_COINS = 15;
-const BONUS_AD_DAILY_LIMIT = 5;
+const BONUS_AD_DAILY_LIMIT = 8;
 const BONUS_AD_COOLDOWN_MS = 60 * 60 * 1000;
 
 // Watch GigaPub ads config
