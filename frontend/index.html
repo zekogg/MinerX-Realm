@@ -662,9 +662,10 @@ function i18nPick(ev, code){
   --c-free-pet-progress-1: #6b3fa0;
   --c-free-pet-progress-2: #a56cf0;
   --c-ad-avail-text: #6fbf73;
-  --c-ad-watch-1:    #4a9eff;
-  --c-ad-watch-2:    #12171D;
-  --c-ad-watch-text: #f3f8ff;
+  --c-ad-watch-1:    #7b8cff;
+  --c-ad-watch-2:    #22c6ff;
+  --c-ad-watch-text: #ffffff;
+  --c-ad-watch-lip:  #3341b0;
   --c-btn-convert-1:    #4338ca;
   --c-btn-convert-2:    #6366f1;
   --c-btn-convert-text: #f5f3ff;
@@ -1467,7 +1468,6 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .mystery-box__slot--filled img[alt="Penguin"]{ transform:scale(1.45); }
 .mystery-box__check{
   width:70%; padding:calc(5px * var(--s)); border-radius:calc(9px * var(--s)); flex-shrink:0;
-  background:linear-gradient(135deg, var(--c-ad-watch-1), var(--c-ad-watch-2));
   color:var(--c-ad-watch-text); font-weight:800; font-size:calc(10px * var(--s));
 }
 .mystery-box__check:disabled{ opacity:.5; }
@@ -1835,8 +1835,25 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .ad-task__footer{ display:flex; align-items:center; justify-content:space-between; gap:calc(6px * var(--s)); margin-top:calc(2px * var(--s)); }
 .ad-task__watch{
   padding:calc(6px * var(--s)) calc(14px * var(--s)); border-radius:calc(9px * var(--s)); flex-shrink:0;
-  background:linear-gradient(135deg, var(--c-ad-watch-1), var(--c-ad-watch-2));
   color:var(--c-ad-watch-text); font-weight:800; font-size:calc(9.5px * var(--s));
+}
+/* 3D look shared by the task buttons and the Daily Combo Check button: top shine, darker lip and drop shadow;
+   the button sinks onto its lip while pressed */
+.ad-task__watch, .mystery-box__check{
+  background:linear-gradient(180deg, var(--c-ad-watch-1), var(--c-ad-watch-2));
+  border:1px solid rgba(255,255,255,.18);
+  text-shadow:0 1px 0 rgba(0,0,0,.25);
+  box-shadow:inset 0 calc(1.5px * var(--s)) 0 rgba(255,255,255,.55), inset 0 calc(-2px * var(--s)) 0 rgba(0,0,0,.18),
+    0 calc(3px * var(--s)) 0 var(--c-ad-watch-lip), 0 calc(5px * var(--s)) calc(8px * var(--s)) rgba(0,0,0,.45);
+  transform:translateY(calc(-1.5px * var(--s)));
+}
+.ad-task__watch:active:not(:disabled):not(.is-claimed), .mystery-box__check:active:not(:disabled){
+  transform:translateY(calc(1px * var(--s)));
+  box-shadow:inset 0 calc(1px * var(--s)) 0 rgba(255,255,255,.4), 0 calc(1px * var(--s)) 0 var(--c-ad-watch-lip);
+}
+/* the Daily Combo result states and the green ready state keep their own flat look */
+.mystery-box__check.is-solved, .mystery-box__check.is-failed, .ad-task__watch.is-ready{
+  border-color:transparent; text-shadow:none; box-shadow:none; transform:none;
 }
 .ad-task__counter{ font-size:calc(8px * var(--s)); color:var(--ink-faint); flex-shrink:0; }
 .ad-task__watch.is-ready{
