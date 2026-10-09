@@ -1895,7 +1895,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   display:flex; align-items:center; justify-content:center;
   width:100%; box-sizing:border-box; padding-left:0; padding-right:0; text-align:center;
 }
-.sp-task__ad [slot="done"]{ opacity:.5; }
+.sp-task__ad [slot="done"], .sp-task__ad [slot="claim"].is-waiting{ opacity:.5; }
 .sp-task__ad [slot="reward"]{ font-weight:normal; }
 .sp-sk{ display:flex; align-items:center; gap:calc(10px * var(--s)); width:100%; }
 .sp-sk__img{ width:calc(32px * var(--s)); height:calc(32px * var(--s)); border-radius:calc(9px * var(--s)); flex-shrink:0; background:rgba(196,181,253,.14); }
@@ -8254,6 +8254,8 @@ var SPONSORED_TASK_RETRY_GAP_MS = 60000;
 var SPONSORED_TASK_MIN_LOADING_MS = 2000;
 // how long Done shows after a claim before the next task is asked for
 var SPONSORED_TASK_DONE_SHOW_MS = 3000;
+// Claim counts down this long after Start before it can be tapped (Adsgram still checks the task itself)
+var SPONSORED_TASK_CLAIM_WAIT_S = 5;
 var sponsoredState = { doneToday: 0, dailyLimit: 10, rewardCoins: 20, loaded: false, opened: false, view: 'loading', lastLoadAt: 0 };
 var sponsoredTaskEl = null;
 var sponsoredReloadTimer = null;
@@ -8366,6 +8368,14 @@ function mountSponsoredTask(){
     '<div slot="button" class="ad-task__watch partner-task__btn">Start</div>' +
     '<div slot="claim" class="ad-task__watch partner-task__btn">Claim</div>' +
     '<div slot="done" class="ad-task__watch partner-task__btn is-claimed">Done</div>';
+  var claimBtn = el.querySelector('[slot="claim"]');
+  el.querySelector('[slot="button"]').addEventListener('click', function(){ startSponsoredClaimWait(el, claimBtn); });
+  // a tap during the countdown stops here, before it reaches Adsgram's element
+  claimBtn.addEventListener('click', function(e){
+    if (!claimBtn.classList.contains('is-waiting')) return;
+    e.stopImmediatePropagation();
+    e.preventDefault();
+  }, true);
   el.addEventListener('reward', onSponsoredTaskReward);
   el.addEventListener('onBannerNotFound', hideSponsoredTask);
   el.addEventListener('onTooLongSession', hideSponsoredTask);
@@ -8390,10 +8400,26 @@ function mountSponsoredTask(){
   slot.appendChild(el);
   if (!window.ResizeObserver){ clearTimeout(sponsoredLoadTimer); setSponsoredView('task'); }
 }
+// after Start, Claim shows a countdown and cannot be tapped until it ends (once per task)
+function startSponsoredClaimWait(el, claimBtn){
+  if (el.__claimWaitStarted) return;
+  el.__claimWaitStarted = true;
+  var left = SPONSORED_TASK_CLAIM_WAIT_S;
+  claimBtn.classList.add('is-waiting');
+  claimBtn.textContent = String(left);
+  el.__claimTimer = setInterval(function(){
+    left--;
+    if (left > 0){ claimBtn.textContent = String(left); return; }
+    clearInterval(el.__claimTimer);
+    claimBtn.classList.remove('is-waiting');
+    claimBtn.textContent = 'Claim';
+  }, 1000);
+}
 function unmountSponsoredTask(){
   clearTimeout(sponsoredReloadTimer);
   clearTimeout(sponsoredLoadTimer);
   if (!sponsoredTaskEl) return;
+  clearInterval(sponsoredTaskEl.__claimTimer);
   if (sponsoredTaskEl.__spObserver) sponsoredTaskEl.__spObserver.disconnect();
   sponsoredTaskEl.remove();
   sponsoredTaskEl = null;
