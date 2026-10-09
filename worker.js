@@ -104,14 +104,6 @@ const BONUS_AD_COOLDOWN_MS = 60 * 60 * 1000;
 const GIGAPUB_REWARD_COINS = 15;
 const GIGAPUB_DAILY_LIMIT = 8;
 
-// Watch MonetixAds config
-const MONETIX_REWARD_COINS = 15;
-const MONETIX_DAILY_LIMIT = 10;
-
-// Watch OnClicka Ads config
-const ONCLICKA_REWARD_COINS = 15;
-const ONCLICKA_DAILY_LIMIT = 10;
-
 // Realm pets & Storage config
 const PETS = {
   duck:         { basespeed: 77,    price: 200000 },
@@ -218,22 +210,22 @@ async function routeRequest(request, env, url) {
       return handleRealmStatus(request, env);
     }
     if (url.pathname === "/api/mine/start" && request.method === "POST") {
-      return withGateAd(request, env, handleMineStart);
+      return handleMineStart(request, env);
     }
     if (url.pathname === "/api/mine/claim" && request.method === "POST") {
-      return withGateAd(request, env, handleMineClaim);
+      return handleMineClaim(request, env);
     }
     if (url.pathname === "/api/streak/claim" && request.method === "POST") {
-      return withGateAd(request, env, handleStreakClaim);
+      return handleStreakClaim(request, env);
     }
     if (url.pathname === "/api/spin/claim" && request.method === "POST") {
-      return withGateAd(request, env, handleSpinClaim);
+      return handleSpinClaim(request, env);
     }
     if (url.pathname === "/api/chest/claim" && request.method === "POST") {
-      return withGateAd(request, env, handleChestClaim);
+      return handleChestClaim(request, env);
     }
     if (url.pathname === "/api/giftpick/claim" && request.method === "POST") {
-      return withGateAd(request, env, handleGiftPickClaim);
+      return handleGiftPickClaim(request, env);
     }
     const petMatch = request.method === "POST" && url.pathname.match(/^\/api\/pet\/([a-z_]+)\/(buy|upgrade)$/);
     if (petMatch) {
@@ -248,7 +240,7 @@ async function routeRequest(request, env, url) {
       return handleStorageUpgrade(request, env);
     }
     if (url.pathname === "/api/promo/redeem" && request.method === "POST") {
-      return withGateAd(request, env, handlePromoRedeem);
+      return handlePromoRedeem(request, env);
     }
     if (url.pathname === "/api/exchange" && request.method === "POST") {
       return handleExchange(request, env);
@@ -269,7 +261,7 @@ async function routeRequest(request, env, url) {
       return handleWalletHistory(request, env);
     }
     if (url.pathname === "/api/combo/check" && request.method === "POST") {
-      return withGateAd(request, env, handleComboCheck);
+      return handleComboCheck(request, env);
     }
     if (url.pathname === "/api/ads/reward" && request.method === "GET") {
       return handleAdsReward(url, env);
@@ -297,9 +289,6 @@ async function routeRequest(request, env, url) {
     }
     if (url.pathname === "/api/gigapub/postback" && request.method === "GET") {
       return handleGigapubPostback(url, env);
-    }
-    if (url.pathname === "/api/ads/client-rewards" && request.method === "POST") {
-      return handleClientAdRewards(request, env);
     }
     if (url.pathname === "/api/pets/claim_happy_dog" && request.method === "POST") {
       return handleClaimHappyDog(request, env);
@@ -393,7 +382,7 @@ async function handleGetUser(request, env) {
            u.checkin1_claimed_date, u.checkin2_claimed_date, u.checkin3_claimed_date, u.checkin4_claimed_date, u.checkin5_claimed_date,
            u.bonus_ad_count_today, u.bonus_ad_date, u.bonus_ad_last_watched_at,
            u.gigapub_task_count, u.gigapub_task_date, u.photo_url,
-           u.monetix_task_count, u.monetix_task_date, u.onclicka_task_count, u.onclicka_task_date, u.lifetime_ads_watched,
+           u.lifetime_ads_watched,
            u.combo_date, u.combo_attempts_used, u.combo_solved, u.device_id, u.banned_at, u.locked_coins
     FROM users u
     WHERE u.telegram_id = ?
@@ -488,12 +477,6 @@ async function handleGetUser(request, env) {
   view.gigapub_watched_today = user.gigapub_task_date === today ? (user.gigapub_task_count || 0) : 0;
   view.gigapub_daily_limit = GIGAPUB_DAILY_LIMIT;
   view.gigapub_reward_coins = GIGAPUB_REWARD_COINS;
-  view.monetix_watched_today = user.monetix_task_date === today ? (user.monetix_task_count || 0) : 0;
-  view.monetix_daily_limit = MONETIX_DAILY_LIMIT;
-  view.monetix_reward_coins = MONETIX_REWARD_COINS;
-  view.onclicka_watched_today = user.onclicka_task_date === today ? (user.onclicka_task_count || 0) : 0;
-  view.onclicka_daily_limit = ONCLICKA_DAILY_LIMIT;
-  view.onclicka_reward_coins = ONCLICKA_REWARD_COINS;
   view.locked_coins = user.locked_coins || 0;
   return jsonResponse({ user: view });
 }
@@ -2346,98 +2329,6 @@ async function handleGigapubPostback(url, env) {
     await activateReferralOnLifetimeAds(env, telegramId, updated.referred_by, updated.lifetime_ads_watched);
   }
   return new Response("OK", { status: 200 });
-}
-
-// /api/ads/client-rewards — Monetix and OnClicka have no postback, so the app reports their ads itself:
-// it shows the reward at once and sends the counts here in one request a minute after the last ad
-const CLIENT_AD_NETWORKS = {
-  monetix: { countCol: "monetix_task_count", dateCol: "monetix_task_date", limit: MONETIX_DAILY_LIMIT, reward: MONETIX_REWARD_COINS },
-  onclicka: { countCol: "onclicka_task_count", dateCol: "onclicka_task_date", limit: ONCLICKA_DAILY_LIMIT, reward: ONCLICKA_REWARD_COINS }
-};
-async function handleClientAdRewards(request, env) {
-  let body;
-  try {
-    body = await request.json();
-  } catch (e) {
-    return jsonResponse({ error: "invalid_body" }, 400);
-  }
-  const auth = await authenticateRequest(request, env, body);
-  if (!auth.ok) return auth.response;
-  const { telegramId } = auth;
-  const networks = Object.keys(CLIENT_AD_NETWORKS);
-  const today = todayUTC();
-  // a lost compare-and-set (another request changed a count in between) is retried with fresh counts
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const row = await env.DB.prepare(
-      `SELECT coins, ${networks.map((n) => CLIENT_AD_NETWORKS[n].countCol + ", " + CLIENT_AD_NETWORKS[n].dateCol).join(", ")}
-       FROM users WHERE telegram_id = ?`
-    ).bind(telegramId).first();
-    if (!row) return jsonResponse({ error: "user_not_found" }, 404);
-    const sets = [];
-    const setArgs = [];
-    const guards = [];
-    const guardArgs = [];
-    const result = { credited: {} };
-    let coinsAdded = 0;
-    let adsAdded = 0;
-    for (const n of networks) {
-      const cfg = CLIENT_AD_NETWORKS[n];
-      const requested = Math.max(0, Math.min(cfg.limit, parseInt(body[n], 10) || 0));
-      const countToday = row[cfg.dateCol] === today ? (row[cfg.countCol] || 0) : 0;
-      const credit = Math.min(requested, cfg.limit - countToday);
-      result.credited[n] = credit;
-      result[n] = { watched_today: countToday + credit, daily_limit: cfg.limit, reward_coins: cfg.reward };
-      if (credit <= 0) continue;
-      sets.push(`${cfg.countCol} = ?`, `${cfg.dateCol} = ?`);
-      setArgs.push(countToday + credit, today);
-      guards.push(`(${cfg.dateCol} IS NULL OR ${cfg.dateCol} <> ? OR ${cfg.countCol} = ?)`);
-      guardArgs.push(today, countToday);
-      coinsAdded += credit * cfg.reward;
-      adsAdded += credit;
-    }
-    if (adsAdded === 0) {
-      result.coins = row.coins;
-      return jsonResponse(result);
-    }
-    // rewards and every ad counter in one write; RETURNING gives the new totals without a second read
-    const updated = await env.DB.prepare(
-      `UPDATE users SET coins = coins + ?, ${sets.join(", ")}, lifetime_ads_watched = COALESCE(lifetime_ads_watched, 0) + ?, weekly_ads_watched = weekly_ads_watched + ?,
-         ads_today = CASE WHEN ads_today_date = date('now') THEN ads_today + ? ELSE ? END, ads_today_date = date('now')
-       WHERE telegram_id = ? AND ${guards.join(" AND ")}
-       RETURNING coins, lifetime_ads_watched, referred_by`
-    ).bind(coinsAdded, ...setArgs, adsAdded, adsAdded, adsAdded, adsAdded, telegramId, ...guardArgs).first();
-    if (!updated) continue;
-    await activateReferralOnLifetimeAds(env, telegramId, updated.referred_by, updated.lifetime_ads_watched);
-    result.coins = updated.coins;
-    return jsonResponse(result);
-  }
-  return jsonResponse({ error: "busy" }, 409);
-}
-
-// A Monetix/OnClicka ad shown before a gated action comes as gate_ad: true on the action's own request and is
-// counted only when the action succeeds, so each count is tied to an action that has its own daily limit
-async function withGateAd(request, env, handler) {
-  let gateAd = false;
-  let initData = null;
-  try {
-    const body = await request.clone().json();
-    gateAd = body.gate_ad === true;
-    initData = body.initData;
-  } catch (e) {   }
-  const response = await handler(request, env);
-  if (!gateAd || !response.ok) return response;
-  let data = null;
-  try {
-    data = await response.clone().json();
-  } catch (e) {   }
-  if (!data || data.error) return response;
-  // the handler already validated this initData, so the id can be read from it directly
-  let telegramId = null;
-  try {
-    telegramId = JSON.parse(new URLSearchParams(initData).get("user")).id;
-  } catch (e) {   }
-  if (Number.isInteger(telegramId)) await bumpLifetimeAdsWatched(env, telegramId);
-  return response;
 }
 
 // /api/profile

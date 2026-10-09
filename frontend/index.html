@@ -564,11 +564,6 @@ function i18nPick(ev, code){
 <!-- Adsgram SDK -->
 <script defer src="https://sad.adsgram.ai/js/sad.min.js"></script>
 
-<!-- MonetixAds SDK -->
-<script defer src="https://www.monetixads.online/ads.js" data-mxid="MX-00DFB0A3"></script>
-
-<!-- OnClicka SDK (Telegram Mini App rewarded video) -->
-<script defer src="https://js.onclckvd.com/in-stream-ad-admanager/tma.js"></script>
 <style>
 
 /* Theme Variables */
@@ -3779,7 +3774,7 @@ body.reduce-motion .firefly{
     <div class="ad-loading-overlay__box">
       <div class="ad-loading-overlay__spinner"></div>
       <div class="ad-loading-overlay__text" id="ad-loading-overlay-text">Loading Ad...</div>
-      <div class="ad-loading-overlay__via" id="ad-loading-overlay-via">via Monetix</div>
+      <div class="ad-loading-overlay__via" id="ad-loading-overlay-via">via GigaPub</div>
     </div>
   </div>
 
@@ -4205,38 +4200,6 @@ body.reduce-motion .firefly{
           <div class="ad-task__footer">
             <button class="ad-task__watch" id="gigapub-task-watch-btn" onclick="onWatchGigapubClick()">Watch</button>
             <span class="ad-task__counter" id="gigapub-task-counter">0 / 8</span>
-          </div>
-        </div>
-        <div class="card ad-task">
-          <div class="ad-task__icon">
-            <img loading="lazy" draggable="false" src="/OnClicka%20Ads%20icon.webp" alt="OnClicka" style="width:100%;height:100%;object-fit:cover;border-radius:calc(10px * var(--s));">
-          </div>
-          <div class="ad-task__title">Watch OnClicka Ads</div>
-          <div class="ad-task__meta">
-            <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:calc(18px * var(--s));height:calc(18px * var(--s));flex-shrink:0;vertical-align:middle;">
-            <span class="ad-task__reward">+15 / Ad</span>
-            <span class="ad-task__avail" id="onclicka-task-avail">Available</span>
-          </div>
-          <div class="ad-task__divider"></div>
-          <div class="ad-task__footer">
-            <button class="ad-task__watch" id="onclicka-task-watch-btn" onclick="onWatchOnclickaClick()">Watch</button>
-            <span class="ad-task__counter" id="onclicka-task-counter">0 / 10</span>
-          </div>
-        </div>
-        <div class="card ad-task">
-          <div class="ad-task__icon">
-            <img loading="lazy" draggable="false" src="/Monetix%20Ads%20icon.webp" alt="MonetixAds" style="width:100%;height:100%;object-fit:cover;border-radius:calc(10px * var(--s));">
-          </div>
-          <div class="ad-task__title">Watch MonetixAds</div>
-          <div class="ad-task__meta">
-            <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:calc(18px * var(--s));height:calc(18px * var(--s));flex-shrink:0;vertical-align:middle;">
-            <span class="ad-task__reward">+15 / Ad</span>
-            <span class="ad-task__avail" id="monetix-task-avail">Available</span>
-          </div>
-          <div class="ad-task__divider"></div>
-          <div class="ad-task__footer">
-            <button class="ad-task__watch" id="monetix-task-watch-btn" onclick="onWatchMonetixClick()">Watch</button>
-            <span class="ad-task__counter" id="monetix-task-counter">0 / 10</span>
           </div>
         </div>
       </div>
@@ -5343,9 +5306,7 @@ var domCache = {
   lbRewardsBadge: null,
   adsTaskBtn: null, adsTaskCounter: null, adsTaskAvail: null,
   gigapubBtn: null, gigapubCounter: null, gigapubAvail: null,
-  bonusAdBtn: null, bonusAdCounter: null, bonusAdAvail: null,
-  monetixBtn: null, monetixCounter: null, monetixAvail: null,
-  onclickaBtn: null, onclickaCounter: null, onclickaAvail: null
+  bonusAdBtn: null, bonusAdCounter: null, bonusAdAvail: null
 };
 (function(){
   domCache.miningBtn = document.getElementById('btn-start-mining');
@@ -5366,12 +5327,6 @@ var domCache = {
   domCache.bonusAdBtn = document.getElementById('bonus-ad-watch-btn');
   domCache.bonusAdCounter = document.getElementById('bonus-ad-counter');
   domCache.bonusAdAvail = document.getElementById('bonus-ad-avail');
-  domCache.monetixBtn = document.getElementById('monetix-task-watch-btn');
-  domCache.monetixCounter = document.getElementById('monetix-task-counter');
-  domCache.monetixAvail = document.getElementById('monetix-task-avail');
-  domCache.onclickaBtn = document.getElementById('onclicka-task-watch-btn');
-  domCache.onclickaCounter = document.getElementById('onclicka-task-counter');
-  domCache.onclickaAvail = document.getElementById('onclicka-task-avail');
 })();
 
 // Animation Toggle
@@ -5749,16 +5704,6 @@ function fetchUserData(){
       daily_limit: data.user.gigapub_daily_limit,
       reward_coins: data.user.gigapub_reward_coins
     });
-    applyMonetixState({
-      watched_today: data.user.monetix_watched_today,
-      daily_limit: data.user.monetix_daily_limit,
-      reward_coins: data.user.monetix_reward_coins
-    });
-    applyOnclickaState({
-      watched_today: data.user.onclicka_watched_today,
-      daily_limit: data.user.onclicka_daily_limit,
-      reward_coins: data.user.onclicka_reward_coins
-    });
     setupInviteLink(data.user.telegram_id);
     applyFriendsState({
       invites: data.user.friends_invites,
@@ -5766,8 +5711,6 @@ function fetchUserData(){
       pending_earnings: data.user.friends_pending_earnings,
       min_claim: data.user.friends_min_claim
     });
-    reapplyPendingClientAds();
-    if (hasPendingClientAds() && !clientAdsTimer) sendClientAdRewards(false);
     hideSplashScreen();
   })
   .catch(function(err){
@@ -5873,7 +5816,7 @@ function callMiningApi(path){
   return fetch(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData: initData, gate_ad: takeGateAd() })
+    body: JSON.stringify({ initData: initData })
   }).then(function(res){
     syncServerClock(res, sentAt);
     return res.json().then(function(data){ return { status: res.status, data: data }; });
@@ -6011,7 +5954,7 @@ function runStreakClaimRequest(initData){
   fetch('/api/streak/claim', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData: initData, gate_ad: takeGateAd() })
+    body: JSON.stringify({ initData: initData })
   })
   .then(function(res){ return res.json().then(function(data){ return { status: res.status, data: data }; }); })
   .then(function(result){
@@ -6221,7 +6164,7 @@ function runSpinClaimRequest(initData, btn){
   fetch('/api/spin/claim', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData: initData, gate_ad: takeGateAd() })
+    body: JSON.stringify({ initData: initData })
   })
   .then(function(res){ return res.json().then(function(data){ return { status: res.status, data: data }; }); })
   .then(function(result){
@@ -6296,7 +6239,7 @@ function runChestClaimRequest(initData){
   fetch('/api/chest/claim', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData: initData, gate_ad: takeGateAd() })
+    body: JSON.stringify({ initData: initData })
   })
   .then(function(res){ return res.json().then(function(data){ return { status: res.status, data: data }; }); })
   .then(function(result){
@@ -6374,7 +6317,7 @@ function runGiftClaimRequest(initData, selectedBox){
   fetch('/api/giftpick/claim', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData: initData, gate_ad: takeGateAd() })
+    body: JSON.stringify({ initData: initData })
   })
   .then(function(res){ return res.json().then(function(data){ return { status: res.status, data: data }; }); })
   .then(function(result){
@@ -7796,7 +7739,7 @@ function runComboCheckRequest(initData, order){
   fetch('/api/combo/check', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData: initData, order: order, gate_ad: takeGateAd() })
+    body: JSON.stringify({ initData: initData, order: order })
   })
   .then(function(res){ return res.json(); })
   .then(function(data){
@@ -7881,9 +7824,6 @@ function waitForAdSdk(isReady){
       setTimeout(poll, 200);
     })();
   });
-}
-function isMonetixSdkReady(){
-  return typeof window.showRewardAd === 'function';
 }
 function creditAdRewardOptimistically(amount){
   updateBalanceDisplay({ coins: CURRENT_COINS_BALANCE + amount, gram: CURRENT_GRAM_BALANCE });
@@ -8236,397 +8176,17 @@ function runAdGate(onSuccess, onFail, opts){
       if (!(opts && opts.noConfetti)) triggerConfetti();
       onSuccess();
     }).catch(function(){
-      runAdGateOnclickaFallback(onSuccess, onFail, opts);
+      runAdGateFailed(onFail, 'Ad was not completed');
     });
     return;
   }
-  runAdGateOnclickaFallback(onSuccess, onFail, opts);
+  runAdGateFailed(onFail, 'Ad not available right now');
 }
-// Second choice after GigaPub; counted like the Monetix gate (lifetime ads only), never against the OnClicka daily task
-function runAdGateOnclickaFallback(onSuccess, onFail, opts){
-  setAdLoadingOverlayVia('OnClicka');
-  var settled = false;
-  var fallBack = function(detail){
-    if (settled) return;
-    settled = true;
-    clearTimeout(safetyTimer);
-    runAdGateMonetixFallback(onSuccess, onFail, opts);
-  };
-  // show() only settles when the ad ends, so the safety timer covers a whole video
-  var safetyTimer = setTimeout(function(){ fallBack('no answer from the SDK'); }, ONCLICKA_MAX_WAIT_MS);
-  onclickaEnsureReady().then(function(show){
-    if (settled) return;
-    return Promise.resolve().then(function(){ return show(); }).then(function(){
-      if (settled) return;
-      settled = true;
-      clearTimeout(safetyTimer);
-      setAdLoadingOverlayVerifying();
-      reportGateAdWatched();
-      if (!(opts && opts.noConfetti)) triggerConfetti();
-      onSuccess();
-    }, fallBack);
-  }, fallBack);
-}
-function runAdGateMonetixFallback(onSuccess, onFail, opts){
-  setAdLoadingOverlayVia('Monetix');
-  if (!isMonetixSdkReady()){
-    waitForAdSdk(isMonetixSdkReady).then(function(ready){
-      if (ready){ runAdGateMonetixFallback(onSuccess, onFail, opts); return; }
-      hideAdLoadingOverlay();
-      showBuyErrorToast('Ad not available right now', { title: 'Ad Required' });
-      if (onFail) onFail();
-    });
-    return;
-  }
-  if (typeof window.showRewardAd !== 'function'){
-    hideAdLoadingOverlay();
-    showBuyErrorToast('Ad not available right now', { title: 'Ad Required' });
-    if (onFail) onFail();
-    return;
-  }
-  var settled = false;
-  var noAdTimeout = setTimeout(function(){
-    if (settled) return;
-    settled = true;
-    hideAdLoadingOverlay();
-    showBuyErrorToast('Ad not available right now', { title: 'Ad Required' });
-    if (onFail) onFail();
-  }, 10000);
-  window.showRewardAd(function(res){
-    if (settled) return;
-    settled = true;
-    clearTimeout(noAdTimeout);
-    if (res && (res.status === 'completed' || res.status === 'closed')){
-      setAdLoadingOverlayVerifying();
-      reportGateAdWatched();
-      if (!(opts && opts.noConfetti)) triggerConfetti();
-      onSuccess();
-    } else {
-      hideAdLoadingOverlay();
-      showBuyErrorToast('Ad was not completed', { title: 'Ad Required' });
-      if (onFail) onFail();
-    }
-  });
-}
-// The gate ad is sent as gate_ad: true on the action request that follows it (no request of its own)
-var pendingGateAd = false;
-function reportGateAdWatched(){
-  pendingGateAd = true;
-}
-function takeGateAd(){
-  var watched = pendingGateAd;
-  pendingGateAd = false;
-  return watched;
-}
-
-// Watch MonetixAds
-var monetixState = { watchedToday: 0, dailyLimit: 10, rewardCoins: 15, busy: false, cooldownUntil: 0 };
-var monetixTaskCooldownTimer = null;
-function applyMonetixState(data){
-  monetixState.watchedToday = data.watched_today || 0;
-  monetixState.dailyLimit = data.daily_limit || 10;
-  monetixState.rewardCoins = data.reward_coins || 15;
-  renderMonetixButton();
-}
-function renderMonetixButton(){
-  var btn = domCache.monetixBtn;
-  var counter = domCache.monetixCounter;
-  var avail = domCache.monetixAvail;
-  if (counter) counter.textContent = monetixState.watchedToday + ' / ' + monetixState.dailyLimit;
-  var dailyDone = monetixState.watchedToday >= monetixState.dailyLimit;
-  if (avail) avail.textContent = dailyDone ? 'Come Back Tomorrow' : 'Available';
-  var cooldownRemaining = Math.ceil((monetixState.cooldownUntil - Date.now()) / 1000);
-  var inCooldown = cooldownRemaining > 0;
-  if (btn){
-    if (monetixState.busy){
-      setButtonBusy(btn, true);
-    } else {
-      setButtonBusy(btn, false);
-      btn.disabled = false;
-      btn.textContent = inCooldown ? String(cooldownRemaining) : 'Watch';
-      btn.classList.toggle('is-claimed', dailyDone || inCooldown);
-    }
-  }
-}
-function startMonetixTaskCooldown(){
-  monetixState.cooldownUntil = Date.now() + 10000;
-  clearInterval(monetixTaskCooldownTimer);
-  renderMonetixButton();
-  monetixTaskCooldownTimer = setInterval(function(){
-    if (Date.now() >= monetixState.cooldownUntil){
-      clearInterval(monetixTaskCooldownTimer);
-    }
-    renderMonetixButton();
-  }, 1000);
-}
-function onWatchMonetixClick(){
-  if (monetixState.busy || Date.now() < monetixState.cooldownUntil) return;
-  if (monetixState.watchedToday >= monetixState.dailyLimit){
-    showComeBackTomorrowToast();
-    return;
-  }
-  if (!isMonetixSdkReady()){
-    monetixState.busy = true;
-    renderMonetixButton();
-    waitForAdSdk(isMonetixSdkReady).then(function(ready){
-      monetixState.busy = false;
-      renderMonetixButton();
-      if (ready) onWatchMonetixClick();
-      else showBuyErrorToast('Ad not available right now', { title: 'Watch MonetixAds' });
-    });
-    return;
-  }
-  monetixState.busy = true;
-  renderMonetixButton();
-  showAdLoadingOverlay();
-  setAdLoadingOverlayVia('Monetix');
-  var settled = false;
-  var noAdTimeout = setTimeout(function(){
-    if (settled) return;
-    settled = true;
-    hideAdLoadingOverlay();
-    monetixState.busy = false;
-    renderMonetixButton();
-    showBuyErrorToast('No ad available right now', { title: 'Watch MonetixAds' });
-  }, 10000);
-  window.showRewardAd(function(res){
-    if (settled) return;
-    settled = true;
-    clearTimeout(noAdTimeout);
-    if (res && (res.status === 'completed' || res.status === 'closed')){
-      setAdLoadingOverlayVerifying();
-      creditMonetixReward();
-    } else {
-      hideAdLoadingOverlay();
-      monetixState.busy = false;
-      renderMonetixButton();
-      showBuyErrorToast('Ad was not completed', { title: 'Watch MonetixAds' });
-    }
-  });
-}
-function creditMonetixReward(){
-  monetixState.watchedToday++;
-  creditAdRewardOptimistically(monetixState.rewardCoins);
-  showAppToast({ title: 'Watch MonetixAds', icon: PRIZE_ICON_URLS.coins, amount: '+' + monetixState.rewardCoins + ' Coins' });
-  triggerConfetti();
-  monetixState.busy = false;
-  startMonetixTaskCooldown();
+function runAdGateFailed(onFail, message){
   hideAdLoadingOverlay();
-  queueClientAdReward('monetix');
+  showBuyErrorToast(message, { title: 'Ad Required' });
+  if (onFail) onFail();
 }
-
-// Watch OnClicka Ads
-// The SDK hands back a show() function once it is ready; show() resolves when the ad was watched to the end
-// a number, as in the OnClicka guide ({ id: Spot ID }); initCdTma answers null for an id it does not accept
-var ONCLICKA_SPOT_ID = 6152787;
-var ONCLICKA_MAX_WAIT_MS = 90000;
-var ONCLICKA_READY_WAIT_MS = 12000;
-var onclickaShow = null;
-var onclickaInitPromise = null;
-// Starts the SDK once (again after a failure); resolves with show() or rejects with the reason.
-// The SDK script may still be loading, so it is waited for instead of skipped.
-function onclickaEnsureReady(){
-  if (typeof onclickaShow === 'function') return Promise.resolve(onclickaShow);
-  if (onclickaInitPromise) return onclickaInitPromise;
-  var startedAt = Date.now();
-  onclickaInitPromise = new Promise(function(resolve, reject){
-    (function waitForSdk(){
-      if (typeof window.initCdTma === 'function'){
-        var initTimer = setTimeout(function(){ reject(new Error('initCdTma did not answer within ' + (ONCLICKA_READY_WAIT_MS / 1000) + 's')); }, ONCLICKA_READY_WAIT_MS);
-        window.initCdTma({ id: ONCLICKA_SPOT_ID }).then(function(show){
-          clearTimeout(initTimer);
-          if (typeof show !== 'function') throw new Error('initCdTma returned no show() function: ' + String(show) + ' (spot ' + ONCLICKA_SPOT_ID + ', ' + typeof ONCLICKA_SPOT_ID + ')');
-          onclickaShow = show;
-          resolve(show);
-        }).catch(function(e){ clearTimeout(initTimer); reject(e); });
-        return;
-      }
-      if (Date.now() - startedAt > ONCLICKA_READY_WAIT_MS){
-        reject(new Error('SDK script not loaded (window.initCdTma is ' + typeof window.initCdTma + ')'));
-        return;
-      }
-      setTimeout(waitForSdk, 250);
-    })();
-  }).catch(function(e){
-    onclickaInitPromise = null;
-    throw e;
-  });
-  return onclickaInitPromise;
-}
-// warm up in the background so the first Watch press is instant
-onclickaEnsureReady().catch(function(){});
-var onclickaState = { watchedToday: 0, dailyLimit: 10, rewardCoins: 15, busy: false, cooldownUntil: 0 };
-var onclickaTaskCooldownTimer = null;
-function applyOnclickaState(data){
-  onclickaState.watchedToday = data.watched_today || 0;
-  onclickaState.dailyLimit = data.daily_limit || 10;
-  onclickaState.rewardCoins = data.reward_coins || 15;
-  renderOnclickaButton();
-}
-function renderOnclickaButton(){
-  var btn = domCache.onclickaBtn;
-  var counter = domCache.onclickaCounter;
-  var avail = domCache.onclickaAvail;
-  if (counter) counter.textContent = onclickaState.watchedToday + ' / ' + onclickaState.dailyLimit;
-  var dailyDone = onclickaState.watchedToday >= onclickaState.dailyLimit;
-  if (avail) avail.textContent = dailyDone ? 'Come Back Tomorrow' : 'Available';
-  var cooldownRemaining = Math.ceil((onclickaState.cooldownUntil - Date.now()) / 1000);
-  var inCooldown = cooldownRemaining > 0;
-  if (btn){
-    if (onclickaState.busy){
-      setButtonBusy(btn, true);
-    } else {
-      setButtonBusy(btn, false);
-      btn.disabled = false;
-      btn.textContent = inCooldown ? String(cooldownRemaining) : 'Watch';
-      btn.classList.toggle('is-claimed', dailyDone || inCooldown);
-    }
-  }
-}
-function startOnclickaTaskCooldown(){
-  onclickaState.cooldownUntil = Date.now() + 10000;
-  clearInterval(onclickaTaskCooldownTimer);
-  renderOnclickaButton();
-  onclickaTaskCooldownTimer = setInterval(function(){
-    if (Date.now() >= onclickaState.cooldownUntil){
-      clearInterval(onclickaTaskCooldownTimer);
-    }
-    renderOnclickaButton();
-  }, 1000);
-}
-function onWatchOnclickaClick(){
-  if (onclickaState.busy || Date.now() < onclickaState.cooldownUntil) return;
-  if (onclickaState.watchedToday >= onclickaState.dailyLimit){
-    showComeBackTomorrowToast();
-    return;
-  }
-  onclickaState.busy = true;
-  renderOnclickaButton();
-  showAdLoadingOverlay();
-  setAdLoadingOverlayVia('OnClicka');
-  var settled = false;
-  var finishWithError = function(message, detail){
-    if (settled) return;
-    settled = true;
-    clearTimeout(safetyTimer);
-    hideAdLoadingOverlay();
-    onclickaState.busy = false;
-    renderOnclickaButton();
-    showBuyErrorToast(message, { title: 'Watch OnClicka Ads' });
-  };
-  // show() only settles when the ad ends, so the safety timer covers a whole video, not just loading
-  var safetyTimer = setTimeout(function(){ finishWithError('No ad available right now', 'no answer from the SDK'); }, ONCLICKA_MAX_WAIT_MS);
-  onclickaEnsureReady().then(function(show){
-    if (settled) return;
-    return Promise.resolve().then(function(){ return show(); }).then(function(result){
-      if (settled) return;
-      settled = true;
-      clearTimeout(safetyTimer);
-      setAdLoadingOverlayVerifying();
-      creditOnclickaReward();
-    }, function(e){ finishWithError('Ad was not completed', e); });
-  }, function(e){ finishWithError('Ad not available right now', e); });
-}
-function creditOnclickaReward(){
-  onclickaState.watchedToday++;
-  creditAdRewardOptimistically(onclickaState.rewardCoins);
-  showAppToast({ title: 'Watch OnClicka Ads', icon: PRIZE_ICON_URLS.coins, amount: '+' + onclickaState.rewardCoins + ' Coins' });
-  triggerConfetti();
-  onclickaState.busy = false;
-  startOnclickaTaskCooldown();
-  hideAdLoadingOverlay();
-  queueClientAdReward('onclicka');
-}
-
-// Monetix and OnClicka have no postback: their rewards show at once and are sent together in one
-// /api/ads/client-rewards request a minute after the last ad. Unsent counts are kept in localStorage
-// and sent when the app is hidden or opened again. A batch leaves the saved queue the moment it is sent
-// and comes back only if the request fails, so a request still in flight when the app closes is never
-// sent a second time on the next open.
-var CLIENT_ADS_KEY = 'mx_pending_client_ads';
-var clientAdsQueue = (function(){
-  try{
-    var saved = JSON.parse(localStorage.getItem(CLIENT_ADS_KEY) || 'null');
-    if (saved) return { monetix: Math.max(0, saved.monetix | 0), onclicka: Math.max(0, saved.onclicka | 0) };
-  }catch(e){}
-  return { monetix: 0, onclicka: 0 };
-})();
-var clientAdsTimer = null;
-var clientAdsSending = false;
-function saveClientAdsQueue(){
-  try{ localStorage.setItem(CLIENT_ADS_KEY, JSON.stringify(clientAdsQueue)); }catch(e){}
-}
-function hasPendingClientAds(){
-  return clientAdsQueue.monetix > 0 || clientAdsQueue.onclicka > 0;
-}
-function scheduleClientAdRewards(){
-  clearTimeout(clientAdsTimer);
-  clientAdsTimer = setTimeout(function(){ sendClientAdRewards(false); }, AD_VERIFY_DELAY_MS);
-}
-function queueClientAdReward(network){
-  clientAdsQueue[network]++;
-  saveClientAdsQueue();
-  scheduleClientAdRewards();
-}
-// Server data does not include ads still waiting to be sent, so they are added back on top of it
-function reapplyPendingClientAds(){
-  if (!hasPendingClientAds()) return;
-  creditAdRewardOptimistically(clientAdsQueue.monetix * monetixState.rewardCoins + clientAdsQueue.onclicka * onclickaState.rewardCoins);
-  monetixState.watchedToday += clientAdsQueue.monetix;
-  onclickaState.watchedToday += clientAdsQueue.onclicka;
-  renderMonetixButton();
-  renderOnclickaButton();
-}
-function sendClientAdRewards(keepalive){
-  clearTimeout(clientAdsTimer);
-  clientAdsTimer = null;
-  if (clientAdsSending || !hasPendingClientAds()) return;
-  var initData = getTelegramInitData();
-  if (!initData) return;
-  var batch = { monetix: clientAdsQueue.monetix, onclicka: clientAdsQueue.onclicka };
-  clientAdsQueue.monetix = 0;
-  clientAdsQueue.onclicka = 0;
-  saveClientAdsQueue();
-  var putBack = function(){
-    clientAdsQueue.monetix += batch.monetix;
-    clientAdsQueue.onclicka += batch.onclicka;
-    saveClientAdsQueue();
-    scheduleClientAdRewards();
-  };
-  clientAdsSending = true;
-  fetch('/api/ads/client-rewards', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    keepalive: !!keepalive,
-    body: JSON.stringify({ initData: initData, monetix: batch.monetix, onclicka: batch.onclicka })
-  })
-  .then(function(res){ return res.json().then(function(data){ return { ok: res.ok, status: res.status, data: data }; }); })
-  .then(function(r){
-    clientAdsSending = false;
-    if (!r.ok || r.data.error){
-      console.error('client ad rewards refused:', r.data && r.data.error);
-      // only a malformed request or an unknown user is dropped; anything else is sent again later
-      if (r.status !== 400 && r.status !== 404) putBack();
-      return;
-    }
-    // ads watched while the request was on its way are still in the queue and are added back on top
-    updateBalanceDisplay({ coins: r.data.coins, gram: CURRENT_GRAM_BALANCE , locked_coins: r.data.locked_coins });
-    applyMonetixState(r.data.monetix);
-    applyOnclickaState(r.data.onclicka);
-    localCacheClear('profile');
-    reapplyPendingClientAds();
-    if (hasPendingClientAds()) scheduleClientAdRewards();
-  })
-  .catch(function(err){
-    clientAdsSending = false;
-    console.error('client ad rewards request failed:', err);
-    putBack();
-  });
-}
-document.addEventListener('visibilitychange', function(){
-  if (document.visibilityState === 'hidden') sendClientAdRewards(true);
-});
-window.addEventListener('pagehide', function(){ sendClientAdRewards(true); });
 
 // Check-in
 var checkinState = {
@@ -9425,7 +8985,7 @@ function runPromoRedeemRequest(initData, code, input){
   fetch('/api/promo/redeem', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData: initData, code: code, gate_ad: takeGateAd() })
+    body: JSON.stringify({ initData: initData, code: code })
   })
   .then(function(res){ return res.json().then(function(data){ return { status: res.status, data: data }; }); })
   .then(function(result){
