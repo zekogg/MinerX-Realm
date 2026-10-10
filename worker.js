@@ -2185,16 +2185,17 @@ async function handleAdminAmbassadorList(request, env) {
 }
 
 // /api/leaderboard
-// Ties keep a fixed order (telegram_id) in the board and in the payout alike. The referrals board reads only the
+// Ties keep a fixed order (telegram_id) in the board and in the payout alike. The admin account is left out of both
+// boards, so it never shows there nor takes a prize (the next player moves up). The referrals board reads only the
 // top rows through its index; the ads board has no index on purpose: every ad would write a second row to it, and
 // the board is read only when its cache runs out, so a scan of the users there costs far less than those writes.
 const LEADERBOARD_ADS_SQL =
   `SELECT telegram_id, username, photo_url, weekly_ads_watched AS val
-   FROM users WHERE weekly_ads_watched > 0
+   FROM users WHERE weekly_ads_watched > 0 AND telegram_id <> ${ADMIN_TELEGRAM_ID}
    ORDER BY weekly_ads_watched DESC, telegram_id ASC LIMIT ?`;
 const LEADERBOARD_REFS_SQL =
   `SELECT telegram_id, username, photo_url, weekly_active_referrals AS val
-   FROM users WHERE weekly_active_referrals > 0
+   FROM users WHERE weekly_active_referrals > 0 AND telegram_id <> ${ADMIN_TELEGRAM_ID}
    ORDER BY weekly_active_referrals DESC, telegram_id ASC LIMIT ?`;
 function shapeLeaderboardRows(rows) {
   return (rows.results || []).map((r, i) => ({
