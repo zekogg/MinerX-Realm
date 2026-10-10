@@ -8374,6 +8374,7 @@ function mountSponsoredTask(){
       e.preventDefault();
       return;
     }
+    if (part === 'claim') el.__claimTapped = true;
     if (part === 'button' || (part === null && !el.__claimWaitStarted)) startSponsoredClaimWait(el);
   }, true);
   el.addEventListener('reward', onSponsoredTaskReward);
@@ -8386,11 +8387,18 @@ function mountSponsoredTask(){
   // the row is shown once Adsgram has drawn the task, so an empty row never shows
   if (window.ResizeObserver){
     el.__spObserver = new ResizeObserver(function(){
-      if (sponsoredTaskEl === el && sponsoredState.view === 'loading' && el.getBoundingClientRect().height > 0){
+      if (sponsoredTaskEl !== el) return;
+      if (sponsoredState.view === 'task'){
+        if (isStaleSponsoredTask(el)) hideSponsoredTask();
+        return;
+      }
+      if (sponsoredState.view === 'loading' && el.getBoundingClientRect().height > 0){
         clearTimeout(sponsoredLoadTimer);
         var wait = SPONSORED_TASK_MIN_LOADING_MS - (Date.now() - sponsoredState.lastLoadAt);
         sponsoredLoadTimer = setTimeout(function(){
-          if (sponsoredTaskEl === el && sponsoredState.view === 'loading') setSponsoredView('task');
+          if (sponsoredTaskEl !== el || sponsoredState.view !== 'loading') return;
+          if (isStaleSponsoredTask(el)) hideSponsoredTask();
+          else setSponsoredView('task');
         }, Math.max(0, wait));
       }
     });
@@ -8475,7 +8483,16 @@ function retrySponsoredTask(){
   if (Date.now() - sponsoredState.lastLoadAt < SPONSORED_TASK_RETRY_GAP_MS) return;
   loadSponsoredTask();
 }
+// Adsgram may answer with the task the user already completed, drawn in its Done state, instead of saying it
+// has none: Done showing on a task the user has not claimed here means there is no new task (Come Back Later)
+function isStaleSponsoredTask(el){
+  if (el.__claimTapped || el.__rewarded) return false;
+  var nodes = Array.prototype.slice.call(el.querySelectorAll('[slot="done"]'));
+  if (el.shadowRoot) nodes = nodes.concat(Array.prototype.slice.call(el.shadowRoot.querySelectorAll('[slot="done"]')));
+  return nodes.some(function(n){ return n.getClientRects().length > 0; });
+}
 function onSponsoredTaskReward(){
+  if (sponsoredTaskEl) sponsoredTaskEl.__rewarded = true;
   sponsoredState.doneToday++;
   creditAdRewardOptimistically(sponsoredState.rewardCoins);
   showAppToast({ title: 'Sponsored Task', icon: PRIZE_ICON_URLS.coins, amount: '+' + sponsoredState.rewardCoins + ' Coins' });
