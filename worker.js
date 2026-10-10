@@ -1730,7 +1730,7 @@ async function handleAdminUserFind(request, env) {
   if (!auth.ok) return auth.response;
   const targetId = parseInt(body.target_id, 10);
   if (!Number.isInteger(targetId)) return jsonResponse({ error: "invalid_target_id" }, 400);
-  const [user, depositResult, withdrawResult] = await Promise.all([
+  const [user, depositResult, withdrawResult, referralAds] = await Promise.all([
     env.DB.prepare(
       "SELECT telegram_id, username, coins, gram, total_speed, invites_count, active_referrals_count, referral_deposit_commission_total, lifetime_ads_watched, created_at, device_id, banned_at, locked_coins FROM users WHERE telegram_id = ?"
     ).bind(targetId).first(),
@@ -1739,6 +1739,13 @@ async function handleAdminUserFind(request, env) {
     ).bind(targetId).first(),
     env.DB.prepare(
       "SELECT COALESCE(SUM(net_gram), 0) AS total FROM withdrawals WHERE telegram_id = ? AND status = 'approved'"
+    ).bind(targetId).first(),
+    // lifetime ads of this user's referrals, split by active (reached the ads threshold) and not yet active
+    env.DB.prepare(
+      `SELECT COALESCE(SUM(CASE WHEN r.is_active = 1 THEN u.lifetime_ads_watched ELSE 0 END), 0) AS active_ads,
+              COALESCE(SUM(CASE WHEN r.is_active = 1 THEN 0 ELSE u.lifetime_ads_watched END), 0) AS inactive_ads
+       FROM referrals r JOIN users u ON u.telegram_id = r.referred_id
+       WHERE r.referrer_id = ?`
     ).bind(targetId).first()
   ]);
   if (!user) return jsonResponse({ error: "user_not_found" }, 404);
@@ -1761,6 +1768,8 @@ async function handleAdminUserFind(request, env) {
     total_speed: user.total_speed,
     invites: user.invites_count || 0,
     active_invites: user.active_referrals_count || 0,
+    referral_ads_active: referralAds.active_ads || 0,
+    referral_ads_inactive: referralAds.inactive_ads || 0,
     referral_commission_total: user.referral_deposit_commission_total || 0,
     registered_date: user.created_at ? formatDateDDMMYYYY(user.created_at) : "—",
     ads_watched: user.lifetime_ads_watched || 0,
