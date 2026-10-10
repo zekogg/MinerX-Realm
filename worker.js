@@ -2176,8 +2176,9 @@ async function handleAdminAmbassadorList(request, env) {
 }
 
 // /api/leaderboard
-// Ties keep a fixed order (telegram_id) in the board and in the payout alike. The index on each weekly
-// counter is stored as (counter DESC, rowid ASC), so this order still reads only the top rows.
+// Ties keep a fixed order (telegram_id) in the board and in the payout alike. The referrals board reads only the
+// top rows through its index; the ads board has no index on purpose: every ad would write a second row to it, and
+// the board is read only when its cache runs out, so a scan of the users there costs far less than those writes.
 const LEADERBOARD_ADS_SQL =
   `SELECT telegram_id, username, photo_url, weekly_ads_watched AS val
    FROM users WHERE weekly_ads_watched > 0

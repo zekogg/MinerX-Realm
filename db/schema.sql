@@ -191,5 +191,4 @@ CREATE INDEX idx_user_pets_boost ON user_pets(pet_id, daily_boost_days);
 CREATE INDEX idx_users_banned ON users(banned_at) WHERE banned_at IS NOT NULL;
 CREATE INDEX idx_users_device_id ON users(device_id) WHERE device_id IS NOT NULL;
 CREATE INDEX idx_weekly_active_referrals ON users(weekly_active_referrals DESC);
-CREATE INDEX idx_weekly_ads_watched ON users(weekly_ads_watched DESC);
 CREATE INDEX idx_withdrawals_telegram_id ON withdrawals(telegram_id);
