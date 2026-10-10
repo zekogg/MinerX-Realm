@@ -12,18 +12,18 @@ const MINING_REWARD_COINS = 70;
 const MINING_DAILY_LIMIT = 5;
 
 // Daily Streak config
-const STREAK_REWARDS = [50, 100, 150, 200, 250, 300, 500];
+const STREAK_REWARDS = [25, 50, 75, 100, 125, 150, 500];
 
 // Spin config
 const SPIN_SEGMENTS = [
-  { type: "coins", amount: 100,    weight: 500  },
-  { type: "gram",  amount: 0.0025, weight: 25   },
-  { type: "coins", amount: 500,    weight: 100  },
+  { type: "coins", amount: 100,    weight: 200  },
+  { type: "gram",  amount: 0.0025, weight: 70   },
+  { type: "coins", amount: 500,    weight: 25   },
   { type: "gram",  amount: 0.005,  weight: 25   },
-  { type: "coins", amount: 150,    weight: 500  },
-  { type: "gram",  amount: 0.001,  weight: 25   },
-  { type: "coins", amount: 50,     weight: 8800 },
-  { type: "gram",  amount: 0.01,   weight: 25   }
+  { type: "coins", amount: 150,    weight: 200  },
+  { type: "gram",  amount: 0.001,  weight: 70   },
+  { type: "coins", amount: 50,     weight: 9400 },
+  { type: "gram",  amount: 0.01,   weight: 10   }
 ];
 
 // Exchange config
