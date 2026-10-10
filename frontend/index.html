@@ -639,6 +639,7 @@ function i18nPick(ev, code){
   --c-streakcard-day-bg:     rgba(111,191,115,.16);
   --c-streakcard-day-border: #6fbf73;
   --c-streakcard-day-text:   #6fbf73;
+  --c-streakcard-bigday-border: #ff8a3d;
   --c-streakcard-timer:      #ff8a3d;
   --c-streakcard-claim-bg:   rgba(111,191,115,.18);
   --c-streakcard-claim-text: #6fbf73;
@@ -656,7 +657,6 @@ function i18nPick(ev, code){
   --c-tab-active-1:    #4338ca;
   --c-tab-active-2:    #6366f1;
   --c-tab-active-text: #f5f3ff;
-  --c-free-pet-border:     rgba(165,108,240,.5);
   --c-free-pet-icon:       #a56cf0;
   --c-free-pet-badge-text: #a56cf0;
   --c-free-pet-progress-1: #6b3fa0;
@@ -1370,6 +1370,8 @@ html[data-lang="ar"] b, html[data-lang="ar"] strong, html[data-lang="fa"] b, htm
 .streak-days__day .d-val{ font-size:calc(9.5px * var(--s)); font-weight:800; color:var(--ink); margin-top:calc(2px * var(--s)); }
 .streak-days__day.is-active{ background:var(--c-streakcard-day-bg); border:1px solid var(--c-streakcard-day-border); }
 .streak-days__day.is-active .d-val{ color:var(--c-streakcard-day-text); }
+/* the day-7 prize (500) always keeps an orange frame; on its day the inside turns green like the rest (kept after .is-active so the frame wins) */
+.streak-days__day[data-day="7"]{ border:1px solid var(--c-streakcard-bigday-border); }
 .streak-chest{ display:flex; align-items:center; justify-content:space-between; gap:calc(10px * var(--s)); }
 .streak-chest__left{ display:flex; align-items:center; gap:calc(10px * var(--s)); }
 /* drawn 15% bigger without taking more room, so nothing around it moves */
@@ -1481,19 +1483,27 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   color:var(--ink-faint); margin-bottom:calc(10px * var(--s));
 }
 .quick-actions__grid{ display:grid; grid-template-columns:repeat(2, 1fr); gap:calc(10px * var(--s)); }
+/* each card is tinted with its icon's colour (--qa-acc): a soft glow behind a bigger icon, with the name under it (static, no animation) */
 .qa-btn{
-  background:var(--stone); border:1px solid var(--stone-border); border-radius:calc(18px * var(--s));
-  padding:calc(14px * var(--s)) calc(4px * var(--s)); display:flex; flex-direction:row; align-items:center; justify-content:center; gap:calc(10px * var(--s));
+  --qa-acc:196,181,253;
+  background:radial-gradient(55% 55% at 50% 32%, rgba(var(--qa-acc),.22), transparent 70%), rgba(20,15,36,.6);
+  border:1px solid rgba(var(--qa-acc),.3); border-radius:calc(18px * var(--s));
+  padding:calc(12px * var(--s)) calc(4px * var(--s)) calc(10px * var(--s)); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:calc(6px * var(--s));
 }
-.qa-btn svg{ width:calc(22px * var(--s)); height:calc(22px * var(--s)); flex-shrink:0; }
-.qa-btn span{ font-size:calc(12px * var(--s)); font-weight:700; color:var(--ink-dim); }
+.qa-btn > img, .qa-btn > svg{
+  width:calc(32px * var(--s)); height:calc(32px * var(--s)); flex-shrink:0;
+  filter:drop-shadow(0 0 calc(6px * var(--s)) rgba(var(--qa-acc),.55));
+}
+.qa-btn span{ font-size:calc(12px * var(--s)); font-weight:700; color:#efe6d6; }
+.qa-btn--profile{ --qa-acc:59,139,234; }
+.qa-btn--exchange{ --qa-acc:240,193,75; }
+.qa-btn--withdraw{ --qa-acc:111,191,115; }
 .qa-btn--free-pet{
-  border-color:var(--c-free-pet-border);
-  background:rgba(165,108,240,.06);
+  --qa-acc:165,108,240;
   backdrop-filter:blur(var(--glass-blur));
   -webkit-backdrop-filter:blur(var(--glass-blur));
 }
-.qa-btn--free-pet span{ color:var(--c-free-pet-badge-text); }
+.qa-btn--free-pet span{ color:#c39bff; }
 
 /* Chest */
 .chest-card{
@@ -3969,12 +3979,12 @@ body.reduce-motion .firefly{
           <span class="streak-card__day-badge" id="streak-day-badge">Day 1 of 7</span>
         </div>
         <div class="streak-days">
-          <div class="streak-days__day is-active" data-day="1"><div class="d-val">50</div></div>
-          <div class="streak-days__day" data-day="2"><div class="d-val">100</div></div>
-          <div class="streak-days__day" data-day="3"><div class="d-val">150</div></div>
-          <div class="streak-days__day" data-day="4"><div class="d-val">200</div></div>
-          <div class="streak-days__day" data-day="5"><div class="d-val">250</div></div>
-          <div class="streak-days__day" data-day="6"><div class="d-val">300</div></div>
+          <div class="streak-days__day is-active" data-day="1"><div class="d-val">25</div></div>
+          <div class="streak-days__day" data-day="2"><div class="d-val">50</div></div>
+          <div class="streak-days__day" data-day="3"><div class="d-val">75</div></div>
+          <div class="streak-days__day" data-day="4"><div class="d-val">100</div></div>
+          <div class="streak-days__day" data-day="5"><div class="d-val">125</div></div>
+          <div class="streak-days__day" data-day="6"><div class="d-val">150</div></div>
           <div class="streak-days__day" data-day="7"><div class="d-val">500</div></div>
         </div>
         <div class="streak-chest">
@@ -4136,20 +4146,20 @@ body.reduce-motion .firefly{
       <div class="quick-actions">
         <div class="quick-actions__title">Quick Actions</div>
         <div class="quick-actions__grid">
-          <button class="qa-btn" onclick="openProfileModal()">
-            <img loading="lazy" draggable="false" src="/Profile%20icon%20.svg" alt="Profile" style="width:calc(25.3px * var(--s));height:calc(25.3px * var(--s));flex-shrink:0;">
+          <button class="qa-btn qa-btn--profile" onclick="openProfileModal()">
+            <img loading="lazy" draggable="false" src="/Profile%20icon%20.svg" alt="Profile">
             <span>Profile</span>
           </button>
           <button class="qa-btn qa-btn--free-pet" onclick="openQuickFreePetModal()">
-            <img loading="lazy" draggable="false" src="/Free%20Pet%20Icon%20.svg" alt="Free Pet" style="width:calc(27.5px * var(--s));height:calc(27.5px * var(--s));flex-shrink:0;">
+            <img loading="lazy" draggable="false" src="/Free%20Pet%20Icon%20.svg" alt="Free Pet">
             <span>Free Pet</span>
           </button>
-          <button class="qa-btn" onclick="openExchangeModal()">
-            <img loading="lazy" draggable="false" src="/Exchange%20icon%20.svg" alt="Exchange" style="width:calc(33px * var(--s));height:calc(33px * var(--s));flex-shrink:0;">
+          <button class="qa-btn qa-btn--exchange" onclick="openExchangeModal()">
+            <svg viewBox="0 0 24 24" aria-hidden="true" style="overflow:visible;"><defs><linearGradient id="exbolt-qa" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe08a"/><stop offset=".55" stop-color="#f0c14b"/><stop offset="1" stop-color="#d9962e"/></linearGradient></defs><path d="M14.2 1.5 4.6 13.4h6.1l-1.6 9.1 10.3-12.6h-6.3z" fill="url(#exbolt-qa)" stroke="#3a2a12" stroke-width="1.1" stroke-linejoin="round"/></svg>
             <span>Exchange</span>
           </button>
-          <button class="qa-btn" onclick="openWithdrawModal()">
-            <img loading="lazy" draggable="false" src="/Withdraw%20icon%20.svg" alt="Withdraw" style="width:calc(25.3px * var(--s));height:calc(25.3px * var(--s));flex-shrink:0;">
+          <button class="qa-btn qa-btn--withdraw" onclick="openWithdrawModal()">
+            <img loading="lazy" draggable="false" src="/Withdraw%20icon%20.svg" alt="Withdraw">
             <span>Withdraw</span>
           </button>
         </div>
@@ -5267,7 +5277,7 @@ body.reduce-motion .firefly{
       <span class="fp-corner fp-corner--tr"></span>
       <div class="modal-head">
         <div class="modal-head__title-wrap">
-          <img draggable="false" loading="lazy" src="/Exchange%20icon%20.svg" alt="Exchange" style="width:calc(30px * var(--s));height:calc(30px * var(--s));flex-shrink:0;">
+          <svg viewBox="0 0 24 24" aria-hidden="true" style="width:calc(30px * var(--s));height:calc(30px * var(--s));flex-shrink:0;overflow:visible;"><defs><linearGradient id="exbolt-modal" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe08a"/><stop offset=".55" stop-color="#f0c14b"/><stop offset="1" stop-color="#d9962e"/></linearGradient></defs><path d="M14.2 1.5 4.6 13.4h6.1l-1.6 9.1 10.3-12.6h-6.3z" fill="url(#exbolt-modal)" stroke="#3a2a12" stroke-width="1.1" stroke-linejoin="round"/></svg>
           <div>
             <div class="modal-head__title">Exchange</div>
             <div class="modal-head__sub">Coins to Gram</div>
