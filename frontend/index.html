@@ -639,6 +639,7 @@ function i18nPick(ev, code){
   --c-streakcard-day-bg:     rgba(111,191,115,.16);
   --c-streakcard-day-border: #6fbf73;
   --c-streakcard-day-text:   #6fbf73;
+  --c-streakcard-bigday-border: #ff8a3d;
   --c-streakcard-timer:      #ff8a3d;
   --c-streakcard-claim-bg:   rgba(111,191,115,.18);
   --c-streakcard-claim-text: #6fbf73;
@@ -1370,6 +1371,8 @@ html[data-lang="ar"] b, html[data-lang="ar"] strong, html[data-lang="fa"] b, htm
 .streak-days__day .d-val{ font-size:calc(9.5px * var(--s)); font-weight:800; color:var(--ink); margin-top:calc(2px * var(--s)); }
 .streak-days__day.is-active{ background:var(--c-streakcard-day-bg); border:1px solid var(--c-streakcard-day-border); }
 .streak-days__day.is-active .d-val{ color:var(--c-streakcard-day-text); }
+/* the day-7 prize (500) gets an orange frame until it is the current day, then it turns green like the rest */
+.streak-days__day[data-day="7"]:not(.is-active){ border:1px solid var(--c-streakcard-bigday-border); }
 .streak-chest{ display:flex; align-items:center; justify-content:space-between; gap:calc(10px * var(--s)); }
 .streak-chest__left{ display:flex; align-items:center; gap:calc(10px * var(--s)); }
 /* drawn 15% bigger without taking more room, so nothing around it moves */
