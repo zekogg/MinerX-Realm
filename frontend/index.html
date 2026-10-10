@@ -6856,6 +6856,7 @@ fetchUserData();
       var active = btn.getAttribute('data-page') === pageId;
       btn.classList.toggle('is-active', active);
     });
+    if (pageId === 'page-tasks' && typeof loadPendingSponsoredTask === 'function') loadPendingSponsoredTask();
     if (pageId === 'page-realm'){
       if (typeof fetchRealmStatus === 'function') fetchRealmStatus();
       if (typeof resumeStorageTick === 'function') resumeStorageTick();
@@ -7928,6 +7929,14 @@ function creditAdRewardOptimistically(amount){
 }
 var adsTaskState = { watchedToday: 0, dailyLimit: 10, rewardCoins: 15, busy: false, cooldownUntil: 0 };
 var adsTaskCooldownTimer = null;
+// Adsgram resolves show() with { done }; a result with done: false was not watched to the end, so it goes the
+// "not completed" way like a rejection (the reward itself only ever comes from Adsgram's reward URL)
+function adsgramShow(controller){
+  return controller.show().then(function(result){
+    if (result && result.done === false) throw result;
+    return result;
+  });
+}
 function initAdsgramController(){
   if (window.Adsgram && !adsgramController){
     try {
@@ -7994,7 +8003,7 @@ function onWatchAdsgramClick(){
   showAdLoadingOverlay();
   setAdLoadingOverlayVia('Adsgram');
   pauseAdVerification();
-  adsgramController.show().then(function(){
+  adsgramShow(adsgramController).then(function(){
     hideAdLoadingOverlay();
     adsTaskState.busy = false;
     adsTaskState.watchedToday++;
@@ -8036,6 +8045,7 @@ document.addEventListener('DOMContentLoaded', function(){
   initAdsgramController();
   initBonusAdsgramController();
   initGateAdsgramController();
+  watchSponsoredCardOnScreen();
   renderAdsTaskButton();
   renderBonusAdButton();
 });
@@ -8101,7 +8111,7 @@ function onWatchBonusAdClick(){
   showAdLoadingOverlay();
   setAdLoadingOverlayVia('Adsgram');
   pauseAdVerification();
-  bonusAdsgramController.show().then(function(){
+  adsgramShow(bonusAdsgramController).then(function(){
     hideAdLoadingOverlay();
     bonusAdState.busy = false;
     bonusAdState.watchedToday++;
@@ -8317,14 +8327,48 @@ function renderSponsoredTask(){
     document.getElementById('sp-task-counter').textContent = sponsoredCounterText();
     return;
   }
-  // nothing is asked for until Check in has been opened
+  // nothing is asked for until Check in has been opened, and never while the card is off screen
   if (!sponsoredState.opened){
+    setSponsoredView('loading');
+    return;
+  }
+  if (!isSponsoredCardOnScreen()){
+    sponsoredState.nextPending = true;
     setSponsoredView('loading');
     return;
   }
   loadSponsoredTask();
 }
+// the card is on screen: the app is in front, the Tasks page is the active page (other pages stay laid out,
+// only hidden) and its Check in panel with the card is shown
+function isSponsoredCardOnScreen(){
+  var card = document.getElementById('sp-task-card');
+  if (!card || document.visibilityState !== 'visible' || card.getClientRects().length === 0) return false;
+  var page = card.closest('.page');
+  return !page || page.classList.contains('is-active');
+}
+// a next task held back while the card was off screen is asked for once it is seen again
+function loadPendingSponsoredTask(){
+  if (!sponsoredState.nextPending || !isSponsoredCardOnScreen()) return;
+  if (sponsoredState.doneToday >= sponsoredState.dailyLimit){
+    sponsoredState.nextPending = false;
+    setSponsoredView('limit');
+    return;
+  }
+  loadSponsoredTask();
+}
+function watchSponsoredCardOnScreen(){
+  var card = document.getElementById('sp-task-card');
+  if (!card) return;
+  if (window.IntersectionObserver){
+    new IntersectionObserver(function(entries){
+      if (entries.some(function(e){ return e.isIntersecting; })) loadPendingSponsoredTask();
+    }).observe(card);
+  }
+  document.addEventListener('visibilitychange', loadPendingSponsoredTask);
+}
 function loadSponsoredTask(){
+  sponsoredState.nextPending = false;
   unmountSponsoredTask();
   sponsoredState.lastLoadAt = Date.now();
   setSponsoredView('loading');
@@ -8475,6 +8519,10 @@ function onCheckinOpened(){
     renderSponsoredTask();
     return;
   }
+  if (sponsoredState.nextPending){
+    setTimeout(loadPendingSponsoredTask, 0);
+    return;
+  }
   retrySponsoredTask();
 }
 function retrySponsoredTask(){
@@ -8518,8 +8566,13 @@ function onSponsoredTaskReward(){
     if (sponsoredState.doneToday >= sponsoredState.dailyLimit){
       unmountSponsoredTask();
       setSponsoredView('limit');
-    } else {
+    } else if (isSponsoredCardOnScreen()){
       loadSponsoredTask();
+    } else {
+      // the user left Check in (or the app) during the countdown: the next task waits until the card is seen again
+      unmountSponsoredTask();
+      sponsoredState.nextPending = true;
+      setSponsoredView('loading');
     }
   }, SPONSORED_TASK_DONE_SHOW_MS);
 }
@@ -8584,7 +8637,7 @@ function runAdGateAdsgramFallback(onSuccess, onFail, opts){
     return;
   }
   setAdLoadingOverlayVia('Adsgram');
-  gateAdsgramController.show().then(function(){
+  adsgramShow(gateAdsgramController).then(function(){
     setAdLoadingOverlayVerifying();
     if (!(opts && opts.noConfetti)) triggerConfetti();
     onSuccess();
