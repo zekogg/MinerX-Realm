@@ -8322,7 +8322,7 @@ function onWatchGigapubClick(){
 // again when Check in is opened later (Adsgram's servers only, no request to ours)
 var SPONSORED_TASK_BLOCK_ID = 'task-52985';
 var SPONSORED_TASK_LOAD_TIMEOUT_MS = 15000;
-var SPONSORED_TASK_RETRY_GAP_MS = 60000;
+var SPONSORED_TASK_RETRY_GAP_MS = 45000;
 // the loading row stays at least this long, so a new task is seen arriving
 var SPONSORED_TASK_MIN_LOADING_MS = 2000;
 // how long Done shows after a claim before the next task is asked for (with the Claim wait and the loading row,
@@ -8624,7 +8624,7 @@ function hideSponsoredTask(){
   saveAdWait('sponsored_retry', sponsoredState.lastLoadAt + SPONSORED_TASK_RETRY_GAP_MS);
 }
 // the first opening of Check in asks for the first task; later ones ask again after a Come Back Later
-// (at most once a minute)
+// (at most once every 45 seconds)
 function onCheckinOpened(){
   if (!sponsoredState.opened){
     sponsoredState.opened = true;
