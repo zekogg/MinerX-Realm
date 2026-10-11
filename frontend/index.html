@@ -669,6 +669,7 @@ function i18nPick(ev, code){
   --c-ad-watch-2:    #4f7dff;
   --c-ad-watch-text: #ffffff;
   --c-ad-watch-lip:  #3341b0;
+  --c-ad-counter-track: rgba(255,255,255,.14);
   --c-btn-convert-1:    #4338ca;
   --c-btn-convert-2:    #6366f1;
   --c-btn-convert-text: #f5f3ff;
@@ -1872,6 +1873,19 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   border-color:transparent; text-shadow:none; box-shadow:none; transform:none;
 }
 .ad-task__counter{ font-size:calc(8px * var(--s)); color:var(--ink-faint); flex-shrink:0; }
+/* Daily Ads: today's count over a bar that fills with it */
+.ad-task__counter--bar{
+  display:flex; flex-direction:column; align-items:flex-end; gap:calc(3px * var(--s));
+  color:var(--c-ad-watch-text); font-weight:800; font-size:calc(9.5px * var(--s));
+}
+.ad-task__bar{
+  display:block; width:calc(46px * var(--s)); height:calc(4px * var(--s));
+  border-radius:999px; background:var(--c-ad-counter-track); overflow:hidden;
+}
+.ad-task__bar-fill{
+  display:block; width:0; height:100%; border-radius:999px;
+  background:linear-gradient(90deg, var(--c-ad-watch-1), var(--c-ad-watch-2));
+}
 /* Sponsored Task: Adsgram renders the advertiser's image and title; the reward and buttons are our slots.
    A placeholder row stands in while a task loads, when there is none (Come Back Later) and past the daily limit */
 .sp-task{
@@ -4253,7 +4267,7 @@ body.reduce-motion .firefly{
           <div class="ad-task__divider"></div>
           <div class="ad-task__footer">
             <button class="ad-task__watch" id="ads-task-watch-btn" onclick="onWatchAdsgramClick()">Watch</button>
-            <span class="ad-task__counter" id="ads-task-counter">0 / 10</span>
+            <span class="ad-task__counter ad-task__counter--bar" id="ads-task-counter"><span class="ad-task__count">0 / 10</span><span class="ad-task__bar"><span class="ad-task__bar-fill"></span></span></span>
           </div>
         </div>
         <div class="card ad-task">
@@ -4269,7 +4283,7 @@ body.reduce-motion .firefly{
           <div class="ad-task__divider"></div>
           <div class="ad-task__footer">
             <button class="ad-task__watch" id="bonus-ad-watch-btn" onclick="onWatchBonusAdClick()">Watch</button>
-            <span class="ad-task__counter" id="bonus-ad-counter">0 / 5</span>
+            <span class="ad-task__counter ad-task__counter--bar" id="bonus-ad-counter"><span class="ad-task__count">0 / 5</span><span class="ad-task__bar"><span class="ad-task__bar-fill"></span></span></span>
           </div>
         </div>
         <div class="card ad-task">
@@ -4285,7 +4299,7 @@ body.reduce-motion .firefly{
           <div class="ad-task__divider"></div>
           <div class="ad-task__footer">
             <button class="ad-task__watch" id="gigapub-task-watch-btn" onclick="onWatchGigapubClick()">Watch</button>
-            <span class="ad-task__counter" id="gigapub-task-counter">0 / 10</span>
+            <span class="ad-task__counter ad-task__counter--bar" id="gigapub-task-counter"><span class="ad-task__count">0 / 10</span><span class="ad-task__bar"><span class="ad-task__bar-fill"></span></span></span>
           </div>
         </div>
       </div>
@@ -7953,6 +7967,14 @@ function waitForAdSdk(isReady){
     })();
   });
 }
+// Daily Ads counter: today's count and the bar that fills with it
+function renderAdCounter(el, done, limit){
+  if (!el) return;
+  var count = el.querySelector('.ad-task__count');
+  var fill = el.querySelector('.ad-task__bar-fill');
+  if (count) count.textContent = done + ' / ' + limit;
+  if (fill) fill.style.width = (limit > 0 ? Math.min(100, done / limit * 100) : 0) + '%';
+}
 function creditAdRewardOptimistically(amount){
   updateBalanceDisplay({ coins: CURRENT_COINS_BALANCE + amount, gram: CURRENT_GRAM_BALANCE });
 }
@@ -8017,7 +8039,7 @@ function renderAdsTaskButton(){
   var btn = domCache.adsTaskBtn;
   var counter = domCache.adsTaskCounter;
   var avail = domCache.adsTaskAvail;
-  if (counter) counter.textContent = adsTaskState.watchedToday + ' / ' + adsTaskState.dailyLimit;
+  renderAdCounter(counter, adsTaskState.watchedToday, adsTaskState.dailyLimit);
   if (!adsgramController){
     if (avail) avail.textContent = 'Coming Soon';
     if (btn){ btn.textContent = 'Soon'; btn.classList.add('is-claimed'); }
@@ -8123,7 +8145,7 @@ function renderBonusAdButton(){
   var btn = domCache.bonusAdBtn;
   var counter = domCache.bonusAdCounter;
   var avail = domCache.bonusAdAvail;
-  if (counter) counter.textContent = bonusAdState.watchedToday + ' / ' + bonusAdState.dailyLimit;
+  renderAdCounter(counter, bonusAdState.watchedToday, bonusAdState.dailyLimit);
   if (!bonusAdsgramController){
     if (avail) avail.textContent = 'Coming Soon';
     if (btn){
@@ -8243,7 +8265,7 @@ function renderGigapubButton(){
   var btn = domCache.gigapubBtn;
   var counter = domCache.gigapubCounter;
   var avail = domCache.gigapubAvail;
-  if (counter) counter.textContent = gigapubState.watchedToday + ' / ' + gigapubState.dailyLimit;
+  renderAdCounter(counter, gigapubState.watchedToday, gigapubState.dailyLimit);
   if (!gigapubReady){
     if (avail) avail.textContent = 'Coming Soon';
     if (btn){ btn.textContent = 'Soon'; btn.classList.add('is-claimed'); }
