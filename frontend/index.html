@@ -640,6 +640,9 @@ function i18nPick(ev, code){
   --c-streakcard-day-border: #6fbf73;
   --c-streakcard-day-text:   #6fbf73;
   --c-streakcard-bigday-border: #ff8a3d;
+  --c-streakcard-pending-bg:     rgba(255,255,255,.09);
+  --c-streakcard-pending-border: rgba(255,255,255,.55);
+  --c-streakcard-pending-text:   #ffffff;
   --c-streakcard-timer:      #ff8a3d;
   --c-streakcard-claim-bg:   rgba(111,191,115,.18);
   --c-streakcard-claim-text: #6fbf73;
@@ -1370,8 +1373,11 @@ html[data-lang="ar"] b, html[data-lang="ar"] strong, html[data-lang="fa"] b, htm
 .streak-days__day .d-val{ font-size:calc(9.5px * var(--s)); font-weight:800; color:var(--ink); margin-top:calc(2px * var(--s)); }
 .streak-days__day.is-active{ background:var(--c-streakcard-day-bg); border:1px solid var(--c-streakcard-day-border); }
 .streak-days__day.is-active .d-val{ color:var(--c-streakcard-day-text); }
-/* the day-7 prize (500) always keeps an orange frame; on its day the inside turns green like the rest (kept after .is-active so the frame wins) */
+/* the day-7 prize (500) keeps an orange frame, except on its day before it is claimed; once claimed the inside turns green like the rest (kept after .is-active so the frame wins) */
 .streak-days__day[data-day="7"]{ border:1px solid var(--c-streakcard-bigday-border); }
+/* today before its reward is claimed: white instead of green, day 7 included (its orange frame returns once claimed) */
+.streak-days__day.is-active.is-pending{ background:var(--c-streakcard-pending-bg); border-color:var(--c-streakcard-pending-border); }
+.streak-days__day.is-active.is-pending .d-val{ color:var(--c-streakcard-pending-text); }
 .streak-chest{ display:flex; align-items:center; justify-content:space-between; gap:calc(10px * var(--s)); }
 .streak-chest__left{ display:flex; align-items:center; gap:calc(10px * var(--s)); }
 /* drawn 15% bigger without taking more room, so nothing around it moves */
@@ -1918,6 +1924,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 /* same width as Adsgram's button area, so Start does not move when the task appears */
 .sp-sk .partner-task__btn{ width:calc(66px * var(--s)); padding-left:0; padding-right:0; flex-shrink:0; }
 .sp-task__reward{ display:inline-flex; align-items:center; gap:calc(5px * var(--s)); }
+.sp-task .ad-task__counter{ color:#ffffff; }
 .ad-task__watch.is-ready{
   background:linear-gradient(135deg, #6fbf73, #2f7d3f);
   color:#eafdec;
@@ -5995,6 +6002,7 @@ function renderStreakDayBadge(){
   document.querySelectorAll('.streak-days__day').forEach(function(dayEl){
     var isActive = parseInt(dayEl.getAttribute('data-day'), 10) === streakState.displayDay;
     dayEl.classList.toggle('is-active', isActive);
+    dayEl.classList.toggle('is-pending', isActive && !streakState.claimedToday);
   });
 }
 function renderStreakButton(){
