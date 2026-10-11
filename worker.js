@@ -49,6 +49,17 @@ const WITHDRAW_ACTIVE_REFERRALS = 1;
 const ADS_TODAY_PLUS_ONE = "ads_today = CASE WHEN ads_today_date = date('now') THEN ads_today + 1 ELSE 1 END, ads_today_date = date('now')";
 const WITHDRAW_FEE_RATE = 0.05;
 const WITHDRAW_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+// A withdrawal's amount and payout are cut (never rounded up) to 3 decimals, as the app shows them; the fee is the
+// rest. Worked out in thousandths of a Gram, so no float remainder (0.26030000000000003) reaches D1 or a message
+function gramThousandths(value) {
+  const n = Number(value) || 0;
+  let units = Math.floor(Math.round(n * 1e9) / 1e6);
+  if (units / 1000 > n) units--;
+  return units;
+}
+function formatGram3(value) {
+  return (gramThousandths(value) / 1000).toFixed(3);
+}
 const ADMIN_TELEGRAM_ID = 1018495986;
 const DEVICE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const ADMIN_CHANNEL_ID = -1004325013522;
@@ -1297,9 +1308,11 @@ async function handleWithdrawRequest(request, env) {
   const auth = await authenticateRequest(request, env, body);
   if (!auth.ok) return auth.response;
   const { telegramId, rawUsername, firstName } = auth;
-  const amountGram = Number(body.amount);
+  const rawAmount = Number(body.amount);
+  const amountUnits = Number.isFinite(rawAmount) ? gramThousandths(rawAmount) : 0;
+  const amountGram = amountUnits / 1000;
   const address = typeof body.address === "string" ? body.address.trim() : "";
-  if (!Number.isFinite(amountGram) || amountGram < WITHDRAW_MIN_GRAM) {
+  if (!Number.isFinite(rawAmount) || amountGram < WITHDRAW_MIN_GRAM) {
     return jsonResponse({ error: "below_minimum", minimum: WITHDRAW_MIN_GRAM }, 400);
   }
   if (!address) {
@@ -1307,8 +1320,10 @@ async function handleWithdrawRequest(request, env) {
   }
   const now = Date.now();
   const cooldownCutoff = now - WITHDRAW_COOLDOWN_MS;
-  const feeGram = amountGram * WITHDRAW_FEE_RATE;
-  const netGram = Math.max(0, amountGram - feeGram);
+  const feeBasisPoints = Math.round(WITHDRAW_FEE_RATE * 10000);
+  const netUnits = Math.floor(amountUnits * (10000 - feeBasisPoints) / 10000);
+  const netGram = netUnits / 1000;
+  const feeGram = (amountUnits - netUnits) / 1000;
   const reserveStmt = env.DB.prepare(
     `UPDATE users SET gram = gram - ?, last_withdraw_request_at = ?
      WHERE telegram_id = ? AND gram >= ? AND banned_at IS NULL
@@ -1395,7 +1410,7 @@ async function handleWithdrawRequest(request, env) {
     await sendMessage(env, telegramId, {
       text:
         `📨 Withdrawal Request Created\n\n` +
-        `Your request for ${netGram} Gram has been received and is being processed.\n\n` +
+        `Your request for ${formatGram3(netGram)} Gram has been received and is being processed.\n\n` +
         `⏱ This usually takes a few minutes, but can sometimes take up to 24 hours.`
     });
   } catch (e) {
@@ -3123,7 +3138,7 @@ function buildWithdrawText(status, w) {
     `${title}\n\n` +
     `👤 ${nameLine}\n` +
     `🆔 <code>${w.telegramId}</code>\n\n` +
-    `💵 Amount: ${w.netGram} Gram\n\n` +
+    `💵 Amount: ${formatGram3(w.netGram)} Gram\n\n` +
     `📍 Address:\n<code>${escapeHtml(w.address)}</code>`
   );
 }
