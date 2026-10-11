@@ -4269,7 +4269,7 @@ body.reduce-motion .firefly{
           <div class="ad-task__divider"></div>
           <div class="ad-task__footer">
             <button class="ad-task__watch" id="bonus-ad-watch-btn" onclick="onWatchBonusAdClick()">Watch</button>
-            <span class="ad-task__counter" id="bonus-ad-counter">0 / 8</span>
+            <span class="ad-task__counter" id="bonus-ad-counter">0 / 5</span>
           </div>
         </div>
         <div class="card ad-task">
@@ -8087,7 +8087,7 @@ function onWatchAdsgramClick(){
 var BONUS_AD_BLOCK_ID = '52885';
 var bonusAdsgramController = null;
 var BONUS_AD_COOLDOWN_MS = 60 * 60 * 1000;
-var bonusAdState = { watchedToday: 0, dailyLimit: 8, rewardCoins: 15, busy: false, nextAvailableAt: 0 };
+var bonusAdState = { watchedToday: 0, dailyLimit: 5, rewardCoins: 15, busy: false, nextAvailableAt: 0 };
 var bonusAdCountdownTimer = null;
 function isValidAdsgramBlockId(id){
   return /^(\d+|int-\d+)$/.test(String(id));
@@ -8114,7 +8114,7 @@ document.addEventListener('DOMContentLoaded', function(){
 });
 function applyBonusAdState(data){
   bonusAdState.watchedToday = data.watched_today || 0;
-  bonusAdState.dailyLimit = data.daily_limit || 8;
+  bonusAdState.dailyLimit = data.daily_limit || 5;
   bonusAdState.rewardCoins = data.reward_coins || 15;
   bonusAdState.nextAvailableAt = data.next_available_at || 0;
   startBonusAdCountdown();
@@ -9544,9 +9544,45 @@ function onExchangeConfirm(){
 }
 
 // Promo Code
+// The code is checked first, so the ad is shown only for a code that can be redeemed; after a code that cannot,
+// Redeem counts down a few seconds before the next try
 var promoRedeemBusy = false;
+var PROMO_RETRY_WAIT_S = 5;
+var promoRetryTimer = null;
+var PROMO_ERROR_MESSAGES = {
+  missing_code: 'Enter a code first',
+  invalid_code: 'This code does not exist',
+  code_expired: 'This code has expired',
+  code_exhausted: 'This code reached its usage limit',
+  already_redeemed: 'You already used this code'
+};
+function showPromoError(error){
+  showAppToast({ title: 'Redeem Failed', amount: PROMO_ERROR_MESSAGES[error] || 'Something went wrong' });
+}
+function endPromoRedeem(){
+  var btn = document.getElementById('promo-redeem-btn');
+  promoRedeemBusy = false;
+  setButtonBusy(btn, false);
+  if (btn) btn.disabled = false;
+}
+function startPromoRetryWait(){
+  var btn = document.getElementById('promo-redeem-btn');
+  if (!btn) return;
+  var left = PROMO_RETRY_WAIT_S;
+  btn.disabled = true;
+  btn.textContent = String(left);
+  clearInterval(promoRetryTimer);
+  promoRetryTimer = setInterval(function(){
+    left--;
+    if (left > 0){ btn.textContent = String(left); return; }
+    clearInterval(promoRetryTimer);
+    promoRetryTimer = null;
+    btn.textContent = 'Redeem';
+    btn.disabled = false;
+  }, 1000);
+}
 function onPromoRedeemClick(){
-  if (promoRedeemBusy) return;
+  if (promoRedeemBusy || promoRetryTimer) return;
   var input = document.getElementById('promo-code-input');
   var code = input ? input.value.trim() : '';
   if (!code){
@@ -9561,10 +9597,25 @@ function onPromoRedeemClick(){
   var promoBtn = document.getElementById('promo-redeem-btn');
   promoRedeemBusy = true;
   setButtonBusy(promoBtn, true);
-  runAdGate(function(){ runPromoRedeemRequest(initData, code, input); }, function(){
-    promoRedeemBusy = false;
-    setButtonBusy(promoBtn, false);
-    if (promoBtn) promoBtn.disabled = false;
+  fetch('/api/promo/redeem', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: initData, code: code, check: true })
+  })
+  .then(function(res){ return res.json(); })
+  .then(function(data){
+    if (data.error){
+      endPromoRedeem();
+      showPromoError(data.error);
+      startPromoRetryWait();
+      return;
+    }
+    runAdGate(function(){ runPromoRedeemRequest(initData, code, input); }, endPromoRedeem);
+  })
+  .catch(function(err){
+    console.error('promo check request failed:', err);
+    endPromoRedeem();
+    showPromoError();
   });
 }
 function runPromoRedeemRequest(initData, code, input){
@@ -9578,14 +9629,7 @@ function runPromoRedeemRequest(initData, code, input){
   .then(function(result){
     var data = result.data;
     if (data.error){
-      var messages = {
-        missing_code: 'Enter a code first',
-        invalid_code: 'This code does not exist',
-        code_expired: 'This code has expired',
-        code_exhausted: 'This code reached its usage limit',
-        already_redeemed: 'You already used this code'
-      };
-      showAppToast({ title: 'Redeem Failed', amount: messages[data.error] || 'Something went wrong' });
+      showPromoError(data.error);
       return;
     }
     updateBalanceDisplay({ coins: data.coins, gram: data.gram , locked_coins: data.locked_coins });

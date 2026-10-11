@@ -108,7 +108,7 @@ const CHECKIN_PARTNER_CHANNEL = "@XTreasuryX";
 
 // Bonus AD Every 1H config
 const BONUS_AD_REWARD_COINS = 15;
-const BONUS_AD_DAILY_LIMIT = 8;
+const BONUS_AD_DAILY_LIMIT = 5;
 const BONUS_AD_COOLDOWN_MS = 60 * 60 * 1000;
 
 // Watch GigaPub ads config
@@ -999,11 +999,23 @@ async function handlePromoRedeem(request, env) {
   const code = typeof body.code === "string" ? body.code.trim().toUpperCase() : "";
   if (!code) return jsonResponse({ error: "missing_code" }, 400);
   const promo = await env.DB.prepare(
-    "SELECT code, reward, currency, max_uses, expires_at FROM promo_codes WHERE code = ?"
+    "SELECT code, reward, currency, max_uses, uses_count, expires_at FROM promo_codes WHERE code = ?"
   ).bind(code).first();
   if (!promo) return jsonResponse({ error: "invalid_code" }, 404);
   if (promo.expires_at && Date.now() > Date.parse(promo.expires_at)) {
     return jsonResponse({ error: "code_expired" }, 400);
+  }
+  // check only (the app asks before its ad, so no ad is shown for a code that cannot be redeemed): the same answers
+  // as a redeem, nothing is written; the redeem after the ad checks everything again
+  if (body.check === true) {
+    const used = await env.DB.prepare(
+      "SELECT 1 FROM promo_redemptions WHERE telegram_id = ? AND code = ?"
+    ).bind(telegramId, code).first();
+    if (used) return jsonResponse({ error: "already_redeemed" }, 409);
+    if (promo.max_uses != null && (promo.uses_count || 0) >= promo.max_uses) {
+      return jsonResponse({ error: "code_exhausted" }, 400);
+    }
+    return jsonResponse({ ok: true });
   }
   // One transaction, all or nothing: the redemption is recorded only if this user has not used the code and it
   // has uses left; the counter and the reward each follow only if the statement before them changed a row.
