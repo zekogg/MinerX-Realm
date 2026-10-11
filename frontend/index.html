@@ -8277,10 +8277,13 @@ var SPONSORED_TASK_LOAD_TIMEOUT_MS = 15000;
 var SPONSORED_TASK_RETRY_GAP_MS = 60000;
 // the loading row stays at least this long, so a new task is seen arriving
 var SPONSORED_TASK_MIN_LOADING_MS = 2000;
-// how long Done shows after a claim before the next task is asked for
-var SPONSORED_TASK_DONE_SHOW_MS = 10000;
+// how long Done shows after a claim before the next task is asked for (with the Claim wait and the loading row,
+// tasks load at least 30 seconds apart, as Adsgram recommends)
+var SPONSORED_TASK_DONE_SHOW_MS = 30000;
+// after the last task of the day, Done shows this long (no countdown) before Come Back Tomorrow
+var SPONSORED_TASK_LAST_DONE_SHOW_MS = 2000;
 // Claim counts down this long after Start before it can be tapped (Adsgram still checks the task itself)
-var SPONSORED_TASK_CLAIM_WAIT_S = 10;
+var SPONSORED_TASK_CLAIM_WAIT_S = 3;
 var SPONSORED_TASK_DONE_SHOW_S = SPONSORED_TASK_DONE_SHOW_MS / 1000;
 var sponsoredState = { doneToday: 0, dailyLimit: 10, rewardCoins: 20, loaded: false, opened: false, view: 'loading', lastLoadAt: 0 };
 var sponsoredTaskEl = null;
@@ -8565,6 +8568,16 @@ function onSponsoredTaskReward(){
   triggerConfetti();
   scheduleAdVerification(true);
   var el = sponsoredTaskEl;
+  // the last task of the day: Done, then Come Back Tomorrow, with no countdown to a task that will not come
+  if (sponsoredState.doneToday >= sponsoredState.dailyLimit){
+    if (el) setSponsoredCounter(el);
+    clearTimeout(sponsoredReloadTimer);
+    sponsoredReloadTimer = setTimeout(function(){
+      unmountSponsoredTask();
+      setSponsoredView('limit');
+    }, SPONSORED_TASK_LAST_DONE_SHOW_MS);
+    return;
+  }
   if (el){
     setSponsoredCounter(el);
     // Done counts down the seconds until the next task is asked for
