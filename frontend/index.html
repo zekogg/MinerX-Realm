@@ -5387,7 +5387,7 @@ body.reduce-motion .firefly{
       <div class="modal-field-label"><span>Address (Gram~Ton):</span></div>
       <input type="text" class="modal-plain-input" id="withdraw-address" placeholder="UQ...">
       <div class="modal-field-label"><span>Amount to be received:</span></div>
-      <div class="modal-plain-box has-gram" style="display:flex;align-items:center;gap:calc(6px * var(--s));"><span id="withdraw-output">0.0000</span> Gram <img draggable="false" loading="lazy" src="/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:calc(16px * var(--s));height:calc(16px * var(--s));flex-shrink:0;"></div>
+      <div class="modal-plain-box has-gram" style="display:flex;align-items:center;gap:calc(6px * var(--s));"><span id="withdraw-output">0.000</span> Gram <img draggable="false" loading="lazy" src="/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:calc(16px * var(--s));height:calc(16px * var(--s));flex-shrink:0;"></div>
       <div class="wd-req">
         <div class="wd-req__label"><span>Min Withdraw : <span id="withdraw-min-label">0.1</span></span></div>
       </div>
@@ -5679,13 +5679,24 @@ var CURRENT_LOCKED_COINS = 0;
 function exchangeableCoins(){
   return Math.max(0, CURRENT_COINS_BALANCE - CURRENT_LOCKED_COINS);
 }
+// Gram is shown cut, never rounded up, so no shown, MAX or typed amount is more than the balance; a balance a hair
+// under its decimal value (float sums, e.g. 0.19999999999999998) shows the lower value
+function floorGramUnits(value, decimals){
+  var n = Number(value) || 0;
+  var units = Math.floor(Math.round(n * 1e9) / Math.pow(10, 9 - decimals));
+  if (units / Math.pow(10, decimals) > n) units--;
+  return units;
+}
+function formatGram(value, decimals){
+  return (floorGramUnits(value, decimals) / Math.pow(10, decimals)).toFixed(decimals);
+}
 function updateBalanceDisplay(u){
   if (u.locked_coins !== undefined) CURRENT_LOCKED_COINS = Number(u.locked_coins) || 0;
   CURRENT_COINS_BALANCE = Number(u.coins) || 0;
   CURRENT_GRAM_BALANCE = Number(u.gram) || 0;
   var coinsWhole = Number(u.coins).toLocaleString('en-US', { maximumFractionDigits: 0 });
-  var gramText = Number(u.gram).toFixed(2);
-  var gramWalletText = Number(u.gram).toFixed(3);
+  var gramText = formatGram(u.gram, 2);
+  var gramWalletText = formatGram(u.gram, 3);
   if (typeof u.exchange_rate_coin_to_gram === 'number'){
     EXCHANGE_RATE_COIN_TO_GRAM = u.exchange_rate_coin_to_gram;
   }
@@ -7358,7 +7369,7 @@ function applyProfileData(data){
   var coinsEl = document.getElementById('pf-stat-coins');
   if (coinsEl) coinsEl.textContent = Number(data.coins).toLocaleString('en-US', { maximumFractionDigits: 0 });
   var gramEl = document.getElementById('pf-stat-gram');
-  if (gramEl) gramEl.textContent = Number(data.gram).toFixed(3);
+  if (gramEl) gramEl.textContent = formatGram(data.gram, 3);
   var speedEl = document.getElementById('pf-stat-speed');
   if (speedEl) speedEl.textContent = '+' + Number(data.total_speed).toLocaleString('en-US', { maximumFractionDigits: 0 }) + ' Coins/hr';
   var depositEl = document.getElementById('pf-stat-deposit');
@@ -9359,7 +9370,7 @@ function openExchangeModal(){
   var coinBalEl = document.getElementById('exchange-coin-balance');
   var gramBalEl = document.getElementById('exchange-gram-balance');
   if (coinBalEl) coinBalEl.textContent = CURRENT_COINS_BALANCE.toLocaleString('en-US', { maximumFractionDigits: 0 });
-  if (gramBalEl) gramBalEl.textContent = CURRENT_GRAM_BALANCE.toFixed(2);
+  if (gramBalEl) gramBalEl.textContent = formatGram(CURRENT_GRAM_BALANCE, 2);
   renderExchangeLocked();
   updateExchange();
   openModal('modal-exchange');
@@ -9665,8 +9676,14 @@ var WITHDRAW_MIN_GRAM = 0.1;
 var NEXT_WITHDRAW_ALLOWED_AT = null;
 var withdrawCooldownTimer = null;
 var withdrawBusy = false;
+// a withdrawal's payout, worked out as the server does: the amount and the payout are cut to 3 decimals
+function withdrawNetGram(amount){
+  var units = floorGramUnits(amount, 3);
+  var feeBp = Math.round(WITHDRAW_FEE_RATE * 10000);
+  return Math.floor(units * (10000 - feeBp) / 10000) / 1000;
+}
 function setMaxWithdraw(){
-  document.getElementById('withdraw-amount').value = CURRENT_GRAM_BALANCE.toFixed(4);
+  document.getElementById('withdraw-amount').value = formatGram(CURRENT_GRAM_BALANCE, 3);
   updateWithdraw();
 }
 function openWithdrawModal(){
@@ -9679,14 +9696,21 @@ function openWithdrawModal(){
   openModal('modal-withdraw');
 }
 function updateWithdraw(){
-  var val = parseFloat(document.getElementById('withdraw-amount').value) || 0;
-  var out = Math.max(0, val - (val * WITHDRAW_FEE_RATE));
-  document.getElementById('withdraw-output').textContent = out.toFixed(4);
+  var input = document.getElementById('withdraw-amount');
+  // at most 3 decimals, as the balance is shown
+  var cut = /^(\d*\.\d{3})\d+$/.exec(input.value);
+  if (cut) input.value = cut[1];
+  var val = parseFloat(input.value) || 0;
+  document.getElementById('withdraw-output').textContent = withdrawNetGram(val).toFixed(3);
   var cta = document.getElementById('withdraw-cta');
   var onCooldown = NEXT_WITHDRAW_ALLOWED_AT && Date.now() < NEXT_WITHDRAW_ALLOWED_AT;
   if (onCooldown) return;
   if (val > 0 && val < WITHDRAW_MIN_GRAM){
     cta.textContent = 'Minimum ' + WITHDRAW_MIN_GRAM + ' Gram';
+    cta.disabled = true;
+    cta.classList.remove('is-ready');
+  } else if (val > CURRENT_GRAM_BALANCE){
+    cta.textContent = 'Not Enough Gram';
     cta.disabled = true;
     cta.classList.remove('is-ready');
   } else {
@@ -9856,7 +9880,7 @@ function renderTxHistory(items){
     var amtClass = isWithdraw ? 'is-neg' : 'is-pos';
     var sign = isWithdraw ? '-' : '+';
     var amtIcon = isWithdraw ? PRIZE_ICON_URLS.gram : PRIZE_ICON_URLS.coins;
-    var amountText = isWithdraw ? String(Number(Number(item.amount).toFixed(3))) : Math.round(item.amount).toLocaleString('en-US');
+    var amountText = isWithdraw ? formatGram(item.amount, 3) : Math.round(item.amount).toLocaleString('en-US');
     var STATUS_MAP = {
       pending:   { cls: 'is-pending',   text: 'Pending' },
       confirmed: { cls: 'is-confirmed', text: 'Confirmed' },
