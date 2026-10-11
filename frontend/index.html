@@ -7956,6 +7956,37 @@ function waitForAdSdk(isReady){
 function creditAdRewardOptimistically(amount){
   updateBalanceDisplay({ coins: CURRENT_COINS_BALANCE + amount, gram: CURRENT_GRAM_BALANCE });
 }
+// Ad waits are also kept on the device, so closing and reopening the app does not skip them (and a reopen, with the
+// requests it costs, gains nothing); a kept wait is never longer than its own length, so a changed device clock
+// cannot stretch it, and storage that is blocked or cleared only means the wait is not carried over
+var AD_WAIT_KEY = 'mx_adwait_';
+function saveAdWait(name, until){
+  try{ localStorage.setItem(AD_WAIT_KEY + name, String(until)); }catch(e){   }
+}
+function loadAdWait(name, lengthMs){
+  var until = 0;
+  try{ until = Number(localStorage.getItem(AD_WAIT_KEY + name)) || 0; }catch(e){   }
+  var left = until - Date.now();
+  return left > 0 && left <= lengthMs ? until : 0;
+}
+function restoreAdWaits(){
+  var until = loadAdWait('adsgram', ADS_TASK_COOLDOWN_MS);
+  if (until) startAdsTaskCooldown(until);
+  until = loadAdWait('gigapub', GIGAPUB_TASK_COOLDOWN_MS);
+  if (until) startGigapubTaskCooldown(until);
+  until = loadAdWait('sponsored_next', SPONSORED_TASK_DONE_SHOW_MS);
+  if (until){
+    startSponsoredWait(until);
+    return;
+  }
+  // no task last time: Come Back Later, and Check in asks again only once the retry gap has passed
+  until = loadAdWait('sponsored_retry', SPONSORED_TASK_RETRY_GAP_MS);
+  if (until){
+    sponsoredState.lastLoadAt = until - SPONSORED_TASK_RETRY_GAP_MS;
+    setSponsoredView('none');
+  }
+}
+var ADS_TASK_COOLDOWN_MS = 10000;
 var adsTaskState = { watchedToday: 0, dailyLimit: 10, rewardCoins: 15, busy: false, cooldownUntil: 0 };
 var adsTaskCooldownTimer = null;
 // Adsgram resolves show() with { done }; a result with done: false was not watched to the end, so it goes the
@@ -8006,8 +8037,10 @@ function renderAdsTaskButton(){
     }
   }
 }
-function startAdsTaskCooldown(){
-  adsTaskState.cooldownUntil = Date.now() + 10000;
+// restoredUntil: a wait kept on the device from before the app was reopened
+function startAdsTaskCooldown(restoredUntil){
+  adsTaskState.cooldownUntil = restoredUntil || Date.now() + ADS_TASK_COOLDOWN_MS;
+  if (!restoredUntil) saveAdWait('adsgram', adsTaskState.cooldownUntil);
   clearInterval(adsTaskCooldownTimer);
   renderAdsTaskButton();
   adsTaskCooldownTimer = setInterval(function(){
@@ -8075,6 +8108,7 @@ document.addEventListener('DOMContentLoaded', function(){
   initBonusAdsgramController();
   initGateAdsgramController();
   watchSponsoredCardOnScreen();
+  restoreAdWaits();
   renderAdsTaskButton();
   renderBonusAdButton();
 });
@@ -8162,6 +8196,7 @@ function onWatchBonusAdClick(){
 // Watch GigaPub Ads
 var GIGAPUB_PUBLISHER_ID = '8282';
 var gigapubReady = false;
+var GIGAPUB_TASK_COOLDOWN_MS = 10000;
 var gigapubState = { watchedToday: 0, dailyLimit: 10, rewardCoins: 15, busy: false, cooldownUntil: 0 };
 var gigapubTaskCooldownTimer = null;
 function isValidGigapubId(id){
@@ -8229,8 +8264,10 @@ function renderGigapubButton(){
     }
   }
 }
-function startGigapubTaskCooldown(){
-  gigapubState.cooldownUntil = Date.now() + 10000;
+// restoredUntil: a wait kept on the device from before the app was reopened
+function startGigapubTaskCooldown(restoredUntil){
+  gigapubState.cooldownUntil = restoredUntil || Date.now() + GIGAPUB_TASK_COOLDOWN_MS;
+  if (!restoredUntil) saveAdWait('gigapub', gigapubState.cooldownUntil);
   clearInterval(gigapubTaskCooldownTimer);
   renderGigapubButton();
   gigapubTaskCooldownTimer = setInterval(function(){
@@ -8296,10 +8333,11 @@ var SPONSORED_TASK_LAST_DONE_SHOW_MS = 2000;
 // Claim counts down this long after Start before it can be tapped (Adsgram still checks the task itself)
 var SPONSORED_TASK_CLAIM_WAIT_S = 3;
 var SPONSORED_TASK_DONE_SHOW_S = SPONSORED_TASK_DONE_SHOW_MS / 1000;
-var sponsoredState = { doneToday: 0, dailyLimit: 10, rewardCoins: 20, loaded: false, opened: false, view: 'loading', lastLoadAt: 0 };
+var sponsoredState = { doneToday: 0, dailyLimit: 10, rewardCoins: 20, loaded: false, opened: false, view: 'loading', lastLoadAt: 0, waitUntil: 0 };
 var sponsoredTaskEl = null;
 var sponsoredReloadTimer = null;
 var sponsoredLoadTimer = null;
+var sponsoredWaitTimer = null;
 function applySponsoredTaskState(data){
   sponsoredState.doneToday = data.done_today || 0;
   sponsoredState.dailyLimit = data.daily_limit || 10;
@@ -8334,8 +8372,40 @@ function setSponsoredView(view){
   bar.hidden = view !== 'loading';
   msg.hidden = view === 'loading';
   msg.textContent = view === 'limit' ? 'Come Back Tomorrow' : 'Come Back Later';
-  btn.textContent = view === 'limit' ? 'Done' : 'Start';
-  btn.classList.toggle('is-claimed', view === 'limit');
+  btn.textContent = view === 'limit' ? 'Done' : view === 'wait' ? sponsoredWaitText() : 'Start';
+  btn.classList.toggle('is-claimed', view === 'limit' || view === 'wait');
+}
+// the app was reopened while Done was counting down to the next task: Come Back Later counts down the rest
+// (kept on the device), then the next task is asked for
+function sponsoredWaitText(){
+  return 'Next ' + Math.max(1, Math.ceil((sponsoredState.waitUntil - Date.now()) / 1000));
+}
+function startSponsoredWait(until){
+  sponsoredState.waitUntil = until;
+  setSponsoredView('wait');
+  clearInterval(sponsoredWaitTimer);
+  sponsoredWaitTimer = setInterval(tickSponsoredWait, 1000);
+}
+function tickSponsoredWait(){
+  if (sponsoredState.view !== 'wait'){
+    clearInterval(sponsoredWaitTimer);
+    return;
+  }
+  if (Date.now() < sponsoredState.waitUntil){
+    document.getElementById('sp-task-btn').textContent = sponsoredWaitText();
+    return;
+  }
+  clearInterval(sponsoredWaitTimer);
+  setSponsoredView('loading');
+  // before the user data or the first opening of Check in, renderSponsoredTask asks for the task when they come
+  if (!sponsoredState.loaded || !sponsoredState.opened) return;
+  if (sponsoredState.doneToday >= sponsoredState.dailyLimit){
+    setSponsoredView('limit');
+  } else if (isSponsoredCardOnScreen()){
+    loadSponsoredTask();
+  } else {
+    sponsoredState.nextPending = true;
+  }
 }
 function renderSponsoredTask(){
   if (!document.getElementById('sp-task-card') || !sponsoredState.loaded) return;
@@ -8353,6 +8423,11 @@ function renderSponsoredTask(){
   // no task last time: it stays Come Back Later until Check in is opened again
   if (sponsoredState.view === 'none'){
     setSponsoredView('none');
+    return;
+  }
+  // the wait before the next task, carried over a reopen of the app
+  if (sponsoredState.view === 'wait'){
+    setSponsoredView('wait');
     return;
   }
   if (sponsoredState.view === 'loading' && sponsoredState.lastLoadAt){
@@ -8540,8 +8615,13 @@ function unmountSponsoredTask(){
 // no task for this user right now
 function hideSponsoredTask(){
   unmountSponsoredTask();
-  if (sponsoredState.doneToday >= sponsoredState.dailyLimit) setSponsoredView('limit');
-  else setSponsoredView('none');
+  if (sponsoredState.doneToday >= sponsoredState.dailyLimit){
+    setSponsoredView('limit');
+    return;
+  }
+  setSponsoredView('none');
+  // kept on the device, so a reopen of the app does not ask again before the retry gap
+  saveAdWait('sponsored_retry', sponsoredState.lastLoadAt + SPONSORED_TASK_RETRY_GAP_MS);
 }
 // the first opening of Check in asks for the first task; later ones ask again after a Come Back Later
 // (at most once a minute)
@@ -8602,7 +8682,9 @@ function onSponsoredTaskReward(){
       else clearInterval(el.__doneTimer);
     }, 1000);
   }
-  // a fresh element asks Adsgram for the next task (Come Back Later when there is none)
+  // a fresh element asks Adsgram for the next task (Come Back Later when there is none); the wait is kept on the
+  // device, so a reopen of the app does not skip it
+  saveAdWait('sponsored_next', Date.now() + SPONSORED_TASK_DONE_SHOW_MS);
   clearTimeout(sponsoredReloadTimer);
   sponsoredReloadTimer = setTimeout(function(){
     if (sponsoredState.doneToday >= sponsoredState.dailyLimit){
