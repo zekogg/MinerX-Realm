@@ -8516,6 +8516,8 @@ function onWatchSupportAdClick(){
     supportAdState.busy = false;
     saveSupportAdWatched(supportAdWatchedToday() + 1);
     startSupportAdCooldown();
+    // a thank-you, with no reward and no celebration
+    showAppToast({ title: 'Thank You!', icon: '/Support%20Us%20icon.svg', amount: 'Thanks for supporting us' });
   }).catch(function(){
     hideAdLoadingOverlay();
     supportAdState.busy = false;
