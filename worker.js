@@ -1540,22 +1540,35 @@ async function bumpLifetimeAdsWatched(env, telegramId) {
   await activateReferralOnLifetimeAds(env, telegramId, updated.referred_by, updated.lifetime_ads_watched);
 }
 
-// Referral becomes active once the invited user reaches ACTIVE_FRIEND_ADS_THRESHOLD lifetime ads
+// A referral becomes active (the inviter's bonus) once the invited user has both ACTIVE_FRIEND_ADS_THRESHOLD lifetime
+// ads and the news channel joined. The channel counts as joined when the Check in channel task was ever claimed
+// (checkin1_claimed_date is set only after Telegram confirmed the membership) or, once, when Telegram confirms it at
+// the friend's threshold ad (a friend who joined the channel elsewhere). Friends already active stay active.
 async function activateReferralOnLifetimeAds(env, telegramId, referredBy, lifetimeAds) {
-  if (referredBy && lifetimeAds >= ACTIVE_FRIEND_ADS_THRESHOLD) {
-    // one batch, so a friend is never marked active without the inviter's bonus and counters; changes() is the row
-    // count of the statement just before it, so an already active friend pays nothing
-    await env.DB.batch([
-      env.DB.prepare(
-        `UPDATE referrals SET is_active = 1, earned_coins = earned_coins + ?
-         WHERE referrer_id = ? AND referred_id = ? AND is_active = 0`
-      ).bind(REFERRAL_ACTIVE_BONUS_COINS, referredBy, telegramId),
-      env.DB.prepare(
-        `UPDATE users SET referral_pending_earnings = referral_pending_earnings + ?, active_referrals_count = active_referrals_count + 1, weekly_active_referrals = weekly_active_referrals + 1
-         WHERE telegram_id = ? AND changes() = 1`
-      ).bind(REFERRAL_ACTIVE_BONUS_COINS, referredBy)
-    ]);
-  }
+  if (!referredBy || lifetimeAds < ACTIVE_FRIEND_ADS_THRESHOLD) return;
+  if (await activateReferral(env, telegramId, referredBy, false)) return;
+  // the lifetime count goes up one ad at a time in a single write, so only one ad ever sees the threshold itself:
+  // Telegram is asked at most once per friend
+  if (lifetimeAds !== ACTIVE_FRIEND_ADS_THRESHOLD) return;
+  const member = await fetchChatMemberOnce(env, CHECKIN_NEWS_CHANNEL, telegramId);
+  if (member.state === "member") await activateReferral(env, telegramId, referredBy, true);
+}
+// one batch, so a friend is never marked active without the inviter's bonus and counters; changes() is the row count
+// of the statement just before it, so an already active friend (or one without the channel) pays nothing.
+// channelConfirmed: Telegram has just confirmed the membership. Returns whether the friend became active now.
+async function activateReferral(env, telegramId, referredBy, channelConfirmed) {
+  const [activated] = await env.DB.batch([
+    env.DB.prepare(
+      `UPDATE referrals SET is_active = 1, earned_coins = earned_coins + ?
+       WHERE referrer_id = ? AND referred_id = ? AND is_active = 0
+         AND (? = 1 OR EXISTS (SELECT 1 FROM users WHERE telegram_id = ? AND checkin1_claimed_date IS NOT NULL))`
+    ).bind(REFERRAL_ACTIVE_BONUS_COINS, referredBy, telegramId, channelConfirmed ? 1 : 0, telegramId),
+    env.DB.prepare(
+      `UPDATE users SET referral_pending_earnings = referral_pending_earnings + ?, active_referrals_count = active_referrals_count + 1, weekly_active_referrals = weekly_active_referrals + 1
+       WHERE telegram_id = ? AND changes() = 1`
+    ).bind(REFERRAL_ACTIVE_BONUS_COINS, referredBy)
+  ]);
+  return !!(activated && activated.meta && activated.meta.changes === 1);
 }
 
 // /api/pets/claim_happy_dog
@@ -2524,7 +2537,7 @@ async function handleFriendsList(request, env) {
   const page = Math.max(0, parseInt(body.page, 10) || 0);
   const offset = page * 10;
   const result = await env.DB.prepare(
-    `SELECT u.telegram_id, u.username, u.lifetime_ads_watched, r.earned_coins, r.is_active
+    `SELECT u.telegram_id, u.username, u.lifetime_ads_watched, u.checkin1_claimed_date, r.earned_coins, r.is_active
      FROM referrals r
      JOIN users u ON u.telegram_id = r.referred_id
      WHERE r.referrer_id = ?
@@ -2538,7 +2551,9 @@ async function handleFriendsList(request, env) {
     // lifetime_ads_watched counts every ad network, the Bonus Ad and the ad gates
     ads_watched: r.lifetime_ads_watched || 0,
     earned_coins: r.earned_coins || 0,
-    active: !!r.is_active
+    active: !!r.is_active,
+    // the Check in channel task was claimed at least once (the channel condition for becoming active)
+    channel_joined: !!r.checkin1_claimed_date
   }));
   return jsonResponse({ friends, has_more: hasMore });
 }
@@ -2600,10 +2615,14 @@ async function handleCheckinClaim(request, env) {
   const user = await env.DB.prepare(
     `UPDATE users SET coins = coins + ?, ${column} = ?
      WHERE telegram_id = ? AND (${column} IS NULL OR ${column} <> ?)
-     RETURNING coins`
+     RETURNING coins, referred_by, lifetime_ads_watched`
   ).bind(reward, today, telegramId, today).first();
   if (!user) {
     return jsonResponse({ error: "already_claimed_today" }, 409);
+  }
+  // the news channel task has just confirmed the channel: an invited friend who already has the ads becomes active
+  if (task === 1 && user.referred_by && (user.lifetime_ads_watched || 0) >= ACTIVE_FRIEND_ADS_THRESHOLD) {
+    await activateReferral(env, telegramId, user.referred_by, true);
   }
   return jsonResponse({ reward, coins: user.coins });
 }
