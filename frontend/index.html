@@ -678,6 +678,9 @@ function i18nPick(ev, code){
   --c-combo-label-sep:    rgba(120,150,255,.5);
   --c-combo-label-text:   #ffffff;
   --c-combo-label-reward: #f0c14b;
+  --c-friend-check-ok: #6fbf73;
+  --c-friend-check-no: #ff7a7a;
+  --c-friend-check-mark: #ffffff;
   --c-btn-convert-1:    #4338ca;
   --c-btn-convert-2:    #6366f1;
   --c-btn-convert-text: #f5f3ff;
@@ -2039,6 +2042,16 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .friend-row__name{ font-size:calc(13px * var(--s)); font-weight:700; flex:1; }
 .friend-row__meta{ font-size:calc(10.5px * var(--s)); color:var(--ink-faint); font-weight:600; }
 .friend-row__earn{ font-size:calc(12px * var(--s)); color:var(--c-friend-earn-text); }
+/* the two conditions for an active friend, each red until it is met and green after */
+.friend-row__checks{ display:flex; flex-direction:column; align-items:flex-start; gap:calc(3px * var(--s)); font-size:calc(9.5px * var(--s)); font-weight:700; line-height:1.2; }
+.friend-check{ display:inline-flex; align-items:center; gap:calc(4px * var(--s)); color:var(--c-friend-check-no); }
+.friend-check.is-ok{ color:var(--c-friend-check-ok); }
+.friend-check__mark{
+  display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;
+  width:calc(11px * var(--s)); height:calc(11px * var(--s)); border-radius:50%;
+  font-size:calc(7.5px * var(--s)); font-weight:900; color:var(--c-friend-check-mark); background:var(--c-friend-check-no);
+}
+.friend-check.is-ok .friend-check__mark{ background:var(--c-friend-check-ok); }
 .friends-show-list-btn{
   display:block;
   width:45%;
@@ -4544,7 +4557,7 @@ body.reduce-motion .firefly{
         </div>
         <div class="reward-note">
           <span class="reward-note__icon">i</span>
-          <div class="reward-note__text" data-i18n-html>A friend counts as <b>active</b> once they have watched <b>10</b> ads.</div>
+          <div class="reward-note__text" data-i18n-html>A friend counts as <b>active</b> once they have watched <b>10</b> ads and completed <b>"Join &amp; React To The Latest Post"</b> Task in <b>Check in Tasks</b>.</div>
         </div>
         <div class="milestone-title">Milestone Missions</div>
         <div id="milestone-missions-skeleton" style="display:none;"></div>
@@ -9456,6 +9469,12 @@ function escapeHtmlClient(text){
   div.textContent = String(text);
   return div.innerHTML;
 }
+// a friend becomes active with this many ads and the news channel joined (the server checks both)
+var FRIEND_ACTIVE_ADS = 10;
+function friendCheckHtml(done, text){
+  return '<span class="friend-check' + (done ? ' is-ok' : '') + '">' +
+    '<span class="friend-check__mark" data-no-i18n>' + (done ? '\u2713' : '\u2715') + '</span><span>' + text + '</span></span>';
+}
 function renderFriendsList(){
   var container = document.getElementById('friends-list-container');
   if (!container) return;
@@ -9468,9 +9487,15 @@ function renderFriendsList(){
   container.innerHTML = friends.map(function(f){
     var safeName = escapeHtmlClient(f.name);
     var initials = String(f.name).trim().slice(0, 2).toUpperCase();
-    var metaHtml = f.active
-      ? '<div class="friend-row__meta" style="color:var(--c-ad-avail-text);font-weight:700;">Active</div>'
-      : '<div class="friend-row__meta">' + f.ads_watched + ' Ads Watched</div>';
+    // an active friend shows both conditions met (friends made active before the channel condition included)
+    var adsDone = f.active || f.ads_watched >= FRIEND_ACTIVE_ADS;
+    var joined = f.active || f.channel_joined;
+    var adsShown = adsDone ? FRIEND_ACTIVE_ADS : f.ads_watched;
+    var metaHtml =
+      '<div class="friend-row__meta friend-row__checks">' +
+        friendCheckHtml(adsDone, adsShown + '/' + FRIEND_ACTIVE_ADS + ' Ads Watched') +
+        friendCheckHtml(joined, 'Joined Channel') +
+      '</div>';
     return (
       '<div class="card friend-row">' +
         '<div class="friend-row__avatar">' + escapeHtmlClient(initials) + '</div>' +
