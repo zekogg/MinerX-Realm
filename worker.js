@@ -91,7 +91,7 @@ const LEADERBOARD_PRIZES = [5000, 3750, 2500, 1250, 1250, 1250, 1250, 1250, 1250
 const GUARDIAN_ADS_THRESHOLD = 4000;
 const GUARDIAN_SPEED = 50;
 const HAPPY_DOG_FRIENDS_THRESHOLD = 100;
-const HAPPY_DOG_SPEED = 25;
+const HAPPY_DOG_SPEED = 20;
 // Friends milestone missions: active friends needed and the coin reward. Fixed values, so they live here instead of
 // being read from a table on every request; each has its users.milestone_<friends>_claimed column
 const FRIEND_MILESTONES = [

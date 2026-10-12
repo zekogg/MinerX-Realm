@@ -6694,7 +6694,8 @@ function applyRealmStatusData(data){
   applyHappyDogState({
     active_friends: friendsState.active,
     threshold: data.happy_dog_friends_threshold,
-    claimed: data.happy_dog_claimed
+    claimed: data.happy_dog_claimed,
+    speed: data.pets && data.pets.happy_dog ? data.pets.happy_dog.speed : 0
   });
   applyGuardianState({
     ads_watched: data.lifetime_ads_watched,
@@ -7584,14 +7585,15 @@ function onStorageUpgradeConfirm(){
 }
 
 // Exclusive Pets (Happy Dog / Guardian)
-var happyDogState = { activeFriends: 0, threshold: 100, claimed: false, busy: false };
+// speed: the claimed pet's own speed (from the server), so an older claim shows what it really mines
+var happyDogState = { activeFriends: 0, threshold: 100, claimed: false, busy: false, speed: 20 };
 var guardianState = { adsWatched: 0, threshold: 4000, claimed: false, busy: false };
 function renderHappyDogUI(){
   var pct = Math.min(100, Math.round((happyDogState.activeFriends / happyDogState.threshold) * 100));
   var progressBadge = document.getElementById('hd-progress-badge');
   if (progressBadge) progressBadge.textContent = '(' + happyDogState.activeFriends + '/' + happyDogState.threshold + ') Active';
   var speedEl = document.getElementById('hd-speed-value');
-  if (speedEl) speedEl.textContent = happyDogState.claimed ? '25/hr' : '??/hr';
+  if (speedEl) speedEl.textContent = happyDogState.claimed ? happyDogState.speed + '/hr' : '??/hr';
   var cardBtn = document.getElementById('hd-claim-btn');
   var modalBtn = document.getElementById('fp-claim-btn');
   [cardBtn, modalBtn].forEach(function(btn){
@@ -7629,6 +7631,7 @@ function applyHappyDogState(data){
   happyDogState.activeFriends = data.active_friends || 0;
   happyDogState.threshold = data.threshold || 100;
   happyDogState.claimed = !!data.claimed;
+  if (data.speed) happyDogState.speed = data.speed;
   renderHappyDogUI();
 }
 function onClaimHappyDogClick(){
@@ -7654,6 +7657,7 @@ function onClaimHappyDogClick(){
       return;
     }
     happyDogState.claimed = true;
+    if (typeof data.speed === 'number') happyDogState.speed = data.speed;
     if (typeof data.coins === 'number') updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE , locked_coins: data.locked_coins });
     if (typeof data.total_speed === 'number') applyClaimedPetSpeed(data.total_speed);
     renderHappyDogUI();
