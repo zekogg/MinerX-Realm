@@ -673,6 +673,11 @@ function i18nPick(ev, code){
   --c-ad-badge-1:    #ff6b6b;
   --c-ad-badge-2:    #e0383e;
   --c-ad-badge-text: #ffffff;
+  --c-combo-label-bg:     #16112a;
+  --c-combo-label-border: rgba(120,150,255,.65);
+  --c-combo-label-sep:    rgba(120,150,255,.5);
+  --c-combo-label-text:   #ffffff;
+  --c-combo-label-reward: #f0c14b;
   --c-btn-convert-1:    #4338ca;
   --c-btn-convert-2:    #6366f1;
   --c-btn-convert-text: #f5f3ff;
@@ -1453,14 +1458,18 @@ html[data-lang="ar"] b, html[data-lang="ar"] strong, html[data-lang="fa"] b, htm
   padding:calc(14px * var(--s)) calc(10px * var(--s)) calc(10px * var(--s));
 }
 .mystery-box__label{
-  position:absolute; top:calc(-9px * var(--s)); left:50%; transform:translateX(-50%);
+  position:absolute; top:calc(-12.5px * var(--s)); left:50%; transform:translateX(-50%);
+  display:inline-flex; align-items:center; gap:calc(4px * var(--s));
   padding:calc(2px * var(--s)) calc(10px * var(--s)); border-radius:calc(999px * var(--s));
-  background:rgba(28,22,46,.55);
-  backdrop-filter:blur(calc(10px * var(--s))); -webkit-backdrop-filter:blur(calc(10px * var(--s)));
-  border:1px solid var(--stone-border-2);
-  font-size:calc(7px * var(--s)); font-weight:800; letter-spacing:.3px; text-transform:uppercase; color:var(--ink-dim);
+  background:var(--c-combo-label-bg);
+  border:1px solid var(--c-combo-label-border);
+  font-size:calc(7px * var(--s)); font-weight:800; letter-spacing:.3px; text-transform:uppercase; color:var(--c-combo-label-text);
   white-space:nowrap;
 }
+/* the prize for solving it, after a divider */
+.mystery-box__label-sep{ width:1px; align-self:stretch; background:var(--c-combo-label-sep); }
+.mystery-box__label-reward{ display:inline-flex; align-items:center; gap:calc(2px * var(--s)); color:var(--c-combo-label-reward); }
+.mystery-box__label-reward img{ width:calc(9px * var(--s)); height:calc(9px * var(--s)); }
 .mystery-box__grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:calc(4px * var(--s)); width:100%; }
 .mystery-box__slot{
   aspect-ratio:1; border-radius:calc(6px * var(--s));
@@ -4239,7 +4248,7 @@ body.reduce-motion .firefly{
           <button class="promo-card__redeem ad-gate ad-gate--bottom" id="promo-redeem-btn" onclick="onPromoRedeemClick()">Redeem</button>
         </div>
         <div class="card mystery-box">
-          <span class="mystery-box__label">Daily Combo</span>
+          <span class="mystery-box__label">Daily Combo<span class="mystery-box__label-sep"></span><span class="mystery-box__label-reward"><img draggable="false" src="/Pet%20Coin.webp" alt="">200</span></span>
           <div class="mystery-box__grid">
             <div class="mystery-box__slot" id="combo-slot-0"><span>Empty</span></div>
             <div class="mystery-box__slot" id="combo-slot-1"><span>Empty</span></div>
