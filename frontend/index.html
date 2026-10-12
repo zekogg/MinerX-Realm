@@ -670,6 +670,9 @@ function i18nPick(ev, code){
   --c-ad-watch-text: #ffffff;
   --c-ad-watch-lip:  #3341b0;
   --c-ad-counter-track: rgba(255,255,255,.14);
+  --c-ad-badge-1:    #ff6b6b;
+  --c-ad-badge-2:    #e0383e;
+  --c-ad-badge-text: #ffffff;
   --c-btn-convert-1:    #4338ca;
   --c-btn-convert-2:    #6366f1;
   --c-btn-convert-text: #f5f3ff;
@@ -1873,6 +1876,38 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   border-color:transparent; text-shadow:none; box-shadow:none; transform:none;
 }
 .ad-task__counter{ font-size:calc(8px * var(--s)); color:var(--ink-faint); flex-shrink:0; }
+/* "AD" on the edge of a button that shows an ad first (the ad gates), only while it can be tapped (so not while
+   mining or once used today); out of the layout, so nothing around it moves. Redeem and Check carry it on the bottom edge */
+.ad-gate{ position:relative; }
+.ad-gate:not(:disabled)::after{
+  content:"AD"; position:absolute; left:50%; top:0; transform:translate(-50%,-55%);
+  padding:calc(1px * var(--s)) calc(6px * var(--s)); border-radius:999px;
+  background:linear-gradient(135deg, var(--c-ad-badge-1), var(--c-ad-badge-2));
+  color:var(--c-ad-badge-text); font-size:calc(7.5px * var(--s)); font-weight:900; letter-spacing:.4px; line-height:1.35;
+  text-shadow:none; box-shadow:0 2px 6px rgba(0,0,0,.45); pointer-events:none; white-space:nowrap;
+}
+.ad-gate--bottom:not(:disabled)::after{ top:auto; bottom:0; transform:translate(-50%,55%); }
+:root[data-lang="ru"] .ad-gate:not(:disabled)::after{ content:"РЕКЛАМА"; }
+:root[data-lang="uk"] .ad-gate:not(:disabled)::after{ content:"РЕКЛАМА"; }
+:root[data-lang="ar"] .ad-gate:not(:disabled)::after{ content:"إعلان"; }
+:root[data-lang="fa"] .ad-gate:not(:disabled)::after{ content:"تبلیغ"; }
+:root[data-lang="tr"] .ad-gate:not(:disabled)::after{ content:"REKLAM"; }
+:root[data-lang="es"] .ad-gate:not(:disabled)::after{ content:"ANUNCIO"; }
+:root[data-lang="id"] .ad-gate:not(:disabled)::after{ content:"IKLAN"; }
+:root[data-lang="vi"] .ad-gate:not(:disabled)::after{ content:"QUẢNG CÁO"; }
+:root[data-lang="fr"] .ad-gate:not(:disabled)::after{ content:"PUB"; }
+:root[data-lang="de"] .ad-gate:not(:disabled)::after{ content:"WERBUNG"; }
+:root[data-lang="pt"] .ad-gate:not(:disabled)::after{ content:"ANÚNCIO"; }
+:root[data-lang="it"] .ad-gate:not(:disabled)::after{ content:"ANNUNCIO"; }
+:root[data-lang="pl"] .ad-gate:not(:disabled)::after{ content:"REKLAMA"; }
+:root[data-lang="uz"] .ad-gate:not(:disabled)::after{ content:"REKLAMA"; }
+:root[data-lang="fil"] .ad-gate:not(:disabled)::after{ content:"AD"; }
+:root[data-lang="bn"] .ad-gate:not(:disabled)::after{ content:"বিজ্ঞাপন"; }
+:root[data-lang="hi"] .ad-gate:not(:disabled)::after{ content:"विज्ञापन"; }
+:root[data-lang="th"] .ad-gate:not(:disabled)::after{ content:"โฆษณา"; }
+:root[data-lang="my"] .ad-gate:not(:disabled)::after{ content:"ကြော်ငြာ"; }
+:root[data-lang="zh"] .ad-gate:not(:disabled)::after{ content:"广告"; }
+:root[data-lang="ar"] .ad-gate:not(:disabled)::after, :root[data-lang="fa"] .ad-gate:not(:disabled)::after, :root[data-lang="bn"] .ad-gate:not(:disabled)::after, :root[data-lang="hi"] .ad-gate:not(:disabled)::after, :root[data-lang="th"] .ad-gate:not(:disabled)::after, :root[data-lang="my"] .ad-gate:not(:disabled)::after, :root[data-lang="zh"] .ad-gate:not(:disabled)::after{ letter-spacing:0; }
 /* Daily Ads: today's count over a bar that fills with it */
 .ad-task__counter--bar{
   display:flex; flex-direction:column; align-items:flex-end; gap:calc(3px * var(--s));
@@ -3985,7 +4020,7 @@ body.reduce-motion .firefly{
           <div class="progress-track"><div class="progress-fill" id="mining-progress-fill" style="width:0%"></div></div>
         </div>
         <div class="btn-row">
-          <button class="btn-primary" id="btn-start-mining" onclick="onMiningButtonClick()">Start Mining</button>
+          <button class="btn-primary ad-gate" id="btn-start-mining" onclick="onMiningButtonClick()">Start Mining</button>
           <div class="mining-progress-card"><span class="mining-progress-card__text" id="mining-cycles-counter">(0/7) ⛏️</span></div>
         </div>
       </div>
@@ -4019,7 +4054,7 @@ body.reduce-motion .firefly{
               </div>
             </div>
           </div>
-          <button class="streak-chest__claim" id="streak-claim-btn" onclick="onStreakClaimClick()">Claim</button>
+          <button class="streak-chest__claim ad-gate" id="streak-claim-btn" onclick="onStreakClaimClick()">Claim</button>
         </div>
       </div>
 
@@ -4039,7 +4074,7 @@ body.reduce-motion .firefly{
           <span class="chest-card__icon-wrap" id="chest-icon-wrap">
             <img loading="lazy" draggable="false" class="chest-card__icon-art" src="/The%20Chest.svg" alt="Chest">
           </span>
-          <button class="chest-card__open" id="btn-open-chest" onclick="onChestOpenClick()">Open Chest&nbsp;&nbsp;(1)</button>
+          <button class="chest-card__open ad-gate" id="btn-open-chest" onclick="onChestOpenClick()">Open Chest&nbsp;&nbsp;(1)</button>
         </div>
         <div class="chest-card__caption">Open chests to find your prize.</div>
       </div>
@@ -4106,7 +4141,7 @@ body.reduce-motion .firefly{
           </div>
           </div>
         </div>
-        <button class="spin-btn" id="btn-spin" onclick="onSpinButtonClick()">Spin (1)</button>
+        <button class="spin-btn ad-gate" id="btn-spin" onclick="onSpinButtonClick()">Spin (1)</button>
       </div>
 
       <!-- Pick 1 Of The 3 Gifts -->
@@ -4160,7 +4195,7 @@ body.reduce-motion .firefly{
             </div>
           </button>
         </div>
-        <button class="gift-pick-open-btn" id="btn-gift-open" onclick="onGiftOpenClick()">Open&nbsp;&nbsp;(1)</button>
+        <button class="gift-pick-open-btn ad-gate" id="btn-gift-open" onclick="onGiftOpenClick()">Open&nbsp;&nbsp;(1)</button>
       </div>
 
       <!-- Quick Actions -->
@@ -4201,7 +4236,7 @@ body.reduce-motion .firefly{
           <div class="promo-card__input-row">
             <input class="promo-card__input" type="text" id="promo-code-input" placeholder="CODE">
           </div>
-          <button class="promo-card__redeem" id="promo-redeem-btn" onclick="onPromoRedeemClick()">Redeem</button>
+          <button class="promo-card__redeem ad-gate ad-gate--bottom" id="promo-redeem-btn" onclick="onPromoRedeemClick()">Redeem</button>
         </div>
         <div class="card mystery-box">
           <span class="mystery-box__label">Daily Combo</span>
@@ -4219,7 +4254,7 @@ body.reduce-motion .firefly{
               <img loading="lazy" draggable="false" class="mystery-box__pick-art" src="/Polar%20Combo%20.webp" alt="Polar Bear">
             </button>
           </div>
-          <button class="mystery-box__check" id="combo-check-btn" onclick="onComboCheckClick()">Check</button>
+          <button class="mystery-box__check ad-gate ad-gate--bottom" id="combo-check-btn" onclick="onComboCheckClick()">Check</button>
         </div>
       </div>
       <div class="task-tabs">
