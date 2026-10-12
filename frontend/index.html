@@ -6700,7 +6700,8 @@ function applyRealmStatusData(data){
   applyGuardianState({
     ads_watched: data.lifetime_ads_watched,
     threshold: data.guardian_ads_threshold,
-    claimed: data.guardian_claimed
+    claimed: data.guardian_claimed,
+    speed: data.pets && data.pets.guardian ? data.pets.guardian.speed : 0
   });
   applyAmbassadorState({
     available: data.ambassador_available,
@@ -7587,7 +7588,7 @@ function onStorageUpgradeConfirm(){
 // Exclusive Pets (Happy Dog / Guardian)
 // speed: the claimed pet's own speed (from the server), so an older claim shows what it really mines
 var happyDogState = { activeFriends: 0, threshold: 100, claimed: false, busy: false, speed: 20 };
-var guardianState = { adsWatched: 0, threshold: 4000, claimed: false, busy: false };
+var guardianState = { adsWatched: 0, threshold: 4000, claimed: false, busy: false, speed: 25 };
 function renderHappyDogUI(){
   var pct = Math.min(100, Math.round((happyDogState.activeFriends / happyDogState.threshold) * 100));
   var progressBadge = document.getElementById('hd-progress-badge');
@@ -7675,7 +7676,7 @@ function renderGuardianUI(){
   var progressBadge = document.getElementById('tg-progress-badge');
   if (progressBadge) progressBadge.textContent = 'AD (' + guardianState.adsWatched + '/' + guardianState.threshold + ')';
   var speedEl = document.getElementById('tg-speed-value');
-  if (speedEl) speedEl.textContent = guardianState.claimed ? '50/hr' : '??/hr';
+  if (speedEl) speedEl.textContent = guardianState.claimed ? guardianState.speed + '/hr' : '??/hr';
   var cardBtn = document.getElementById('tg-claim-btn');
   if (cardBtn){
     if (guardianState.claimed){
@@ -7718,6 +7719,7 @@ function applyGuardianState(data){
   guardianState.adsWatched = data.ads_watched || 0;
   guardianState.threshold = data.threshold || 4000;
   guardianState.claimed = !!data.claimed;
+  if (data.speed) guardianState.speed = data.speed;
   renderGuardianUI();
 }
 function onClaimGuardianClick(){
@@ -7743,6 +7745,7 @@ function onClaimGuardianClick(){
       return;
     }
     guardianState.claimed = true;
+    if (typeof data.speed === 'number') guardianState.speed = data.speed;
     if (typeof data.coins === 'number') updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE , locked_coins: data.locked_coins });
     if (typeof data.total_speed === 'number') applyClaimedPetSpeed(data.total_speed);
     renderGuardianUI();
