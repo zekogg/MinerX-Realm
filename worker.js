@@ -3336,7 +3336,7 @@ async function handleWithdrawTxReply(message, env) {
     if (justApproved) {
       jobs.push(sendMessage(env, w.telegram_id, {
         text:
-          `✅ Withdrawal Successful\n\nYour withdrawal of ${w.net_gram} Gram has been sent to your wallet.\n\n` +
+          `✅ Withdrawal Successful\n\nYour withdrawal of ${formatGram3(w.net_gram)} Gram has been sent to your wallet.\n\n` +
           `🔗 TxID: ${txLinkHtml(txHash)}`,
         parse_mode: "HTML",
         link_preview_options: noPreview
@@ -3408,7 +3408,7 @@ async function handleWithdrawCallback(cbq, env) {
       if (!editResult || !editResult.ok) console.error("withdraw callback editMessage failed:", JSON.stringify(editResult));
     }
     await sendMessage(env, w.telegram_id, {
-      text: `✅ Withdrawal Successful\n\nYour withdrawal of ${w.net_gram} Gram has been sent to your wallet.`
+      text: `✅ Withdrawal Successful\n\nYour withdrawal of ${formatGram3(w.net_gram)} Gram has been sent to your wallet.`
     }).catch(() => null);
     await answerCallbackQuery(env, cbq.id, "✅ Approved");
   } catch (e) {
