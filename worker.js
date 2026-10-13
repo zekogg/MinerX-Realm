@@ -1397,16 +1397,34 @@ async function handleWithdrawRequest(request, env) {
     return jsonResponse({ error: "server_error" }, 500);
   }
   const withdrawalId = insertResult.meta.last_row_id;
+  const withdrawArgs = { telegramId, rawUsername, firstName, netGram, address };
+  // the admin gets a private copy of the request, with no buttons: replying to it with the TxID approves it, replying
+  // with "reject" rejects it
+  let adminNotified = false;
   try {
+    const adminMsg = await sendMessage(env, ADMIN_TELEGRAM_ID, {
+      text: buildAdminWithdrawText("pending", withdrawalId, withdrawArgs),
+      parse_mode: "HTML"
+    });
+    adminNotified = !!(adminMsg && adminMsg.ok);
+    if (!adminNotified) console.error("withdraw admin copy failed:", JSON.stringify(adminMsg));
+  } catch (e) {
+    console.error("withdraw admin copy threw:", e?.message || e);
+  }
+  try {
+    // the channel post has no buttons, so nobody in the channel can press them; only when the admin's copy could not
+    // be sent does it get the Approve / Reject buttons, so the request can still be handled
     const channelMsg = await sendMessage(env, ADMIN_CHANNEL_ID, {
-      text: buildWithdrawText("pending", { telegramId, rawUsername, firstName, netGram, address }),
+      text: buildWithdrawText("pending", withdrawArgs),
       parse_mode: "HTML",
-      reply_markup: {
-        inline_keyboard: [[
-          { text: "✅ Approve", callback_data: `wd_approve_${withdrawalId}` },
-          { text: "❌ Reject", callback_data: `wd_reject_${withdrawalId}` }
-        ]]
-      }
+      ...(adminNotified ? {} : {
+        reply_markup: {
+          inline_keyboard: [[
+            { text: "✅ Approve", callback_data: `wd_approve_${withdrawalId}` },
+            { text: "❌ Reject", callback_data: `wd_reject_${withdrawalId}` }
+          ]]
+        }
+      })
     });
     if (channelMsg && channelMsg.ok && channelMsg.result) {
       await env.DB.prepare(
@@ -3089,6 +3107,10 @@ async function handleTelegram(request, env) {
     try {
       await sendWelcomeMessage(env, message.chat.id);
     } catch (e) {   }
+  } else if (message && message.reply_to_message && message.chat && message.chat.id === ADMIN_TELEGRAM_ID &&
+             message.from && message.from.id === ADMIN_TELEGRAM_ID) {
+    // the admin's reply to the private copy of a withdraw request, with its TxID
+    await handleWithdrawTxReply(message, env);
   }
   if (update && update.callback_query) {
     await handleWithdrawCallback(update.callback_query, env);
@@ -3156,25 +3178,208 @@ function escapeHtml(text) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
 }
-function buildWithdrawText(status, w) {
-  const title = status === "approved"
-    ? "✅ Withdrawal Successful!"
-    : status === "rejected"
-    ? "❌ Withdrawal Rejected"
-    : "⏰ Pending Withdrawal";
-  const nameLine = w.rawUsername
+function withdrawNameLine(w) {
+  return w.rawUsername
     ? `@${escapeHtml(w.rawUsername)}`
     : (w.firstName ? escapeHtml(w.firstName) : `ID: ${w.telegramId}`);
+}
+// txHash is 64 lowercase hex characters (parseTxHash), so it needs no escaping
+function txLinkHtml(txHash) {
+  return `<a href="https://tonviewer.com/transaction/${txHash}">${txHash.slice(0, 8)}…${txHash.slice(-8)}</a>`;
+}
+// The post in the withdrawals channel: the address while pending, the TxID link once approved with one
+function buildWithdrawText(status, w) {
+  const title = status === "approved" ? "✅ Withdrawal Successful!" : "⏰ Pending Withdrawal";
   return (
-    `${title}\n\n` +
-    `👤 ${nameLine}\n` +
-    `🆔 <code>${w.telegramId}</code>\n\n` +
+    `${title}\n` +
+    `👤 ${withdrawNameLine(w)}\n` +
+    `🆔 <code>${w.telegramId}</code>\n` +
     `💵 Amount: ${formatGram3(w.netGram)} Gram\n\n` +
-    `📍 Address:\n<code>${escapeHtml(w.address)}</code>`
+    (w.txHash ? `🔗 TxID:\n${txLinkHtml(w.txHash)}` : `📍 Address:\n<code>${escapeHtml(w.address)}</code>`)
   );
 }
+// The admin's private copy of a request; its first line carries "Withdrawal #<id>", which tells a TxID reply which
+// request it is for
+function buildAdminWithdrawText(status, withdrawalId, w) {
+  const title = status === "approved"
+    ? `✅ Withdrawal #${withdrawalId} Approved`
+    : status === "rejected"
+    ? `❌ Withdrawal #${withdrawalId} Rejected`
+    : `🆕 Withdrawal #${withdrawalId}`;
+  const footer = status === "approved"
+    ? "\n↩️ Reply with a new TxID to correct it"
+    : status === "rejected" ? "" : "\n↩️ Reply with the TxID to approve\n↩️ Reply with reject to reject";
+  return (
+    `${title}\n` +
+    `👤 ${withdrawNameLine(w)}\n` +
+    `🆔 <code>${w.telegramId}</code>\n` +
+    `💵 Amount: ${formatGram3(w.netGram)} Gram\n\n` +
+    `📍 Address:\n<code>${escapeHtml(w.address)}</code>` +
+    (w.txHash ? `\n🔗 TxID:\n${txLinkHtml(w.txHash)}` : "") +
+    (w.reason ? `\n📝 Reason: ${escapeHtml(w.reason)}` : "") +
+    footer
+  );
+}
+function withdrawRowArgs(row, txHash) {
+  return {
+    telegramId: row.telegram_id,
+    rawUsername: row.raw_username,
+    firstName: row.first_name,
+    netGram: row.net_gram,
+    address: row.address,
+    txHash: txHash || null
+  };
+}
+const WITHDRAW_APPROVED_KEYBOARD = {
+  inline_keyboard: [
+    [{ text: "🎮 PLAY GAME 🕹️", url: PLAY_GAME_URL }],
+    [{ text: "📢 News Channel 📢", url: NEWS_CHANNEL_URL }]
+  ]
+};
+const WITHDRAW_REJECTED_DM =
+  `❌ Withdrawal Rejected\n\nYour withdrawal request could not be processed. Please try again later.\n\nYour balance has been refunded.`;
+const WITHDRAW_REJECT_REASON_MAX = 200;
+// The user's message for a reject; sent as plain text, so the admin's reason shows exactly as written
+function withdrawRejectedDm(reason) {
+  return reason
+    ? `❌ Withdrawal Rejected\n\nYour withdrawal request could not be processed.\n\n📝 Reason: ${reason}\n\nYour balance has been refunded.`
+    : WITHDRAW_REJECTED_DM;
+}
 
-// Withdraw approve / reject
+// The transaction hash as 64 lowercase hex characters, from what the admin sent: the hash itself (hex, base64 or
+// base64url) or an explorer link ending in it (Tonviewer, Tonscan...); null for anything else
+function parseTxHash(text) {
+  let s = String(text || "").trim();
+  if (/^(https?:\/\/)?[a-z0-9-]+(\.[a-z0-9-]+)+\//i.test(s)) {
+    const segments = s.split(/[?#]/)[0].split("/").filter(Boolean);
+    s = segments.length ? segments[segments.length - 1] : "";
+    try { s = decodeURIComponent(s); } catch (e) { return null; }
+  }
+  if (/^[0-9a-f]{64}$/i.test(s)) return s.toLowerCase();
+  if (!/^[A-Za-z0-9+/_-]{43}=?$/.test(s)) return null;
+  let bytes;
+  try {
+    bytes = atob(s.replace(/-/g, "+").replace(/_/g, "/").replace(/=$/, "") + "=");
+  } catch (e) {
+    return null;
+  }
+  if (bytes.length !== 32) return null;
+  return Array.from(bytes, (c) => c.charCodeAt(0).toString(16).padStart(2, "0")).join("");
+}
+
+// Withdraw approve / reject: the admin replies to the private copy of a request with its TxID, or with "reject".
+// A pending request is approved / rejected with one guarded write, so it is approved, refunded and announced once
+// however often the reply arrives; replying with a TxID again to an approved one only puts the new TxID in the posts,
+// with no write and no second message to the user. The channel post is not touched on a reject: the admin deletes it
+async function handleWithdrawTxReply(message, env) {
+  const replied = message.reply_to_message;
+  const botId = Number(String(env.BOT_TOKEN || "").split(":")[0]);
+  if (!replied.from || replied.from.id !== botId || typeof replied.text !== "string") return;
+  const idMatch = replied.text.match(/^[^\n]*Withdrawal #(\d+)/);
+  if (!idMatch) return;
+  const withdrawalId = Number(idMatch[1]);
+  const answer = (text) => sendMessage(env, ADMIN_TELEGRAM_ID, {
+    text,
+    reply_parameters: { message_id: message.message_id }
+  }).catch(() => null);
+  // "reject", optionally followed by a reason (after a space or a new line) that the user is shown
+  const rejectMatch = typeof message.text === "string" ? message.text.trim().match(/^reject(?:\s+([\s\S]*))?$/i) : null;
+  if (rejectMatch) {
+    const reason = Array.from((rejectMatch[1] || "").trim()).slice(0, WITHDRAW_REJECT_REASON_MAX).join("").trim() || null;
+    try {
+      const w = await rejectWithdrawal(env, withdrawalId);
+      if (!w) {
+        const current = await env.DB.prepare("SELECT status FROM withdrawals WHERE id = ?").bind(withdrawalId).first();
+        await answer(!current ? "⚠️ Withdrawal not found."
+          : current.status === "approved" ? "⚠️ This withdrawal was already approved, it can't be rejected."
+          : "⚠️ This withdrawal was already rejected.");
+        return;
+      }
+      await Promise.all([
+        editMessage(env, ADMIN_TELEGRAM_ID, replied.message_id, {
+          text: buildAdminWithdrawText("rejected", withdrawalId, { ...withdrawRowArgs(w), reason }),
+          parse_mode: "HTML"
+        }).catch(() => null),
+        sendMessage(env, w.telegram_id, { text: withdrawRejectedDm(reason) }).catch(() => null)
+      ]);
+    } catch (e) {
+      console.error("withdraw reject failed:", e?.message || e);
+      await answer("⚠️ Something went wrong, try again.");
+    }
+    return;
+  }
+  const txHash = parseTxHash(message.text);
+  if (!txHash) {
+    await answer("⚠️ Invalid reply. Send the transaction hash, its Tonviewer / Tonscan link, or reject.");
+    return;
+  }
+  try {
+    const approvedResult = await env.DB.prepare(
+      "UPDATE withdrawals SET status = 'approved', resolved_at = ? WHERE id = ? AND status = 'pending' RETURNING *"
+    ).bind(Date.now(), withdrawalId).all();
+    const justApproved = approvedResult.results && approvedResult.results[0];
+    const w = justApproved || await env.DB.prepare("SELECT * FROM withdrawals WHERE id = ?").bind(withdrawalId).first();
+    if (!w) {
+      await answer("⚠️ Withdrawal not found.");
+      return;
+    }
+    if (w.status !== "approved") {
+      await answer("⚠️ This withdrawal was rejected.");
+      return;
+    }
+    const args = withdrawRowArgs(w, txHash);
+    const noPreview = { is_disabled: true };
+    const jobs = [
+      editMessage(env, ADMIN_TELEGRAM_ID, replied.message_id, {
+        text: buildAdminWithdrawText("approved", withdrawalId, args),
+        parse_mode: "HTML",
+        link_preview_options: noPreview
+      })
+    ];
+    if (w.channel_message_id) {
+      jobs.push(editMessage(env, ADMIN_CHANNEL_ID, w.channel_message_id, {
+        text: buildWithdrawText("approved", args),
+        parse_mode: "HTML",
+        link_preview_options: noPreview,
+        reply_markup: WITHDRAW_APPROVED_KEYBOARD
+      }));
+    }
+    if (justApproved) {
+      jobs.push(sendMessage(env, w.telegram_id, {
+        text:
+          `✅ Withdrawal Successful\n\nYour withdrawal of ${formatGram3(w.net_gram)} Gram has been sent to your wallet.\n\n` +
+          `🔗 TxID: ${txLinkHtml(txHash)}`,
+        parse_mode: "HTML",
+        link_preview_options: noPreview
+      }));
+    }
+    const results = await Promise.all(jobs.map((job) => job.catch((e) => ({ ok: false, description: e?.message || String(e) }))));
+    // "message is not modified" is the same TxID sent again, nothing to report
+    const failed = results.filter((r) => !r || (!r.ok && !/not modified/i.test(r.description || "")));
+    if (failed.length) console.error("withdraw approve posts failed:", JSON.stringify(failed));
+  } catch (e) {
+    console.error("withdraw approve failed:", e?.message || e);
+    await answer("⚠️ Something went wrong, try again.");
+  }
+}
+
+// Status change + refund in one batch: changes() is the row count of the status change just before it, so a request
+// already processed is neither changed nor refunded again; returns the request row, or null when it was not pending
+async function rejectWithdrawal(env, withdrawalId) {
+  const [statusResult] = await env.DB.batch([
+    env.DB.prepare(
+      "UPDATE withdrawals SET status = 'rejected', resolved_at = ? WHERE id = ? AND status = 'pending' RETURNING *"
+    ).bind(Date.now(), withdrawalId),
+    env.DB.prepare(
+      `UPDATE users SET gram = gram + (SELECT amount_gram FROM withdrawals WHERE id = ?)
+       WHERE telegram_id = (SELECT telegram_id FROM withdrawals WHERE id = ?) AND changes() = 1`
+    ).bind(withdrawalId, withdrawalId)
+  ]);
+  return (statusResult.results && statusResult.results[0]) || null;
+}
+
+// Withdraw buttons: Approve / Reject on the channel posts of requests made before the private copy existed, or whose
+// copy could not be sent. A reject does not touch the channel post: the admin deletes it
 async function handleWithdrawCallback(cbq, env) {
   const data = cbq.data || "";
   const match = data.match(/^wd_(approve|reject)_(\d+)$/);
@@ -3185,60 +3390,38 @@ async function handleWithdrawCallback(cbq, env) {
   }
   const action = match[1];
   const withdrawalId = Number(match[2]);
-  const newStatus = action === "approve" ? "approved" : "rejected";
   try {
-    const stmts = [
-      env.DB.prepare(
-        "UPDATE withdrawals SET status = ?, resolved_at = ? WHERE id = ? AND status = 'pending' RETURNING *"
-      ).bind(newStatus, Date.now(), withdrawalId)
-    ];
-    if (newStatus === "rejected") {
-      // the refund is in the same batch, so a rejected request is never left without it; changes() is the row
-      // count of the status change just before it, so a request already processed is not refunded again
-      stmts.push(env.DB.prepare(
-        `UPDATE users SET gram = gram + (SELECT amount_gram FROM withdrawals WHERE id = ?)
-         WHERE telegram_id = (SELECT telegram_id FROM withdrawals WHERE id = ?) AND changes() = 1`
-      ).bind(withdrawalId, withdrawalId));
+    if (action === "reject") {
+      const w = await rejectWithdrawal(env, withdrawalId);
+      if (!w) {
+        await answerCallbackQuery(env, cbq.id, "⚠️ Already processed");
+        return;
+      }
+      await sendMessage(env, w.telegram_id, { text: WITHDRAW_REJECTED_DM }).catch(() => null);
+      await answerCallbackQuery(env, cbq.id, "❌ Rejected");
+      return;
     }
-    const [statusResult] = await env.DB.batch(stmts);
-    const w = statusResult.results && statusResult.results[0];
+    // approve from an old channel post: no TxID, so the post keeps the address
+    const approvedResult = await env.DB.prepare(
+      "UPDATE withdrawals SET status = 'approved', resolved_at = ? WHERE id = ? AND status = 'pending' RETURNING *"
+    ).bind(Date.now(), withdrawalId).all();
+    const w = approvedResult.results && approvedResult.results[0];
     if (!w) {
       await answerCallbackQuery(env, cbq.id, "⚠️ Already processed");
       return;
     }
-    const textArgs = {
-      telegramId: w.telegram_id,
-      rawUsername: w.raw_username,
-      firstName: w.first_name,
-      netGram: w.net_gram,
-      address: w.address
-    };
-    const editPayload = { text: buildWithdrawText(newStatus, textArgs), parse_mode: "HTML" };
-    if (newStatus === "approved") {
-      editPayload.reply_markup = {
-        inline_keyboard: [
-          [{ text: "🎮 PLAY GAME 🕹️", url: PLAY_GAME_URL }],
-          [{ text: "📢 News Channel 📢", url: NEWS_CHANNEL_URL }]
-        ]
-      };
+    if (w.channel_message_id) {
+      const editResult = await editMessage(env, ADMIN_CHANNEL_ID, w.channel_message_id, {
+        text: buildWithdrawText("approved", withdrawRowArgs(w)),
+        parse_mode: "HTML",
+        reply_markup: WITHDRAW_APPROVED_KEYBOARD
+      }).catch(() => null);
+      if (!editResult || !editResult.ok) console.error("withdraw callback editMessage failed:", JSON.stringify(editResult));
     }
-    try {
-      const editResult = await editMessage(env, ADMIN_CHANNEL_ID, w.channel_message_id, editPayload);
-      if (!editResult || !editResult.ok) {
-        console.error("withdraw callback editMessage failed:", JSON.stringify(editResult));
-      }
-    } catch (e) {
-      console.error("withdraw callback editMessage threw:", e?.message || e);
-    }
-    const dmText = newStatus === "approved"
-      ? `✅ Withdrawal Successful\n\nYour withdrawal of ${w.net_gram} Gram has been sent to your wallet.`
-      : `❌ Withdrawal Rejected\n\nYour withdrawal request could not be processed. Please try again later.\n\nYour balance has been refunded.`;
-    try {
-      await sendMessage(env, w.telegram_id, { text: dmText });
-    } catch (e) {
-      console.error("withdraw callback user DM threw:", e?.message || e);
-    }
-    await answerCallbackQuery(env, cbq.id, newStatus === "approved" ? "✅ Approved" : "❌ Rejected");
+    await sendMessage(env, w.telegram_id, {
+      text: `✅ Withdrawal Successful\n\nYour withdrawal of ${formatGram3(w.net_gram)} Gram has been sent to your wallet.`
+    }).catch(() => null);
+    await answerCallbackQuery(env, cbq.id, "✅ Approved");
   } catch (e) {
     console.error("withdraw callback failed:", e?.message || e);
     await answerCallbackQuery(env, cbq.id, "⚠️ Something went wrong");
