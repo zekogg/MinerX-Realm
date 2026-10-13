@@ -1398,13 +1398,13 @@ async function handleWithdrawRequest(request, env) {
   }
   const withdrawalId = insertResult.meta.last_row_id;
   const withdrawArgs = { telegramId, rawUsername, firstName, netGram, address };
-  // the admin gets a private copy of the request: replying to it with the TxID approves it, its Reject button rejects it
+  // the admin gets a private copy of the request, with no buttons: replying to it with the TxID approves it, replying
+  // with "reject" rejects it
   let adminNotified = false;
   try {
     const adminMsg = await sendMessage(env, ADMIN_TELEGRAM_ID, {
       text: buildAdminWithdrawText("pending", withdrawalId, withdrawArgs),
-      parse_mode: "HTML",
-      reply_markup: withdrawRejectKeyboard(withdrawalId)
+      parse_mode: "HTML"
     });
     adminNotified = !!(adminMsg && adminMsg.ok);
     if (!adminNotified) console.error("withdraw admin copy failed:", JSON.stringify(adminMsg));
@@ -3163,14 +3163,6 @@ async function editMessage(env, chatId, messageId, payload) {
   });
   return res.json().catch(() => null);
 }
-async function editMessageReplyMarkup(env, chatId, messageId, replyMarkup) {
-  const res = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/editMessageReplyMarkup`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, message_id: messageId, reply_markup: replyMarkup })
-  });
-  return res.json().catch(() => null);
-}
 async function answerCallbackQuery(env, callbackQueryId, text) {
   await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/answerCallbackQuery`, {
     method: "POST",
@@ -3216,7 +3208,7 @@ function buildAdminWithdrawText(status, withdrawalId, w) {
     : `🆕 Withdrawal #${withdrawalId}`;
   const footer = status === "approved"
     ? "\n↩️ Reply with a new TxID to correct it"
-    : status === "rejected" ? "" : "\n↩️ Reply with the TxID to approve";
+    : status === "rejected" ? "" : "\n↩️ Reply with the TxID to approve\n↩️ Reply with reject to reject";
   return (
     `${title}\n` +
     `👤 ${withdrawNameLine(w)}\n` +
@@ -3236,9 +3228,6 @@ function withdrawRowArgs(row, txHash) {
     address: row.address,
     txHash: txHash || null
   };
-}
-function withdrawRejectKeyboard(withdrawalId) {
-  return { inline_keyboard: [[{ text: "❌ Reject", callback_data: `wd_ask_${withdrawalId}` }]] };
 }
 const WITHDRAW_APPROVED_KEYBOARD = {
   inline_keyboard: [
@@ -3270,9 +3259,10 @@ function parseTxHash(text) {
   return Array.from(bytes, (c) => c.charCodeAt(0).toString(16).padStart(2, "0")).join("");
 }
 
-// Withdraw approve: the admin replies to the private copy of a request with its TxID. A pending request is approved
-// (one guarded write, so it is approved and announced once however often the reply arrives); replying again to an
-// approved one only puts the new TxID in the posts, with no write and no second message to the user
+// Withdraw approve / reject: the admin replies to the private copy of a request with its TxID, or with "reject".
+// A pending request is approved / rejected with one guarded write, so it is approved, refunded and announced once
+// however often the reply arrives; replying with a TxID again to an approved one only puts the new TxID in the posts,
+// with no write and no second message to the user. The channel post is not touched on a reject: the admin deletes it
 async function handleWithdrawTxReply(message, env) {
   const replied = message.reply_to_message;
   const botId = Number(String(env.BOT_TOKEN || "").split(":")[0]);
@@ -3284,9 +3274,32 @@ async function handleWithdrawTxReply(message, env) {
     text,
     reply_parameters: { message_id: message.message_id }
   }).catch(() => null);
+  if (typeof message.text === "string" && message.text.trim().toLowerCase() === "reject") {
+    try {
+      const w = await rejectWithdrawal(env, withdrawalId);
+      if (!w) {
+        const current = await env.DB.prepare("SELECT status FROM withdrawals WHERE id = ?").bind(withdrawalId).first();
+        await answer(!current ? "⚠️ Withdrawal not found."
+          : current.status === "approved" ? "⚠️ This withdrawal was already approved, it can't be rejected."
+          : "⚠️ This withdrawal was already rejected.");
+        return;
+      }
+      await Promise.all([
+        editMessage(env, ADMIN_TELEGRAM_ID, replied.message_id, {
+          text: buildAdminWithdrawText("rejected", withdrawalId, withdrawRowArgs(w)),
+          parse_mode: "HTML"
+        }).catch(() => null),
+        sendMessage(env, w.telegram_id, { text: WITHDRAW_REJECTED_DM }).catch(() => null)
+      ]);
+    } catch (e) {
+      console.error("withdraw reject failed:", e?.message || e);
+      await answer("⚠️ Something went wrong, try again.");
+    }
+    return;
+  }
   const txHash = parseTxHash(message.text);
   if (!txHash) {
-    await answer("⚠️ Invalid TxID. Send the transaction hash or its Tonviewer / Tonscan link.");
+    await answer("⚠️ Invalid reply. Send the transaction hash, its Tonviewer / Tonscan link, or reject.");
     return;
   }
   try {
@@ -3354,13 +3367,11 @@ async function rejectWithdrawal(env, withdrawalId) {
   return (statusResult.results && statusResult.results[0]) || null;
 }
 
-// Withdraw buttons. In the admin's private copy: Reject (wd_ask) swaps itself for Yes, Reject (wd_confirm) / Cancel
-// (wd_keep); only Yes, Reject changes anything. The channel post is not touched on a reject: the admin deletes it.
-// wd_approve / wd_reject are the channel buttons of requests made before the private copy existed, or whose copy
-// could not be sent
+// Withdraw buttons: Approve / Reject on the channel posts of requests made before the private copy existed, or whose
+// copy could not be sent. A reject does not touch the channel post: the admin deletes it
 async function handleWithdrawCallback(cbq, env) {
   const data = cbq.data || "";
-  const match = data.match(/^wd_(approve|reject|ask|keep|confirm)_(\d+)$/);
+  const match = data.match(/^wd_(approve|reject)_(\d+)$/);
   if (!match) return;
   if (cbq.from.id !== ADMIN_TELEGRAM_ID) {
     await answerCallbackQuery(env, cbq.id, "⛔ Not authorized");
@@ -3368,30 +3379,12 @@ async function handleWithdrawCallback(cbq, env) {
   }
   const action = match[1];
   const withdrawalId = Number(match[2]);
-  const msg = cbq.message;
   try {
-    if (action === "ask" || action === "keep") {
-      const markup = action === "ask"
-        ? { inline_keyboard: [[
-            { text: "✅ Yes, Reject", callback_data: `wd_confirm_${withdrawalId}` },
-            { text: "↩️ Cancel", callback_data: `wd_keep_${withdrawalId}` }
-          ]] }
-        : withdrawRejectKeyboard(withdrawalId);
-      if (msg) await editMessageReplyMarkup(env, msg.chat.id, msg.message_id, markup);
-      await answerCallbackQuery(env, cbq.id, action === "ask" ? "Reject this withdrawal?" : "Cancelled");
-      return;
-    }
-    if (action === "confirm" || action === "reject") {
+    if (action === "reject") {
       const w = await rejectWithdrawal(env, withdrawalId);
       if (!w) {
         await answerCallbackQuery(env, cbq.id, "⚠️ Already processed");
         return;
-      }
-      if (action === "confirm" && msg) {
-        await editMessage(env, msg.chat.id, msg.message_id, {
-          text: buildAdminWithdrawText("rejected", withdrawalId, withdrawRowArgs(w)),
-          parse_mode: "HTML"
-        }).catch(() => null);
       }
       await sendMessage(env, w.telegram_id, { text: WITHDRAW_REJECTED_DM }).catch(() => null);
       await answerCallbackQuery(env, cbq.id, "❌ Rejected");
