@@ -3216,6 +3216,7 @@ function buildAdminWithdrawText(status, withdrawalId, w) {
     `💵 Amount: ${formatGram3(w.netGram)} Gram\n\n` +
     `📍 Address:\n<code>${escapeHtml(w.address)}</code>` +
     (w.txHash ? `\n🔗 TxID:\n${txLinkHtml(w.txHash)}` : "") +
+    (w.reason ? `\n📝 Reason: ${escapeHtml(w.reason)}` : "") +
     footer
   );
 }
@@ -3237,6 +3238,13 @@ const WITHDRAW_APPROVED_KEYBOARD = {
 };
 const WITHDRAW_REJECTED_DM =
   `❌ Withdrawal Rejected\n\nYour withdrawal request could not be processed. Please try again later.\n\nYour balance has been refunded.`;
+const WITHDRAW_REJECT_REASON_MAX = 200;
+// The user's message for a reject; sent as plain text, so the admin's reason shows exactly as written
+function withdrawRejectedDm(reason) {
+  return reason
+    ? `❌ Withdrawal Rejected\n\nYour withdrawal request could not be processed.\n\n📝 Reason: ${reason}\n\nYour balance has been refunded.`
+    : WITHDRAW_REJECTED_DM;
+}
 
 // The transaction hash as 64 lowercase hex characters, from what the admin sent: the hash itself (hex, base64 or
 // base64url) or an explorer link ending in it (Tonviewer, Tonscan...); null for anything else
@@ -3274,7 +3282,10 @@ async function handleWithdrawTxReply(message, env) {
     text,
     reply_parameters: { message_id: message.message_id }
   }).catch(() => null);
-  if (typeof message.text === "string" && message.text.trim().toLowerCase() === "reject") {
+  // "reject", optionally followed by a reason (after a space or a new line) that the user is shown
+  const rejectMatch = typeof message.text === "string" ? message.text.trim().match(/^reject(?:\s+([\s\S]*))?$/i) : null;
+  if (rejectMatch) {
+    const reason = Array.from((rejectMatch[1] || "").trim()).slice(0, WITHDRAW_REJECT_REASON_MAX).join("").trim() || null;
     try {
       const w = await rejectWithdrawal(env, withdrawalId);
       if (!w) {
@@ -3286,10 +3297,10 @@ async function handleWithdrawTxReply(message, env) {
       }
       await Promise.all([
         editMessage(env, ADMIN_TELEGRAM_ID, replied.message_id, {
-          text: buildAdminWithdrawText("rejected", withdrawalId, withdrawRowArgs(w)),
+          text: buildAdminWithdrawText("rejected", withdrawalId, { ...withdrawRowArgs(w), reason }),
           parse_mode: "HTML"
         }).catch(() => null),
-        sendMessage(env, w.telegram_id, { text: WITHDRAW_REJECTED_DM }).catch(() => null)
+        sendMessage(env, w.telegram_id, { text: withdrawRejectedDm(reason) }).catch(() => null)
       ]);
     } catch (e) {
       console.error("withdraw reject failed:", e?.message || e);
