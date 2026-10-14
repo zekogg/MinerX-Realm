@@ -4056,7 +4056,7 @@ body.reduce-motion .firefly{
           <div class="progress-track"><div class="progress-fill" id="mining-progress-fill" style="width:0%"></div></div>
         </div>
         <div class="btn-row">
-          <button class="btn-primary ad-gate" id="btn-start-mining" onclick="onMiningButtonClick()">Start Mining</button>
+          <button class="btn-primary" id="btn-start-mining" onclick="onMiningButtonClick()">Start Mining</button>
           <div class="mining-progress-card"><span class="mining-progress-card__text" id="mining-cycles-counter">(0/7) ⛏️</span></div>
         </div>
       </div>
@@ -4385,7 +4385,7 @@ body.reduce-motion .firefly{
           <div class="ad-task__divider"></div>
           <div class="ad-task__footer">
             <button class="ad-task__watch" id="support-ad-watch-btn" onclick="onWatchSupportAdClick()">Watch</button>
-            <span class="ad-task__counter ad-task__counter--bar" id="support-ad-counter"><span class="ad-task__count">0 / 10</span><span class="ad-task__bar"><span class="ad-task__bar-fill"></span></span></span>
+            <span class="ad-task__counter ad-task__counter--bar" id="support-ad-counter"><span class="ad-task__count">0 / 5</span><span class="ad-task__bar"><span class="ad-task__bar-fill"></span></span></span>
           </div>
         </div>
       </div>
@@ -5961,6 +5961,8 @@ function setMiningButton(text, opts){
   btn.textContent = text;
   btn.classList.toggle('is-mining', !!opts.mining);
   btn.classList.toggle('is-claim-ready', !!opts.claimReady);
+  // only Claim shows an ad first (Start Mining does not), so only Claim carries the AD badge
+  btn.classList.toggle('ad-gate', !!opts.claimReady);
   btn.disabled = !!opts.disabled;
 }
 function renderMiningCounter(){
@@ -6054,7 +6056,12 @@ function onMiningButtonClick(){
   if (miningState.startedAt && !isReadyToClaim) return;
   miningBusy = true;
   setButtonBusy(domCache.miningBtn, true);
-  runAdGate(function(){ runMiningRequest(!!isReadyToClaim); }, function(){
+  // Start Mining starts the cycle straight away; only Claim shows an ad first
+  if (!isReadyToClaim){
+    runMiningRequest(false);
+    return;
+  }
+  runAdGate(function(){ runMiningRequest(true); }, function(){
     miningBusy = false;
     renderMiningIdleButton();
   });
@@ -8439,7 +8446,7 @@ function onWatchGigapubClick(){
 // leaderboards). Its daily count and the wait between ads are kept on the device only, with no requests; Adsgram
 // itself caps interstitials at 20 a user a day. Closing it early still counts as shown (interstitials can be skipped)
 var SUPPORT_AD_BLOCK_ID = 'int-53564';
-var SUPPORT_AD_DAILY_LIMIT = 10;
+var SUPPORT_AD_DAILY_LIMIT = 5;
 var SUPPORT_AD_COOLDOWN_MS = 35000;
 var SUPPORT_AD_COUNT_KEY = 'mx_support_ads';
 var supportAdController = null;
@@ -8469,7 +8476,8 @@ function renderSupportAdButton(){
   var btn = document.getElementById('support-ad-watch-btn');
   var avail = document.getElementById('support-ad-avail');
   var watched = supportAdWatchedToday();
-  renderAdCounter(document.getElementById('support-ad-counter'), watched, SUPPORT_AD_DAILY_LIMIT);
+  // min: a count kept from when the limit was higher shows as 5 / 5, not 8 / 5
+  renderAdCounter(document.getElementById('support-ad-counter'), Math.min(watched, SUPPORT_AD_DAILY_LIMIT), SUPPORT_AD_DAILY_LIMIT);
   if (!supportAdController){
     if (avail) avail.textContent = 'Coming Soon';
     if (btn){ btn.textContent = 'Soon'; btn.classList.add('is-claimed'); }
