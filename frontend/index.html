@@ -10033,7 +10033,7 @@ var WITHDRAW_MIN_GRAM = 0.1;
 var NEXT_WITHDRAW_ALLOWED_AT = null;
 var withdrawCooldownTimer = null;
 var withdrawBusy = false;
-// a withdrawal's payout, worked out as the server does: the amount and the payout are cut to 3 decimals
+// a withdrawal's payout, worked out as the server does: the amount and the payout are cut to 2 decimals
 function withdrawNetGram(amount){
   var units = floorGramUnits(amount, 2);
   var feeBp = Math.round(WITHDRAW_FEE_RATE * 10000);
