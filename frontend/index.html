@@ -7477,7 +7477,7 @@ function applyProfileData(data){
   var depositEl = document.getElementById('pf-stat-deposit');
   if (depositEl) depositEl.textContent = Number(data.total_deposit_gram).toFixed(3) + ' Gram';
   var withdrawEl = document.getElementById('pf-stat-withdraw');
-  if (withdrawEl) withdrawEl.textContent = Number(data.total_withdraw_gram).toFixed(3) + ' Gram';
+  if (withdrawEl) withdrawEl.textContent = formatWithdrawGram(data.total_withdraw_gram) + ' Gram';
 }
 // The To Withdraw window: shown when Withdraw is pressed with enough Gram but the server says the requirements are
 // not met, with that answer's own counts (today's ads and active referrals)
