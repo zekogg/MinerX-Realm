@@ -75,7 +75,7 @@ function adminFindUser(){
     document.getElementById('ap-find-referral-commission').textContent = Number(data.referral_commission_total).toLocaleString('en-US', { maximumFractionDigits: 0 });
     document.getElementById('ap-find-speed').textContent = '+' + Number(data.total_speed).toLocaleString('en-US', { maximumFractionDigits: 0 }) + ' Coins/hr';
     document.getElementById('ap-find-deposit').textContent = Number(data.total_deposit_gram).toFixed(3) + ' Gram';
-    document.getElementById('ap-find-withdraw').textContent = Number(data.total_withdraw_gram).toFixed(3) + ' Gram';
+    document.getElementById('ap-find-withdraw').textContent = formatWithdrawGram(data.total_withdraw_gram) + ' Gram';
     renderAdminFoundUserBan(data);
   }, function(){
     adminPanelState.foundUser = null;

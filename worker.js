@@ -49,16 +49,20 @@ const WITHDRAW_ACTIVE_REFERRALS = 1;
 const ADS_TODAY_PLUS_ONE = "ads_today = CASE WHEN ads_today_date = date('now') THEN ads_today + 1 ELSE 1 END, ads_today_date = date('now')";
 const WITHDRAW_FEE_RATE = 0.05;
 const WITHDRAW_COOLDOWN_MS = 24 * 60 * 60 * 1000;
-// A withdrawal's amount and payout are cut (never rounded up) to 3 decimals, as the app shows them; the fee is the
-// rest. Worked out in thousandths of a Gram, so no float remainder (0.26030000000000003) reaches D1 or a message
-function gramThousandths(value) {
+// A withdrawal's amount and payout are cut (never rounded up) to 2 decimals, as the app shows them; the fee is the
+// rest. Worked out in whole units (hundredths of a Gram), so no float remainder (0.26030000000000003) reaches D1 or
+// a message
+function gramUnits(value, decimals) {
   const n = Number(value) || 0;
-  let units = Math.floor(Math.round(n * 1e9) / 1e6);
-  if (units / 1000 > n) units--;
+  const scale = 10 ** decimals;
+  let units = Math.floor(Math.round(n * 1e9) / (1e9 / scale));
+  if (units / scale > n) units--;
   return units;
 }
-function formatGram3(value) {
-  return (gramThousandths(value) / 1000).toFixed(3);
+// A withdrawal amount with 2 decimals; requests made when amounts had 3 keep their third one
+function formatWithdrawGram(value) {
+  const units = gramUnits(value, 3);
+  return (units / 1000).toFixed(units % 10 ? 3 : 2);
 }
 const ADMIN_TELEGRAM_ID = 1018495986;
 const DEVICE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -98,7 +102,7 @@ const FRIEND_MILESTONES = [
   { friends: 10, reward: 5000 },
   { friends: 25, reward: 10000 },
   { friends: 50, reward: 20000 },
-  { friends: 100, reward: 50000 }
+  { friends: 100, reward: 30000 }
 ];
 
 // Check-in config
@@ -1321,8 +1325,8 @@ async function handleWithdrawRequest(request, env) {
   if (!auth.ok) return auth.response;
   const { telegramId, rawUsername, firstName } = auth;
   const rawAmount = Number(body.amount);
-  const amountUnits = Number.isFinite(rawAmount) ? gramThousandths(rawAmount) : 0;
-  const amountGram = amountUnits / 1000;
+  const amountUnits = Number.isFinite(rawAmount) ? gramUnits(rawAmount, 2) : 0;
+  const amountGram = amountUnits / 100;
   const address = typeof body.address === "string" ? body.address.trim() : "";
   if (!Number.isFinite(rawAmount) || amountGram < WITHDRAW_MIN_GRAM) {
     return jsonResponse({ error: "below_minimum", minimum: WITHDRAW_MIN_GRAM }, 400);
@@ -1334,8 +1338,8 @@ async function handleWithdrawRequest(request, env) {
   const cooldownCutoff = now - WITHDRAW_COOLDOWN_MS;
   const feeBasisPoints = Math.round(WITHDRAW_FEE_RATE * 10000);
   const netUnits = Math.floor(amountUnits * (10000 - feeBasisPoints) / 10000);
-  const netGram = netUnits / 1000;
-  const feeGram = (amountUnits - netUnits) / 1000;
+  const netGram = netUnits / 100;
+  const feeGram = (amountUnits - netUnits) / 100;
   const reserveStmt = env.DB.prepare(
     `UPDATE users SET gram = gram - ?, last_withdraw_request_at = ?
      WHERE telegram_id = ? AND gram >= ? AND banned_at IS NULL
@@ -1440,7 +1444,7 @@ async function handleWithdrawRequest(request, env) {
     await sendMessage(env, telegramId, {
       text:
         `📨 Withdrawal Request Created\n\n` +
-        `Your request for ${formatGram3(netGram)} Gram has been received and is being processed.\n\n` +
+        `Your request for ${formatWithdrawGram(netGram)} Gram has been received and is being processed.\n\n` +
         `⏱ This usually takes a few minutes, but can sometimes take up to 24 hours.`
     });
   } catch (e) {
@@ -3194,7 +3198,7 @@ function buildWithdrawText(status, w) {
     `${title}\n` +
     `👤 ${withdrawNameLine(w)}\n` +
     `🆔 <code>${w.telegramId}</code>\n` +
-    `💵 Amount: ${formatGram3(w.netGram)} Gram\n\n` +
+    `💵 Amount: ${formatWithdrawGram(w.netGram)} Gram\n\n` +
     (w.txHash ? `🔗 TxID:\n${txLinkHtml(w.txHash)}` : `📍 Address:\n<code>${escapeHtml(w.address)}</code>`)
   );
 }
@@ -3213,7 +3217,7 @@ function buildAdminWithdrawText(status, withdrawalId, w) {
     `${title}\n` +
     `👤 ${withdrawNameLine(w)}\n` +
     `🆔 <code>${w.telegramId}</code>\n` +
-    `💵 Amount: ${formatGram3(w.netGram)} Gram\n\n` +
+    `💵 Amount: ${formatWithdrawGram(w.netGram)} Gram\n\n` +
     `📍 Address:\n<code>${escapeHtml(w.address)}</code>` +
     (w.txHash ? `\n🔗 TxID:\n${txLinkHtml(w.txHash)}` : "") +
     (w.reason ? `\n📝 Reason: ${escapeHtml(w.reason)}` : "") +
@@ -3347,7 +3351,7 @@ async function handleWithdrawTxReply(message, env) {
     if (justApproved) {
       jobs.push(sendMessage(env, w.telegram_id, {
         text:
-          `✅ Withdrawal Successful\n\nYour withdrawal of ${formatGram3(w.net_gram)} Gram has been sent to your wallet.\n\n` +
+          `✅ Withdrawal Successful\n\nYour withdrawal of ${formatWithdrawGram(w.net_gram)} Gram has been sent to your wallet.\n\n` +
           `🔗 TxID: ${txLinkHtml(txHash)}`,
         parse_mode: "HTML",
         link_preview_options: noPreview
@@ -3419,7 +3423,7 @@ async function handleWithdrawCallback(cbq, env) {
       if (!editResult || !editResult.ok) console.error("withdraw callback editMessage failed:", JSON.stringify(editResult));
     }
     await sendMessage(env, w.telegram_id, {
-      text: `✅ Withdrawal Successful\n\nYour withdrawal of ${formatGram3(w.net_gram)} Gram has been sent to your wallet.`
+      text: `✅ Withdrawal Successful\n\nYour withdrawal of ${formatWithdrawGram(w.net_gram)} Gram has been sent to your wallet.`
     }).catch(() => null);
     await answerCallbackQuery(env, cbq.id, "✅ Approved");
   } catch (e) {
