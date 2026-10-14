@@ -5487,7 +5487,7 @@ body.reduce-motion .firefly{
       <div class="modal-field-label"><span>Address (Gram~Ton):</span></div>
       <input type="text" class="modal-plain-input" id="withdraw-address" placeholder="UQ...">
       <div class="modal-field-label"><span>Amount to be received:</span></div>
-      <div class="modal-plain-box has-gram" style="display:flex;align-items:center;gap:calc(6px * var(--s));"><span id="withdraw-output">0.000</span> Gram <img draggable="false" loading="lazy" src="/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:calc(16px * var(--s));height:calc(16px * var(--s));flex-shrink:0;"></div>
+      <div class="modal-plain-box has-gram" style="display:flex;align-items:center;gap:calc(6px * var(--s));"><span id="withdraw-output">0.00</span> Gram <img draggable="false" loading="lazy" src="/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:calc(16px * var(--s));height:calc(16px * var(--s));flex-shrink:0;"></div>
       <div class="wd-req">
         <div class="wd-req__label"><span>Min Withdraw : <span id="withdraw-min-label">0.1</span></span></div>
       </div>
@@ -10035,12 +10035,17 @@ var withdrawCooldownTimer = null;
 var withdrawBusy = false;
 // a withdrawal's payout, worked out as the server does: the amount and the payout are cut to 3 decimals
 function withdrawNetGram(amount){
-  var units = floorGramUnits(amount, 3);
+  var units = floorGramUnits(amount, 2);
   var feeBp = Math.round(WITHDRAW_FEE_RATE * 10000);
-  return Math.floor(units * (10000 - feeBp) / 10000) / 1000;
+  return Math.floor(units * (10000 - feeBp) / 10000) / 100;
+}
+// a withdrawal amount with 2 decimals; requests made when amounts had 3 keep their third one
+function formatWithdrawGram(value){
+  var units = floorGramUnits(value, 3);
+  return (units / 1000).toFixed(units % 10 ? 3 : 2);
 }
 function setMaxWithdraw(){
-  document.getElementById('withdraw-amount').value = formatGram(CURRENT_GRAM_BALANCE, 3);
+  document.getElementById('withdraw-amount').value = formatGram(CURRENT_GRAM_BALANCE, 2);
   updateWithdraw();
 }
 function openWithdrawModal(){
@@ -10054,11 +10059,11 @@ function openWithdrawModal(){
 }
 function updateWithdraw(){
   var input = document.getElementById('withdraw-amount');
-  // at most 3 decimals, as the balance is shown
-  var cut = /^(\d*\.\d{3})\d+$/.exec(input.value);
+  // at most 2 decimals, as the server takes it
+  var cut = /^(\d*\.\d{2})\d+$/.exec(input.value);
   if (cut) input.value = cut[1];
   var val = parseFloat(input.value) || 0;
-  document.getElementById('withdraw-output').textContent = withdrawNetGram(val).toFixed(3);
+  document.getElementById('withdraw-output').textContent = withdrawNetGram(val).toFixed(2);
   var cta = document.getElementById('withdraw-cta');
   var onCooldown = NEXT_WITHDRAW_ALLOWED_AT && Date.now() < NEXT_WITHDRAW_ALLOWED_AT;
   if (onCooldown) return;
@@ -10237,7 +10242,7 @@ function renderTxHistory(items){
     var amtClass = isWithdraw ? 'is-neg' : 'is-pos';
     var sign = isWithdraw ? '-' : '+';
     var amtIcon = isWithdraw ? PRIZE_ICON_URLS.gram : PRIZE_ICON_URLS.coins;
-    var amountText = isWithdraw ? formatGram(item.amount, 3) : Math.round(item.amount).toLocaleString('en-US');
+    var amountText = isWithdraw ? formatWithdrawGram(item.amount) : Math.round(item.amount).toLocaleString('en-US');
     var STATUS_MAP = {
       pending:   { cls: 'is-pending',   text: 'Pending' },
       confirmed: { cls: 'is-confirmed', text: 'Confirmed' },
