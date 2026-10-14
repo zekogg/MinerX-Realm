@@ -102,7 +102,7 @@ const FRIEND_MILESTONES = [
   { friends: 10, reward: 5000 },
   { friends: 25, reward: 10000 },
   { friends: 50, reward: 20000 },
-  { friends: 100, reward: 50000 }
+  { friends: 100, reward: 30000 }
 ];
 
 // Check-in config
