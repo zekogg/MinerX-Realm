@@ -8446,6 +8446,8 @@ function onWatchGigapubClick(){
 // leaderboards). Its daily count and the wait between ads are kept on the device only, with no requests; Adsgram
 // itself caps interstitials at 20 a user a day. Closing it early still counts as shown (interstitials can be skipped)
 var SUPPORT_AD_BLOCK_ID = 'int-53564';
+// false: Support Us is switched off (its button cannot be pressed and no ad is asked for); true turns it back on
+var SUPPORT_AD_ENABLED = false;
 var SUPPORT_AD_DAILY_LIMIT = 5;
 var SUPPORT_AD_COOLDOWN_MS = 35000;
 var SUPPORT_AD_COUNT_KEY = 'mx_support_ads';
@@ -8453,6 +8455,7 @@ var supportAdController = null;
 var supportAdState = { busy: false, cooldownUntil: 0, memory: null };
 var supportAdCooldownTimer = null;
 function initSupportAdController(){
+  if (!SUPPORT_AD_ENABLED) return;
   if (window.Adsgram && !supportAdController && isValidAdsgramBlockId(SUPPORT_AD_BLOCK_ID)){
     try {
       supportAdController = window.Adsgram.init({ blockId: SUPPORT_AD_BLOCK_ID, debug: ADSGRAM_DEBUG });
@@ -8480,7 +8483,8 @@ function renderSupportAdButton(){
   renderAdCounter(document.getElementById('support-ad-counter'), Math.min(watched, SUPPORT_AD_DAILY_LIMIT), SUPPORT_AD_DAILY_LIMIT);
   if (!supportAdController){
     if (avail) avail.textContent = 'Coming Soon';
-    if (btn){ btn.textContent = 'Soon'; btn.classList.add('is-claimed'); }
+    // switched off: the button keeps its Watch label (and its size), dimmed and not pressable
+    if (btn){ btn.textContent = SUPPORT_AD_ENABLED ? 'Soon' : 'Watch'; btn.classList.add('is-claimed'); btn.disabled = !SUPPORT_AD_ENABLED; }
     return;
   }
   var dailyDone = watched >= SUPPORT_AD_DAILY_LIMIT;
@@ -8512,6 +8516,7 @@ function startSupportAdCooldown(restoredUntil){
   }, 1000);
 }
 function onWatchSupportAdClick(){
+  if (!SUPPORT_AD_ENABLED) return;
   initSupportAdController();
   if (!supportAdController){
     showBuyErrorToast('Coming Soon', { title: 'Support Us' });
