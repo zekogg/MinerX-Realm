@@ -3109,7 +3109,7 @@ async function handleTelegram(request, env) {
   const message = update && update.message;
   if (message && message.text === "/start") {
     try {
-      await sendWelcomeMessage(env, message.chat.id);
+      await sendWelcomeMessage(env, message.chat.id, message.from);
     } catch (e) {   }
   } else if (message && message.reply_to_message && message.chat && message.chat.id === ADMIN_TELEGRAM_ID &&
              message.from && message.from.id === ADMIN_TELEGRAM_ID) {
@@ -3138,22 +3138,62 @@ async function sendPhoto(env, chatId, payload) {
   return res.json().catch(() => null);
 }
 
-// Welcome message
-async function sendWelcomeMessage(env, chatId) {
+// Welcome message (/start), in the language of the user's Telegram app (the 20 the app has, English for the rest).
+// Each entry: [greeting with {name}, greeting without a name, the four lines, the "tap" line, the four button labels]
+const WELCOME_TEXTS = {
+  en: ["Welcome, {name}!", "Welcome to MinerXRealm!", "Mine Coins every hour", "Collect pets that mine for you", "Daily rewards, tasks & friend bonuses", "Convert to Gram and withdraw to your wallet", "Tap Open App to start", "Open App", "Payouts", "Support", "Channel"],
+  ru: ["Добро пожаловать, {name}!", "Добро пожаловать в MinerXRealm!", "Добывай монеты каждый час", "Собирай питомцев, которые добывают за тебя", "Ежедневные награды, задания и бонусы за друзей", "Обменивай на Gram и выводи на свой кошелёк", "Нажми «Открыть приложение», чтобы начать", "Открыть приложение", "Выплаты", "Поддержка", "Канал"],
+  uk: ["Ласкаво просимо, {name}!", "Ласкаво просимо до MinerXRealm!", "Видобувай монети щогодини", "Збирай улюбленців, які видобувають за тебе", "Щоденні нагороди, завдання та бонуси за друзів", "Обмінюй на Gram і виводь на свій гаманець", "Натисни «Відкрити застосунок», щоб почати", "Відкрити застосунок", "Виплати", "Підтримка", "Канал"],
+  uz: ["Xush kelibsiz, {name}!", "MinerXRealm'ga xush kelibsiz!", "Har soatda tanga qazing", "Siz uchun qazadigan uy hayvonlarini to'plang", "Kunlik mukofotlar, vazifalar va do'stlar uchun bonuslar", "Gram'ga almashtiring va hamyoningizga yechib oling", "Boshlash uchun «Ilovani ochish» tugmasini bosing", "Ilovani ochish", "To'lovlar", "Yordam", "Kanal"],
+  id: ["Selamat datang, {name}!", "Selamat datang di MinerXRealm!", "Tambang Koin setiap jam", "Kumpulkan hewan peliharaan yang menambang untukmu", "Hadiah harian, tugas & bonus teman", "Tukar ke Gram dan tarik ke dompetmu", "Ketuk Buka Aplikasi untuk mulai", "Buka Aplikasi", "Pembayaran", "Dukungan", "Saluran"],
+  vi: ["Chào mừng, {name}!", "Chào mừng đến với MinerXRealm!", "Đào xu mỗi giờ", "Sưu tầm thú cưng đào thay bạn", "Thưởng hằng ngày, nhiệm vụ & thưởng mời bạn", "Đổi sang Gram và rút về ví của bạn", "Nhấn Mở ứng dụng để bắt đầu", "Mở ứng dụng", "Thanh toán", "Hỗ trợ", "Kênh"],
+  hi: ["स्वागत है, {name}!", "MinerXRealm में आपका स्वागत है!", "हर घंटे कॉइन माइन करें", "ऐसे पेट्स इकट्ठा करें जो आपके लिए माइन करें", "रोज़ाना इनाम, टास्क और दोस्तों के बोनस", "Gram में बदलें और अपने वॉलेट में निकालें", "शुरू करने के लिए ऐप खोलें पर टैप करें", "ऐप खोलें", "भुगतान", "सहायता", "चैनल"],
+  tr: ["Hoş geldin, {name}!", "MinerXRealm'e hoş geldin!", "Her saat Coin kaz", "Senin için kazı yapan evcil hayvanlar topla", "Günlük ödüller, görevler ve arkadaş bonusları", "Gram'a çevir ve cüzdanına çek", "Başlamak için Uygulamayı Aç'a dokun", "Uygulamayı Aç", "Ödemeler", "Destek", "Kanal"],
+  pt: ["Bem-vindo, {name}!", "Bem-vindo ao MinerXRealm!", "Minere moedas a cada hora", "Colecione pets que mineram por você", "Recompensas diárias, tarefas e bônus de amigos", "Converta em Gram e saque para sua carteira", "Toque em Abrir App para começar", "Abrir App", "Pagamentos", "Suporte", "Canal"],
+  es: ["¡Bienvenido, {name}!", "¡Bienvenido a MinerXRealm!", "Mina monedas cada hora", "Colecciona mascotas que minan por ti", "Recompensas diarias, tareas y bonos por amigos", "Conviértelas a Gram y retíralas a tu billetera", "Toca Abrir App para empezar", "Abrir App", "Pagos", "Soporte", "Canal"],
+  fil: ["Maligayang pagdating, {name}!", "Maligayang pagdating sa MinerXRealm!", "Magmina ng Coins bawat oras", "Mangolekta ng mga pet na nagmimina para sa iyo", "Araw-araw na gantimpala, mga task at bonus sa kaibigan", "I-convert sa Gram at i-withdraw sa iyong wallet", "I-tap ang Buksan ang App para magsimula", "Buksan ang App", "Mga Payout", "Suporta", "Channel"],
+  bn: ["স্বাগতম, {name}!", "MinerXRealm-এ স্বাগতম!", "প্রতি ঘণ্টায় কয়েন মাইন করুন", "এমন পোষা প্রাণী সংগ্রহ করুন যারা আপনার জন্য মাইন করে", "প্রতিদিনের পুরস্কার, টাস্ক ও বন্ধুদের বোনাস", "Gram-এ রূপান্তর করে আপনার ওয়ালেটে তুলুন", "শুরু করতে অ্যাপ খুলুন-এ ট্যাপ করুন", "অ্যাপ খুলুন", "পেমেন্ট", "সাপোর্ট", "চ্যানেল"],
+  th: ["ยินดีต้อนรับ {name}!", "ยินดีต้อนรับสู่ MinerXRealm!", "ขุดเหรียญทุกชั่วโมง", "สะสมสัตว์เลี้ยงที่ขุดแทนคุณ", "รางวัลรายวัน ภารกิจ และโบนัสเพื่อน", "แลกเป็น Gram และถอนเข้ากระเป๋าของคุณ", "แตะ เปิดแอป เพื่อเริ่ม", "เปิดแอป", "การจ่ายเงิน", "ซัพพอร์ต", "ช่อง"],
+  my: ["ကြိုဆိုပါတယ် {name}!", "MinerXRealm မှ ကြိုဆိုပါတယ်!", "နာရီတိုင်း Coin တူးပါ", "သင့်အတွက် တူးပေးမယ့် အိမ်မွေးတိရစ္ဆာန်တွေ စုဆောင်းပါ", "နေ့စဉ်ဆုများ၊ တာဝန်များနှင့် သူငယ်ချင်းဘောနပ်စ်များ", "Gram သို့ ပြောင်းပြီး သင့်ပိုက်ဆံအိတ်သို့ ထုတ်ယူပါ", "စတင်ရန် App ဖွင့်ရန် ကိုနှိပ်ပါ", "App ဖွင့်ရန်", "ငွေပေးချေမှုများ", "အကူအညီ", "ချန်နယ်"],
+  fr: ["Bienvenue, {name} !", "Bienvenue sur MinerXRealm !", "Mine des pièces chaque heure", "Collectionne des pets qui minent pour toi", "Récompenses quotidiennes, tâches et bonus d'amis", "Convertis-les en Gram et retire-les sur ton portefeuille", "Appuie sur Ouvrir l'app pour commencer", "Ouvrir l'app", "Paiements", "Support", "Chaîne"],
+  zh: ["欢迎，{name}！", "欢迎来到 MinerXRealm！", "每小时挖矿赚金币", "收集为你挖矿的宠物", "每日奖励、任务和好友奖励", "兑换成 Gram 并提现到你的钱包", "点击“打开应用”开始", "打开应用", "提现记录", "客服", "频道"],
+  de: ["Willkommen, {name}!", "Willkommen bei MinerXRealm!", "Schürfe jede Stunde Coins", "Sammle Pets, die für dich schürfen", "Tägliche Belohnungen, Aufgaben & Freundesboni", "Tausche sie in Gram und zahle sie auf deine Wallet aus", "Tippe auf App öffnen, um zu starten", "App öffnen", "Auszahlungen", "Support", "Kanal"],
+  pl: ["Witaj, {name}!", "Witaj w MinerXRealm!", "Wydobywaj monety co godzinę", "Zbieraj zwierzaki, które kopią za ciebie", "Codzienne nagrody, zadania i bonusy za znajomych", "Wymieniaj na Gram i wypłacaj do portfela", "Stuknij Otwórz aplikację, aby zacząć", "Otwórz aplikację", "Wypłaty", "Wsparcie", "Kanał"],
+  it: ["Benvenuto, {name}!", "Benvenuto su MinerXRealm!", "Mina monete ogni ora", "Colleziona pet che minano per te", "Ricompense giornaliere, task e bonus amici", "Convertile in Gram e preleva sul tuo wallet", "Tocca Apri app per iniziare", "Apri app", "Pagamenti", "Supporto", "Canale"],
+  fa: ["خوش آمدی، {name}!", "به MinerXRealm خوش آمدی!", "هر ساعت سکه استخراج کن", "حیوان‌هایی جمع کن که برایت استخراج می‌کنند", "جایزه‌های روزانه، تسک‌ها و پاداش دوستان", "به Gram تبدیل کن و به کیف پولت برداشت کن", "برای شروع روی «باز کردن برنامه» بزن", "باز کردن برنامه", "پرداخت‌ها", "پشتیبانی", "کانال"],
+  ar: ["أهلاً بك، {name}!", "أهلاً بك في MinerXRealm!", "عدّن العملات كل ساعة", "اجمع حيوانات تعدّن لك", "مكافآت يومية ومهام ومكافآت الأصدقاء", "حوّلها إلى Gram واسحبها إلى محفظتك", "اضغط «فتح التطبيق» للبدء", "فتح التطبيق", "السحوبات", "الدعم", "القناة"]
+};
+// Telegram's language_code ("pt-br", "tl"...) to one of the app's languages, as the app itself picks it
+function welcomeLang(languageCode) {
+  const base = String(languageCode || "").toLowerCase().split("-")[0];
+  const lang = base === "tl" ? "fil" : base;
+  return WELCOME_TEXTS[lang] ? lang : "en";
+}
+// from: the Telegram user who sent /start; the caption is plain text, so a name shows exactly as it is
+async function sendWelcomeMessage(env, chatId, from) {
+  const t = WELCOME_TEXTS[welcomeLang(from && from.language_code)];
+  const name = Array.from(String((from && from.first_name) || "").trim()).slice(0, 32).join("").trim();
+  const greeting = name ? t[0].replace("{name}", name) : t[1];
   await sendPhoto(env, chatId, {
     photo: WELCOME_PHOTO_URL,
-    caption: "Welcome to MinerXRealm!\nStart mining now and earn coins for free.",
+    caption:
+      `🐾 ${greeting}\n\n` +
+      `⛏️ ${t[2]}\n` +
+      `🐻 ${t[3]}\n` +
+      `🎁 ${t[4]}\n` +
+      `💎 ${t[5]}\n\n` +
+      `👇 ${t[6]}`,
     reply_markup: {
       inline_keyboard: [
         [
-          { text: "🎮 Open App", web_app: { url: WEBAPP_URL } }
+          { text: `🎮 ${t[7]}`, web_app: { url: WEBAPP_URL } }
         ],
         [
-          { text: "💰 Payouts", url: PAYOUTS_CHANNEL_URL },
-          { text: "🎧 Support", url: `https://t.me/${SUPPORT_USERNAME}` }
+          { text: `💰 ${t[8]}`, url: PAYOUTS_CHANNEL_URL },
+          { text: `🎧 ${t[9]}`, url: `https://t.me/${SUPPORT_USERNAME}` }
         ],
         [
-          { text: "📺 Channel", url: NEWS_CHANNEL_URL }
+          { text: `📺 ${t[10]}`, url: NEWS_CHANNEL_URL }
         ]
       ]
     }
