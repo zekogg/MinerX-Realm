@@ -3109,7 +3109,7 @@ async function handleTelegram(request, env) {
   const message = update && update.message;
   if (message && message.text === "/start") {
     try {
-      await sendWelcomeMessage(env, message.chat.id);
+      await sendWelcomeMessage(env, message.chat.id, message.from);
     } catch (e) {   }
   } else if (message && message.reply_to_message && message.chat && message.chat.id === ADMIN_TELEGRAM_ID &&
              message.from && message.from.id === ADMIN_TELEGRAM_ID) {
@@ -3138,11 +3138,19 @@ async function sendPhoto(env, chatId, payload) {
   return res.json().catch(() => null);
 }
 
-// Welcome message
-async function sendWelcomeMessage(env, chatId) {
+// Welcome message (/start), in English; from: the Telegram user who sent /start. The caption is plain text, so a name
+// shows exactly as it is
+async function sendWelcomeMessage(env, chatId, from) {
+  const name = Array.from(String((from && from.first_name) || "").trim()).slice(0, 32).join("").trim();
   await sendPhoto(env, chatId, {
     photo: WELCOME_PHOTO_URL,
-    caption: "Welcome to MinerXRealm!\nStart mining now and earn coins for free.",
+    caption:
+      `🐾 ${name ? `Welcome, ${name}!` : "Welcome to MinerXRealm!"}\n\n` +
+      `⛏️ Mine Coins every hour\n` +
+      `🐻 Collect pets that mine for you\n` +
+      `🎁 Daily rewards, tasks & friend bonuses\n` +
+      `💎 Convert to Gram and withdraw to your wallet\n\n` +
+      `👇 Tap Open App to start`,
     reply_markup: {
       inline_keyboard: [
         [
