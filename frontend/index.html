@@ -5929,6 +5929,7 @@ function fetchUserData(){
       daily_limit: data.user.sponsored_task_daily_limit,
       reward_coins: data.user.sponsored_task_reward_coins
     });
+    applyLifetimeAdsFromUser(data.user.lifetime_ads_watched);
     setupInviteLink(data.user.telegram_id);
     applyFriendsState({
       invites: data.user.friends_invites,
@@ -7723,10 +7724,39 @@ function renderGuardianUI(){
   }
 }
 function applyGuardianState(data){
-  guardianState.adsWatched = data.ads_watched || 0;
+  // the lifetime count only grows; the Realm data can be up to 15 minutes old (kept on the device), so it never
+  // takes the count below the one /api/user or the ads since have already shown
+  guardianState.adsWatched = Math.max(data.ads_watched || 0, guardianState.adsWatched);
   guardianState.threshold = data.threshold || 4000;
   guardianState.claimed = !!data.claimed;
   if (data.speed) guardianState.speed = data.speed;
+  rememberGuardianClaimed(guardianState.claimed);
+  renderGuardianUI();
+}
+// Get A Free Pet (and The Guardian's progress) without opening the Realm: the lifetime ad count comes with /api/user
+// (already in it, no extra read), each ad that counts adds 1 on the device at once (no request), and whether The
+// Guardian was claimed is remembered on the device from the Realm data. The Realm data stays the source of truth
+var guardianLocalBumpAt = 0;
+function rememberGuardianClaimed(claimed){
+  try{
+    if (claimed) localStorage.setItem(localCacheKey('guardian_claimed'), '1');
+    else localStorage.removeItem(localCacheKey('guardian_claimed'));
+  }catch(e){   }
+}
+function applyLifetimeAdsFromUser(count){
+  if (count === undefined) return;
+  count = Number(count) || 0;
+  // an ad counted on the device in the last minute may not have reached the server yet
+  guardianState.adsWatched = Date.now() - guardianLocalBumpAt < AD_VERIFY_DELAY_MS ? Math.max(count, guardianState.adsWatched) : count;
+  if (!guardianState.claimed){
+    try{ guardianState.claimed = localStorage.getItem(localCacheKey('guardian_claimed')) === '1'; }catch(e){   }
+  }
+  renderGuardianUI();
+}
+// an ad that adds to the lifetime count on the server (the rewarded Daily Ads, the Sponsored Task, the ad gates)
+function countLifetimeAdOnDevice(){
+  guardianLocalBumpAt = Date.now();
+  guardianState.adsWatched++;
   renderGuardianUI();
 }
 function onClaimGuardianClick(){
@@ -7752,6 +7782,7 @@ function onClaimGuardianClick(){
       return;
     }
     guardianState.claimed = true;
+    rememberGuardianClaimed(true);
     if (typeof data.speed === 'number') guardianState.speed = data.speed;
     if (typeof data.coins === 'number') updateBalanceDisplay({ coins: data.coins, gram: CURRENT_GRAM_BALANCE , locked_coins: data.locked_coins });
     if (typeof data.total_speed === 'number') applyClaimedPetSpeed(data.total_speed);
@@ -8195,6 +8226,7 @@ function onWatchAdsgramClick(){
     adsTaskState.busy = false;
     adsTaskState.watchedToday++;
     creditAdRewardOptimistically(adsTaskState.rewardCoins);
+    countLifetimeAdOnDevice();
     showAppToast({ title: 'Watch Adsgram Ad', icon: PRIZE_ICON_URLS.coins, amount: '+' + adsTaskState.rewardCoins + ' Coins' });
     triggerConfetti();
     startAdsTaskCooldown();
@@ -8307,6 +8339,7 @@ function onWatchBonusAdClick(){
     bonusAdState.watchedToday++;
     bonusAdState.nextAvailableAt = serverNow() + BONUS_AD_COOLDOWN_MS;
     creditAdRewardOptimistically(bonusAdState.rewardCoins);
+    countLifetimeAdOnDevice();
     showAppToast({ title: 'Bonus AD Every 1H', icon: PRIZE_ICON_URLS.coins, amount: '+' + bonusAdState.rewardCoins + ' Coins' });
     triggerConfetti();
     startBonusAdCountdown();
@@ -8428,6 +8461,7 @@ function onWatchGigapubClick(){
     gigapubState.busy = false;
     gigapubState.watchedToday++;
     creditAdRewardOptimistically(gigapubState.rewardCoins);
+    countLifetimeAdOnDevice();
     showAppToast({ title: 'Watch gigapub ads', icon: PRIZE_ICON_URLS.coins, amount: '+' + gigapubState.rewardCoins + ' Coins' });
     triggerConfetti();
     startGigapubTaskCooldown();
@@ -8887,6 +8921,7 @@ function onSponsoredTaskReward(){
   if (sponsoredTaskEl) sponsoredTaskEl.__rewarded = true;
   sponsoredState.doneToday++;
   creditAdRewardOptimistically(sponsoredState.rewardCoins);
+  countLifetimeAdOnDevice();
   showAppToast({ title: 'Sponsored Task', icon: PRIZE_ICON_URLS.coins, amount: '+' + sponsoredState.rewardCoins + ' Coins' });
   triggerConfetti();
   scheduleAdVerification(true);
@@ -8976,6 +9011,7 @@ function runAdGate(onSuccess, onFail, opts){
   setAdLoadingOverlayVia('GigaPub');
   if (gigapubReady && typeof window.showGiga === 'function'){
     window.showGiga({ showTag: GIGAPUB_GATE_PLACEMENT }).then(function(){
+      countLifetimeAdOnDevice();
       setAdLoadingOverlayVerifying();
       if (!(opts && opts.noConfetti)) triggerConfetti();
       onSuccess();
@@ -8994,6 +9030,7 @@ function runAdGateAdsgramFallback(onSuccess, onFail, opts){
   }
   setAdLoadingOverlayVia('Adsgram');
   adsgramShow(gateAdsgramController).then(function(){
+    countLifetimeAdOnDevice();
     setAdLoadingOverlayVerifying();
     if (!(opts && opts.noConfetti)) triggerConfetti();
     onSuccess();
