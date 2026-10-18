@@ -77,7 +77,7 @@ const COMBO_REWARD_COINS = 200;
 const COMBO_MAX_ATTEMPTS = 1;
 
 // Watch Adsgram Ad config
-const ADS_TASK_REWARD_COINS = 15;
+const ADS_TASK_REWARD_COINS = 25;
 const ADS_TASK_DAILY_LIMIT = 10;
 
 // Friends / Referrals config
@@ -111,16 +111,16 @@ const CHECKIN_NEWS_CHANNEL = "@MinerXRealmNews";
 const CHECKIN_PARTNER_CHANNEL = "@XTreasuryX";
 
 // Bonus AD Every 1H config
-const BONUS_AD_REWARD_COINS = 15;
+const BONUS_AD_REWARD_COINS = 30;
 const BONUS_AD_DAILY_LIMIT = 5;
 const BONUS_AD_COOLDOWN_MS = 60 * 60 * 1000;
 
 // Watch GigaPub ads config
-const GIGAPUB_REWARD_COINS = 15;
+const GIGAPUB_REWARD_COINS = 20;
 const GIGAPUB_DAILY_LIMIT = 10;
 
 // Sponsored Task (Adsgram Task block) config
-const SPONSORED_TASK_REWARD_COINS = 20;
+const SPONSORED_TASK_REWARD_COINS = 25;
 const SPONSORED_TASK_DAILY_LIMIT = 10;
 
 // Realm pets & Storage config
