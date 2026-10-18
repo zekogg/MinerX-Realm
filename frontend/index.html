@@ -4332,7 +4332,7 @@ body.reduce-motion .firefly{
           <div class="ad-task__title">Watch Adsgram Ad</div>
           <div class="ad-task__meta">
             <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:calc(18px * var(--s));height:calc(18px * var(--s));flex-shrink:0;vertical-align:middle;">
-            <span class="ad-task__reward">+15 / Ad</span>
+            <span class="ad-task__reward">+25 / Ad</span>
             <span class="ad-task__avail" id="ads-task-avail">Available</span>
           </div>
           <div class="ad-task__divider"></div>
@@ -4348,7 +4348,7 @@ body.reduce-motion .firefly{
           <div class="ad-task__title">Bonus AD Every 1H</div>
           <div class="ad-task__meta">
             <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:calc(18px * var(--s));height:calc(18px * var(--s));flex-shrink:0;vertical-align:middle;">
-            <span class="ad-task__reward">+15 / Ad</span>
+            <span class="ad-task__reward">+30 / Ad</span>
             <span class="ad-task__avail" id="bonus-ad-avail">Available</span>
           </div>
           <div class="ad-task__divider"></div>
@@ -4364,7 +4364,7 @@ body.reduce-motion .firefly{
           <div class="ad-task__title">Watch gigapub ads</div>
           <div class="ad-task__meta">
             <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:calc(18px * var(--s));height:calc(18px * var(--s));flex-shrink:0;vertical-align:middle;">
-            <span class="ad-task__reward">+15 / Ad</span>
+            <span class="ad-task__reward">+20 / Ad</span>
             <span class="ad-task__avail" id="gigapub-task-avail">Available</span>
           </div>
           <div class="ad-task__divider"></div>
@@ -4408,7 +4408,7 @@ body.reduce-motion .firefly{
                 <div class="sp-sk__msg" id="sp-task-msg" hidden></div>
                 <div class="sp-sk__meta">
                   <img draggable="false" loading="lazy" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:calc(18px * var(--s));height:calc(18px * var(--s));flex-shrink:0;">
-                  <span class="ad-task__reward" id="sp-task-reward">+20</span>
+                  <span class="ad-task__reward" id="sp-task-reward">+25</span>
                   <span class="ad-task__counter" id="sp-task-counter">0 / 10</span>
                 </div>
               </div>
@@ -8142,7 +8142,7 @@ function restoreAdWaits(){
   }
 }
 var ADS_TASK_COOLDOWN_MS = 10000;
-var adsTaskState = { watchedToday: 0, dailyLimit: 10, rewardCoins: 15, busy: false, cooldownUntil: 0 };
+var adsTaskState = { watchedToday: 0, dailyLimit: 10, rewardCoins: 25, busy: false, cooldownUntil: 0 };
 var adsTaskCooldownTimer = null;
 // Adsgram resolves show() with { done }; a result with done: false was not watched to the end, so it goes the
 // "not completed" way like a rejection (the reward itself only ever comes from Adsgram's reward URL)
@@ -8165,7 +8165,7 @@ initAdsgramController();
 function applyAdsTaskState(data){
   adsTaskState.watchedToday = data.watched_today || 0;
   adsTaskState.dailyLimit = data.daily_limit || 10;
-  adsTaskState.rewardCoins = data.reward_coins || 15;
+  adsTaskState.rewardCoins = data.reward_coins || 25;
   renderAdsTaskButton();
   renderSupportAdButton();
 }
@@ -8244,7 +8244,7 @@ function onWatchAdsgramClick(){
 var BONUS_AD_BLOCK_ID = '52885';
 var bonusAdsgramController = null;
 var BONUS_AD_COOLDOWN_MS = 60 * 60 * 1000;
-var bonusAdState = { watchedToday: 0, dailyLimit: 5, rewardCoins: 15, busy: false, nextAvailableAt: 0 };
+var bonusAdState = { watchedToday: 0, dailyLimit: 5, rewardCoins: 30, busy: false, nextAvailableAt: 0 };
 var bonusAdCountdownTimer = null;
 function isValidAdsgramBlockId(id){
   return /^(\d+|int-\d+)$/.test(String(id));
@@ -8274,7 +8274,7 @@ document.addEventListener('DOMContentLoaded', function(){
 function applyBonusAdState(data){
   bonusAdState.watchedToday = data.watched_today || 0;
   bonusAdState.dailyLimit = data.daily_limit || 5;
-  bonusAdState.rewardCoins = data.reward_coins || 15;
+  bonusAdState.rewardCoins = data.reward_coins || 30;
   bonusAdState.nextAvailableAt = data.next_available_at || 0;
   startBonusAdCountdown();
 }
@@ -8357,7 +8357,7 @@ function onWatchBonusAdClick(){
 var GIGAPUB_PUBLISHER_ID = '8282';
 var gigapubReady = false;
 var GIGAPUB_TASK_COOLDOWN_MS = 10000;
-var gigapubState = { watchedToday: 0, dailyLimit: 10, rewardCoins: 15, busy: false, cooldownUntil: 0 };
+var gigapubState = { watchedToday: 0, dailyLimit: 10, rewardCoins: 20, busy: false, cooldownUntil: 0 };
 var gigapubTaskCooldownTimer = null;
 function isValidGigapubId(id){
   return /^\d+$/.test(String(id));
@@ -8396,7 +8396,7 @@ loadGigapubScript();
 function applyGigapubState(data){
   gigapubState.watchedToday = data.watched_today || 0;
   gigapubState.dailyLimit = data.daily_limit || 10;
-  gigapubState.rewardCoins = data.reward_coins || 15;
+  gigapubState.rewardCoins = data.reward_coins || 20;
   renderGigapubButton();
 }
 function renderGigapubButton(){
@@ -8599,7 +8599,7 @@ var SPONSORED_TASK_LAST_DONE_SHOW_MS = 2000;
 // Claim counts down this long after Start before it can be tapped (Adsgram still checks the task itself)
 var SPONSORED_TASK_CLAIM_WAIT_S = 3;
 var SPONSORED_TASK_DONE_SHOW_S = SPONSORED_TASK_DONE_SHOW_MS / 1000;
-var sponsoredState = { doneToday: 0, dailyLimit: 10, rewardCoins: 20, loaded: false, opened: false, view: 'loading', lastLoadAt: 0, waitUntil: 0 };
+var sponsoredState = { doneToday: 0, dailyLimit: 10, rewardCoins: 25, loaded: false, opened: false, view: 'loading', lastLoadAt: 0, waitUntil: 0 };
 var sponsoredTaskEl = null;
 var sponsoredReloadTimer = null;
 var sponsoredLoadTimer = null;
@@ -8607,7 +8607,7 @@ var sponsoredWaitTimer = null;
 function applySponsoredTaskState(data){
   sponsoredState.doneToday = data.done_today || 0;
   sponsoredState.dailyLimit = data.daily_limit || 10;
-  sponsoredState.rewardCoins = data.reward_coins || 20;
+  sponsoredState.rewardCoins = data.reward_coins || 25;
   sponsoredState.loaded = true;
   renderSponsoredTask();
 }
