@@ -4324,6 +4324,29 @@ body.reduce-motion .firefly{
         <div class="free-pet-box__progress progress-track"><div class="progress-fill" id="dg-free-pet-fill" style="width:0%"></div></div>
         <div class="free-pet-box__caption" id="dg-free-pet-caption">4000 more ads to unlock</div>
       </div>
+        <div class="card sp-task" id="sp-task-card">
+          <div class="sp-task__head">
+            <div class="sp-task__icon"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 6a13 13 0 0 0 8.4-2.8A1 1 0 0 1 21 4v12a1 1 0 0 1-1.6.8A13 13 0 0 0 11 14H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/><path d="M6 14a12 12 0 0 0 2.4 7.2 2 2 0 0 0 3.2-2.4A8 8 0 0 1 10 14"/><path d="M8 6v8"/></svg></div>
+            <div class="sp-task__title">Sponsored Task</div>
+            <span class="sp-task__badge" data-no-i18n>AdsGram</span>
+          </div>
+          <div class="sp-task__item">
+            <div class="sp-sk is-loading" id="sp-task-placeholder">
+              <div class="sp-sk__img"></div>
+              <div class="sp-sk__body">
+                <div class="sp-sk__bar" id="sp-task-bar"></div>
+                <div class="sp-sk__msg" id="sp-task-msg" hidden></div>
+                <div class="sp-sk__meta">
+                  <img draggable="false" loading="lazy" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:calc(18px * var(--s));height:calc(18px * var(--s));flex-shrink:0;">
+                  <span class="ad-task__reward" id="sp-task-reward">+25</span>
+                  <span class="ad-task__counter" id="sp-task-counter">0 / 10</span>
+                </div>
+              </div>
+              <button class="ad-task__watch partner-task__btn" id="sp-task-btn" disabled>Start</button>
+            </div>
+            <div class="sp-task__slot is-pending" id="sp-task-slot" hidden></div>
+          </div>
+        </div>
       <div class="ad-tasks-grid">
         <div class="card ad-task">
           <div class="ad-task__icon">
@@ -4394,29 +4417,6 @@ body.reduce-motion .firefly{
       <!-- Check-in Tab -->
       <div class="task-panel" id="task-panel-checkin">
         <div class="task-warning"><span>⚠️ Reset Daily at 00:00 UTC</span></div>
-        <div class="card sp-task" id="sp-task-card">
-          <div class="sp-task__head">
-            <div class="sp-task__icon"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 6a13 13 0 0 0 8.4-2.8A1 1 0 0 1 21 4v12a1 1 0 0 1-1.6.8A13 13 0 0 0 11 14H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/><path d="M6 14a12 12 0 0 0 2.4 7.2 2 2 0 0 0 3.2-2.4A8 8 0 0 1 10 14"/><path d="M8 6v8"/></svg></div>
-            <div class="sp-task__title">Sponsored Task</div>
-            <span class="sp-task__badge" data-no-i18n>AdsGram</span>
-          </div>
-          <div class="sp-task__item">
-            <div class="sp-sk is-loading" id="sp-task-placeholder">
-              <div class="sp-sk__img"></div>
-              <div class="sp-sk__body">
-                <div class="sp-sk__bar" id="sp-task-bar"></div>
-                <div class="sp-sk__msg" id="sp-task-msg" hidden></div>
-                <div class="sp-sk__meta">
-                  <img draggable="false" loading="lazy" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:calc(18px * var(--s));height:calc(18px * var(--s));flex-shrink:0;">
-                  <span class="ad-task__reward" id="sp-task-reward">+25</span>
-                  <span class="ad-task__counter" id="sp-task-counter">0 / 10</span>
-                </div>
-              </div>
-              <button class="ad-task__watch partner-task__btn" id="sp-task-btn" disabled>Start</button>
-            </div>
-            <div class="sp-task__slot is-pending" id="sp-task-slot" hidden></div>
-          </div>
-        </div>
         <div class="ad-tasks-grid">
           <div class="card partner-task">
             <div class="ad-task__icon">
@@ -4534,7 +4534,7 @@ body.reduce-motion .firefly{
       <div class="card invite-box">
         <img loading="lazy" draggable="false" class="invite-box__gift" src="/Friends%20icon.svg" alt="Friends">
         <div class="invite-box__title">Invite A Friend · Earn</div>
-        <div class="invite-box__amount"><span class="invite-box__tiny">Up to</span> 500<span class="invite-box__plus">+ 5%</span></div>
+        <div class="invite-box__amount"><span class="invite-box__tiny">Up to</span> 1000<span class="invite-box__plus">+ 5%</span></div>
         <div class="invite-box__sub">Coins + Commission · Per Referral</div>
         <div class="invite-link">
           <span class="invite-link__text" id="invite-link-text">t.me/MinerXRealmBot/app?startapp=ref_0</span>
@@ -4575,7 +4575,7 @@ body.reduce-motion .firefly{
           </div>
           <div class="card reward-tier is-featured">
             <svg class="reward-tier__icon" viewBox="0 0 24 24" fill="var(--c-reward-tier-icon-bolt)" stroke="none"><path d="M13 2 L4 14 L11 14 L10 22 L20 9 L13 9 Z"/></svg>
-            <div class="reward-tier__val">+480</div>
+            <div class="reward-tier__val">+980</div>
             <div class="reward-tier__label">When active</div>
           </div>
           <div class="card reward-tier">
@@ -6995,7 +6995,8 @@ fetchUserData();
       var active = btn.getAttribute('data-page') === pageId;
       btn.classList.toggle('is-active', active);
     });
-    if (pageId === 'page-tasks' && typeof loadPendingSponsoredTask === 'function') loadPendingSponsoredTask();
+    if (pageId === 'page-tasks' && typeof onDailyAdsOpened === 'function' &&
+        document.getElementById('task-panel-daily').classList.contains('is-active')) onDailyAdsOpened();
     if (pageId === 'page-realm'){
       if (typeof fetchRealmStatus === 'function') fetchRealmStatus();
       if (typeof resumeStorageTick === 'function') resumeStorageTick();
@@ -7031,7 +7032,7 @@ fetchUserData();
         adminTasksFetched[target] = true;
         fetchAdminTasks(target);
       }
-      if (target === 'checkin') onCheckinOpened();
+      if (target === 'daily') onDailyAdsOpened();
     });
   });
   var copyBtn = document.getElementById('btn-copy-link');
@@ -8134,7 +8135,7 @@ function restoreAdWaits(){
     startSponsoredWait(until);
     return;
   }
-  // no task last time: Come Back Later, and Check in asks again only once the retry gap has passed
+  // no task last time: Come Back Later, and Daily Ads asks again only once the retry gap has passed
   until = loadAdWait('sponsored_retry', SPONSORED_TASK_RETRY_GAP_MS);
   if (until){
     sponsoredState.lastLoadAt = until - SPONSORED_TASK_RETRY_GAP_MS;
@@ -8580,12 +8581,12 @@ function onWatchSupportAdClick(){
   });
 }
 
-// Sponsored Task (Adsgram Task block, Check in tab): Adsgram picks the advertiser's task and checks it was done.
+// Sponsored Task (Adsgram Task block, Daily Ads tab): Adsgram picks the advertiser's task and checks it was done.
 // The reward and the counters come only from Adsgram's reward URL (&task=sponsored, 10 a day on the server);
 // the app shows the reward at once and the usual post-ad /api/user check confirms it.
 // Card states: loading (placeholder), task (Adsgram's row), none (Come Back Later) and limit (Come Back Tomorrow).
-// A task is asked for only once Check in is opened, so Adsgram never loads one the user does not see; none asks
-// again when Check in is opened later (Adsgram's servers only, no request to ours)
+// A task is asked for only once Daily Ads is opened, so Adsgram never loads one the user does not see; none asks
+// again when Daily Ads is opened later (Adsgram's servers only, no request to ours)
 var SPONSORED_TASK_BLOCK_ID = 'task-52985';
 var SPONSORED_TASK_LOAD_TIMEOUT_MS = 15000;
 var SPONSORED_TASK_RETRY_GAP_MS = 45000;
@@ -8598,7 +8599,6 @@ var SPONSORED_TASK_DONE_SHOW_MS = 30000;
 var SPONSORED_TASK_LAST_DONE_SHOW_MS = 2000;
 // Claim counts down this long after Start before it can be tapped (Adsgram still checks the task itself)
 var SPONSORED_TASK_CLAIM_WAIT_S = 3;
-var SPONSORED_TASK_DONE_SHOW_S = SPONSORED_TASK_DONE_SHOW_MS / 1000;
 var sponsoredState = { doneToday: 0, dailyLimit: 10, rewardCoins: 25, loaded: false, opened: false, view: 'loading', lastLoadAt: 0, waitUntil: 0 };
 var sponsoredTaskEl = null;
 var sponsoredReloadTimer = null;
@@ -8638,14 +8638,11 @@ function setSponsoredView(view){
   bar.hidden = view !== 'loading';
   msg.hidden = view === 'loading';
   msg.textContent = view === 'limit' ? 'Come Back Tomorrow' : 'Come Back Later';
-  btn.textContent = view === 'limit' ? 'Done' : view === 'wait' ? sponsoredWaitText() : 'Start';
+  btn.textContent = view === 'limit' || view === 'wait' ? 'Done' : 'Start';
   btn.classList.toggle('is-claimed', view === 'limit' || view === 'wait');
 }
-// the app was reopened while Done was counting down to the next task: Come Back Later counts down the rest
+// the app was reopened while Done was waiting for the next task: Come Back Later with Done waits out the rest
 // (kept on the device), then the next task is asked for
-function sponsoredWaitText(){
-  return 'Next ' + Math.max(1, Math.ceil((sponsoredState.waitUntil - Date.now()) / 1000));
-}
 function startSponsoredWait(until){
   sponsoredState.waitUntil = until;
   setSponsoredView('wait');
@@ -8657,13 +8654,10 @@ function tickSponsoredWait(){
     clearInterval(sponsoredWaitTimer);
     return;
   }
-  if (Date.now() < sponsoredState.waitUntil){
-    document.getElementById('sp-task-btn').textContent = sponsoredWaitText();
-    return;
-  }
+  if (Date.now() < sponsoredState.waitUntil) return;
   clearInterval(sponsoredWaitTimer);
   setSponsoredView('loading');
-  // before the user data or the first opening of Check in, renderSponsoredTask asks for the task when they come
+  // before the user data or the first opening of Daily Ads, renderSponsoredTask asks for the task when they come
   if (!sponsoredState.loaded || !sponsoredState.opened) return;
   if (sponsoredState.doneToday >= sponsoredState.dailyLimit){
     setSponsoredView('limit');
@@ -8686,7 +8680,7 @@ function renderSponsoredTask(){
     document.getElementById('sp-task-counter').textContent = sponsoredCounterText();
     return;
   }
-  // no task last time: it stays Come Back Later until Check in is opened again
+  // no task last time: it stays Come Back Later until Daily Ads is opened again
   if (sponsoredState.view === 'none'){
     setSponsoredView('none');
     return;
@@ -8700,7 +8694,7 @@ function renderSponsoredTask(){
     document.getElementById('sp-task-counter').textContent = sponsoredCounterText();
     return;
   }
-  // nothing is asked for until Check in has been opened, and never while the card is off screen
+  // nothing is asked for until Daily Ads has been opened, and never while the card is off screen
   if (!sponsoredState.opened){
     setSponsoredView('loading');
     return;
@@ -8713,7 +8707,7 @@ function renderSponsoredTask(){
   loadSponsoredTask();
 }
 // the card is on screen: the app is in front, the Tasks page is the active page (other pages stay laid out,
-// only hidden) and its Check in panel with the card is shown
+// only hidden) and its Daily Ads panel with the card is shown
 function isSponsoredCardOnScreen(){
   var card = document.getElementById('sp-task-card');
   if (!card || document.visibilityState !== 'visible' || card.getClientRects().length === 0) return false;
@@ -8873,7 +8867,6 @@ function unmountSponsoredTask(){
   clearTimeout(sponsoredLoadTimer);
   if (!sponsoredTaskEl) return;
   clearInterval(sponsoredTaskEl.__claimTimer);
-  clearInterval(sponsoredTaskEl.__doneTimer);
   if (sponsoredTaskEl.__spObserver) sponsoredTaskEl.__spObserver.disconnect();
   sponsoredTaskEl.remove();
   sponsoredTaskEl = null;
@@ -8889,9 +8882,9 @@ function hideSponsoredTask(){
   // kept on the device, so a reopen of the app does not ask again before the retry gap
   saveAdWait('sponsored_retry', sponsoredState.lastLoadAt + SPONSORED_TASK_RETRY_GAP_MS);
 }
-// the first opening of Check in asks for the first task; later ones ask again after a Come Back Later
-// (at most once every 45 seconds)
-function onCheckinOpened(){
+// the first opening of Daily Ads (a tap on its tab, or the Tasks page opening on it) asks for the first task;
+// later ones ask again after a Come Back Later (at most once every 45 seconds)
+function onDailyAdsOpened(){
   if (!sponsoredState.opened){
     sponsoredState.opened = true;
     renderSponsoredTask();
@@ -8936,19 +8929,8 @@ function onSponsoredTaskReward(){
     }, SPONSORED_TASK_LAST_DONE_SHOW_MS);
     return;
   }
-  if (el){
-    setSponsoredCounter(el);
-    // Done counts down the seconds until the next task is asked for
-    var left = SPONSORED_TASK_DONE_SHOW_S;
-    setSponsoredSlot(el, 'done', 'Next ' + left);
-    setTimeout(function(){ if (left === SPONSORED_TASK_DONE_SHOW_S) setSponsoredSlot(el, 'done', 'Next ' + left); }, 50);
-    clearInterval(el.__doneTimer);
-    el.__doneTimer = setInterval(function(){
-      left--;
-      if (left > 0) setSponsoredSlot(el, 'done', 'Next ' + left);
-      else clearInterval(el.__doneTimer);
-    }, 1000);
-  }
+  // Done stays shown until the next task is asked for
+  if (el) setSponsoredCounter(el);
   // a fresh element asks Adsgram for the next task (Come Back Later when there is none); the wait is kept on the
   // device, so a reopen of the app does not skip it
   saveAdWait('sponsored_next', Date.now() + SPONSORED_TASK_DONE_SHOW_MS);
@@ -8960,7 +8942,7 @@ function onSponsoredTaskReward(){
     } else if (isSponsoredCardOnScreen()){
       loadSponsoredTask();
     } else {
-      // the user left Check in (or the app) during the countdown: the next task waits until the card is seen again
+      // the user left Daily Ads (or the app) while Done showed: the next task waits until the card is seen again
       unmountSponsoredTask();
       sponsoredState.nextPending = true;
       setSponsoredView('loading');
