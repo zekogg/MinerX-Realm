@@ -681,10 +681,6 @@ function i18nPick(ev, code){
   --c-friend-check-ok: #6fbf73;
   --c-friend-check-no: #ff7a7a;
   --c-friend-check-mark: #ffffff;
-  --c-ad-type-badge-text:   #dbe6ff;
-  --c-ad-type-badge-bg:     rgba(79,125,255,.28);
-  --c-ad-type-badge-border: rgba(140,170,255,.7);
-  --c-ad-no-reward-text:    rgba(255,255,255,.82);
   --c-btn-convert-1:    #4338ca;
   --c-btn-convert-2:    #6366f1;
   --c-btn-convert-text: #f5f3ff;
@@ -1892,16 +1888,6 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   border-color:transparent; text-shadow:none; box-shadow:none; transform:none;
 }
 .ad-task__counter{ font-size:calc(8px * var(--s)); color:var(--ink-faint); flex-shrink:0; }
-/* Support Us: the ad type next to the title, and No Reward where the other cards show their coins (the row keeps
-   the coin icon's height, so its divider and button line up with the card beside it) */
-.ad-task__title--with-type{ display:flex; align-items:center; gap:calc(5px * var(--s)); flex-wrap:wrap; }
-.ad-task__type-badge{
-  font-size:calc(8px * var(--s)); font-weight:900; letter-spacing:.2px; line-height:1.25; white-space:nowrap;
-  color:var(--c-ad-type-badge-text); background:var(--c-ad-type-badge-bg); border:1px solid var(--c-ad-type-badge-border);
-  border-radius:999px; padding:calc(1px * var(--s)) calc(6px * var(--s));
-}
-.ad-task__meta--no-reward{ min-height:calc(18px * var(--s)); }
-.ad-task__reward--none{ color:var(--c-ad-no-reward-text); }
 /* "AD" on the edge of a button that shows an ad first (the ad gates), only while it can be tapped (so not while
    mining or once used today); out of the layout, so nothing around it moves. Redeem and Check carry it on the bottom edge */
 .ad-gate{ position:relative; }
@@ -4394,21 +4380,6 @@ body.reduce-motion .firefly{
           <div class="ad-task__footer">
             <button class="ad-task__watch" id="gigapub-task-watch-btn" onclick="onWatchGigapubClick()">Watch</button>
             <span class="ad-task__counter ad-task__counter--bar" id="gigapub-task-counter"><span class="ad-task__count">0 / 10</span><span class="ad-task__bar"><span class="ad-task__bar-fill"></span></span></span>
-          </div>
-        </div>
-        <div class="card ad-task">
-          <div class="ad-task__icon">
-            <img loading="lazy" draggable="false" src="/Support%20Us%20icon.svg" alt="Support Us" style="width:100%;height:100%;object-fit:cover;border-radius:calc(10px * var(--s));">
-          </div>
-          <div class="ad-task__title ad-task__title--with-type">Support Us <span class="ad-task__type-badge" data-no-i18n>Interstitial Ad</span></div>
-          <div class="ad-task__meta ad-task__meta--no-reward">
-            <span class="ad-task__reward ad-task__reward--none">No Reward</span>
-            <span class="ad-task__avail" id="support-ad-avail">Available</span>
-          </div>
-          <div class="ad-task__divider"></div>
-          <div class="ad-task__footer">
-            <button class="ad-task__watch" id="support-ad-watch-btn" onclick="onWatchSupportAdClick()">Watch</button>
-            <span class="ad-task__counter ad-task__counter--bar" id="support-ad-counter"><span class="ad-task__count">0 / 5</span><span class="ad-task__bar"><span class="ad-task__bar-fill"></span></span></span>
           </div>
         </div>
       </div>
@@ -8128,8 +8099,6 @@ function restoreAdWaits(){
   if (until) startAdsTaskCooldown(until);
   until = loadAdWait('gigapub', GIGAPUB_TASK_COOLDOWN_MS);
   if (until) startGigapubTaskCooldown(until);
-  until = loadAdWait('support', SUPPORT_AD_COOLDOWN_MS);
-  if (until) startSupportAdCooldown(until);
   until = loadAdWait('sponsored_next', SPONSORED_TASK_DONE_SHOW_MS);
   if (until){
     startSponsoredWait(until);
@@ -8168,7 +8137,6 @@ function applyAdsTaskState(data){
   adsTaskState.dailyLimit = data.daily_limit || 10;
   adsTaskState.rewardCoins = data.reward_coins || 25;
   renderAdsTaskButton();
-  renderSupportAdButton();
 }
 function renderAdsTaskButton(){
   var btn = domCache.adsTaskBtn;
@@ -8265,10 +8233,8 @@ document.addEventListener('DOMContentLoaded', function(){
   initAdsgramController();
   initBonusAdsgramController();
   initGateAdsgramController();
-  initSupportAdController();
   watchSponsoredCardOnScreen();
   restoreAdWaits();
-  renderSupportAdButton();
   renderAdsTaskButton();
   renderBonusAdButton();
 });
@@ -8473,111 +8439,6 @@ function onWatchGigapubClick(){
     renderGigapubButton();
     showBuyErrorToast('Ad was not completed', { title: 'Watch gigapub ads' });
     scheduleAdVerification(false);
-  });
-}
-
-// Support Us: an optional Adsgram Interstitial with no reward of any kind. It has no reward URL, so the server never
-// hears of it: nothing is credited and it counts toward nothing (lifetime ads, active friends, the withdraw ads,
-// leaderboards). Its daily count and the wait between ads are kept on the device only, with no requests; Adsgram
-// itself caps interstitials at 20 a user a day. Closing it early still counts as shown (interstitials can be skipped)
-var SUPPORT_AD_BLOCK_ID = 'int-53564';
-// false: Support Us is switched off (its button cannot be pressed and no ad is asked for); true turns it back on
-var SUPPORT_AD_ENABLED = false;
-var SUPPORT_AD_DAILY_LIMIT = 5;
-var SUPPORT_AD_COOLDOWN_MS = 35000;
-var SUPPORT_AD_COUNT_KEY = 'mx_support_ads';
-var supportAdController = null;
-var supportAdState = { busy: false, cooldownUntil: 0, memory: null };
-var supportAdCooldownTimer = null;
-function initSupportAdController(){
-  if (!SUPPORT_AD_ENABLED) return;
-  if (window.Adsgram && !supportAdController && isValidAdsgramBlockId(SUPPORT_AD_BLOCK_ID)){
-    try {
-      supportAdController = window.Adsgram.init({ blockId: SUPPORT_AD_BLOCK_ID, debug: ADSGRAM_DEBUG });
-    } catch (e){
-      console.error('Support Us Adsgram init failed:', e);
-    }
-  }
-}
-function supportAdDay(){ return new Date(serverNow()).toISOString().slice(0, 10); }
-// today's count (UTC day); held in memory too, for when storage is blocked
-function supportAdWatchedToday(){
-  var saved = supportAdState.memory;
-  try{ saved = JSON.parse(localStorage.getItem(SUPPORT_AD_COUNT_KEY) || 'null') || saved; }catch(e){   }
-  return saved && saved.day === supportAdDay() ? (saved.count || 0) : 0;
-}
-function saveSupportAdWatched(count){
-  supportAdState.memory = { day: supportAdDay(), count: count };
-  try{ localStorage.setItem(SUPPORT_AD_COUNT_KEY, JSON.stringify(supportAdState.memory)); }catch(e){   }
-}
-function renderSupportAdButton(){
-  var btn = document.getElementById('support-ad-watch-btn');
-  var avail = document.getElementById('support-ad-avail');
-  var watched = supportAdWatchedToday();
-  // min: a count kept from when the limit was higher shows as 5 / 5, not 8 / 5
-  renderAdCounter(document.getElementById('support-ad-counter'), Math.min(watched, SUPPORT_AD_DAILY_LIMIT), SUPPORT_AD_DAILY_LIMIT);
-  if (!supportAdController){
-    if (avail) avail.textContent = 'Coming Soon';
-    // switched off: the button keeps its Watch label (and its size), dimmed and not pressable
-    if (btn){ btn.textContent = SUPPORT_AD_ENABLED ? 'Soon' : 'Watch'; btn.classList.add('is-claimed'); btn.disabled = !SUPPORT_AD_ENABLED; }
-    return;
-  }
-  var dailyDone = watched >= SUPPORT_AD_DAILY_LIMIT;
-  if (avail) avail.textContent = dailyDone ? 'Come Back Tomorrow' : 'Available';
-  var cooldownRemaining = Math.ceil((supportAdState.cooldownUntil - Date.now()) / 1000);
-  var inCooldown = cooldownRemaining > 0;
-  if (btn){
-    if (supportAdState.busy){
-      setButtonBusy(btn, true);
-    } else {
-      setButtonBusy(btn, false);
-      btn.disabled = false;
-      btn.textContent = inCooldown ? String(cooldownRemaining) : 'Watch';
-      btn.classList.toggle('is-claimed', dailyDone || inCooldown);
-    }
-  }
-}
-// restoredUntil: a wait kept on the device from before the app was reopened
-function startSupportAdCooldown(restoredUntil){
-  supportAdState.cooldownUntil = restoredUntil || Date.now() + SUPPORT_AD_COOLDOWN_MS;
-  if (!restoredUntil) saveAdWait('support', supportAdState.cooldownUntil);
-  clearInterval(supportAdCooldownTimer);
-  renderSupportAdButton();
-  supportAdCooldownTimer = setInterval(function(){
-    if (Date.now() >= supportAdState.cooldownUntil){
-      clearInterval(supportAdCooldownTimer);
-    }
-    renderSupportAdButton();
-  }, 1000);
-}
-function onWatchSupportAdClick(){
-  if (!SUPPORT_AD_ENABLED) return;
-  initSupportAdController();
-  if (!supportAdController){
-    showBuyErrorToast('Coming Soon', { title: 'Support Us' });
-    return;
-  }
-  if (supportAdState.busy || Date.now() < supportAdState.cooldownUntil) return;
-  if (supportAdWatchedToday() >= SUPPORT_AD_DAILY_LIMIT){
-    showComeBackTomorrowToast();
-    return;
-  }
-  supportAdState.busy = true;
-  renderSupportAdButton();
-  showAdLoadingOverlay();
-  setAdLoadingOverlayVia('Adsgram');
-  supportAdController.show().then(function(){
-    hideAdLoadingOverlay();
-    supportAdState.busy = false;
-    saveSupportAdWatched(supportAdWatchedToday() + 1);
-    startSupportAdCooldown();
-    // a thank-you, with no reward and no celebration
-    showAppToast({ title: 'Thank You!', icon: '/Support%20Us%20icon.svg', amount: 'Thanks for supporting us' });
-  }).catch(function(){
-    hideAdLoadingOverlay();
-    supportAdState.busy = false;
-    renderSupportAdButton();
-    showBuyErrorToast('Ad not available right now', { title: 'Support Us' });
   });
 }
 
