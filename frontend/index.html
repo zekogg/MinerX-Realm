@@ -5023,7 +5023,7 @@ body.reduce-motion .firefly{
         <button class="modal-close" onclick="closeModal('modal-withdraw-req')">✕</button>
       </div>
       <div class="wd-req">
-        <div class="wd-req__label"><span id="wd-req-ads-label">Watch 15 Ads Today</span><span id="wd-req-ads-count" data-no-i18n>0/15</span></div>
+        <div class="wd-req__label"><span id="wd-req-ads-label">Watch 20 Ads Today</span><span id="wd-req-ads-count" data-no-i18n>0/20</span></div>
         <div class="wd-req__track"><div class="wd-req__fill" id="wd-req-ads-fill" style="width:0%"></div></div>
       </div>
       <div class="wd-req">
@@ -7588,7 +7588,7 @@ function applyProfileData(data){
 // The To Withdraw window: shown when Withdraw is pressed with enough Gram but the server says the requirements are
 // not met, with that answer's own counts (today's ads and active referrals)
 function openWithdrawReqModal(d){
-  var adsReq = d.ads_required || 15, adsNow = Math.min(d.ads_today || 0, adsReq);
+  var adsReq = d.ads_required || 20, adsNow = Math.min(d.ads_today || 0, adsReq);
   var refReq = d.referrals_required || 1, refNow = Math.min(d.active_referrals || 0, refReq);
   var adsLabel = document.getElementById('wd-req-ads-label');
   if (adsLabel) adsLabel.textContent = 'Watch ' + adsReq + ' Ads Today';
