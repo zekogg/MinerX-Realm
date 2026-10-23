@@ -42,7 +42,7 @@ const DEPOSIT_CHECK_RETRY_DELAY_MS = 15_000;
 const WITHDRAW_MIN_GRAM = 0.1;
 // to withdraw: this many ads watched today (every ad, the gates included; the day starts at 00:00 UTC) and this many
 // active referrals at any time (once reached, it stays reached)
-const WITHDRAW_DAILY_ADS = 15;
+const WITHDRAW_DAILY_ADS = 20;
 const WITHDRAW_ACTIVE_REFERRALS = 1;
 // Today's ad count rides on the same write as the lifetime count: it restarts by itself on the first ad of a new
 // UTC day (date('now') is the UTC date, like todayUTC()), so nothing has to reset it at midnight
