@@ -3239,6 +3239,7 @@ function withdrawChannelPostFromMessage(message) {
   }
   return null;
 }
+const WITHDRAW_POST_CLAIM_S = 30;
 // tried twice, so a passing database error does not lose the number
 async function saveWithdrawChannelPost(env, withdrawalId, postId) {
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -3297,7 +3298,7 @@ function withdrawRowArgs(row, txHash) {
     netGram: row.net_gram,
     address: row.address,
     txHash: txHash || null,
-    channelPostId: row.channel_message_id || null
+    channelPostId: row.channel_message_id > 0 ? row.channel_message_id : null
   };
 }
 const WITHDRAW_APPROVED_KEYBOARD = {
@@ -3403,8 +3404,9 @@ async function handleWithdrawTxReply(message, env) {
     const noPreview = { is_disabled: true };
     // the channel: a post that exists is updated (a request that went to the channel, an old pending post, or a TxID
     // corrected later); otherwise the success post is published now, as a new post. Its number is on the request, or
-    // in the link of the admin's copy when it could not be saved there
-    let postId = w.channel_message_id || withdrawChannelPostFromMessage(replied);
+    // in the link of the admin's copy when it could not be saved there (a negative number there is a claim, below)
+    const savedPostId = w.channel_message_id > 0 ? w.channel_message_id : null;
+    let postId = savedPostId || withdrawChannelPostFromMessage(replied);
     let channelProblem = null;
     const postPayload = {
       chat_id: ADMIN_CHANNEL_ID,
@@ -3414,7 +3416,7 @@ async function handleWithdrawTxReply(message, env) {
       reply_markup: WITHDRAW_APPROVED_KEYBOARD
     };
     if (postId) {
-      if (!w.channel_message_id) await saveWithdrawChannelPost(env, withdrawalId, postId);
+      if (!savedPostId) await saveWithdrawChannelPost(env, withdrawalId, postId);
       const edited = await withdrawTelegramCall(env, "editMessageText", { ...postPayload, message_id: postId });
       // "message is not modified" is the same TxID sent again, nothing to report
       if (edited.state === "failed" && !/not modified/i.test(edited.data.description || "")) {
@@ -3423,17 +3425,32 @@ async function handleWithdrawTxReply(message, env) {
         channelProblem = "⚠️ Approved, but Telegram did not confirm the channel post update\n↩️ Reply with the TxID again to retry";
       }
     } else {
-      const posted = await withdrawTelegramCall(env, "sendMessage", postPayload);
-      if (posted.state === "ok") {
-        postId = posted.result.message_id;
-        if (!(await saveWithdrawChannelPost(env, withdrawalId, postId))) {
-          console.error("withdraw success post number not saved:", withdrawalId, postId);
-        }
-      } else if (posted.state === "failed") {
-        channelProblem = `⚠️ Approved, but the channel post could not be published: ${posted.data.description || "error " + posted.data.error_code}\n↩️ Reply with the TxID again to publish it`;
+      // only one reply publishes: it first claims the request by writing minus the current second as its post number,
+      // so a second reply arriving at the same moment does not publish a second post. A claim older than
+      // WITHDRAW_POST_CLAIM_S (a reply that never finished) can be taken over
+      const claimMark = -Math.floor(Date.now() / 1000);
+      const claim = await env.DB.prepare(
+        `UPDATE withdrawals SET channel_message_id = ?
+         WHERE id = ? AND (channel_message_id IS NULL OR channel_message_id = 0 OR (channel_message_id < 0 AND channel_message_id > ?))`
+      ).bind(claimMark, withdrawalId, claimMark + WITHDRAW_POST_CLAIM_S).run();
+      if (!claim.meta || claim.meta.changes !== 1) {
+        channelProblem = "⏳ The channel post is being published by another reply right now\n🔎 Check the channel in a moment";
       } else {
-        // it may have been published: posting again on its own could show it twice
-        channelProblem = "⚠️ Approved, but Telegram did not confirm the channel post\n🔎 Check the channel: if it is not there, reply with the TxID again";
+        const posted = await withdrawTelegramCall(env, "sendMessage", postPayload);
+        if (posted.state === "ok") {
+          postId = posted.result.message_id;
+          if (!(await saveWithdrawChannelPost(env, withdrawalId, postId))) {
+            console.error("withdraw success post number not saved:", withdrawalId, postId);
+          }
+        } else {
+          // nothing known to be in the channel: the claim is released, so the next reply can publish it
+          await env.DB.prepare("UPDATE withdrawals SET channel_message_id = NULL WHERE id = ? AND channel_message_id = ?")
+            .bind(withdrawalId, claimMark).run().catch((e) => console.error("withdraw post claim release failed:", e?.message || e));
+          channelProblem = posted.state === "failed"
+            ? `⚠️ Approved, but the channel post could not be published: ${posted.data.description || "error " + posted.data.error_code}\n↩️ Reply with the TxID again to publish it`
+            // it may have been published: posting again on its own could show it twice
+            : "⚠️ Approved, but Telegram did not confirm the channel post\n🔎 Check the channel: if it is not there, reply with the TxID again";
+        }
       }
     }
     args.channelPostId = postId || null;
@@ -3514,7 +3531,7 @@ async function handleWithdrawCallback(cbq, env) {
       await answerCallbackQuery(env, cbq.id, "⚠️ Already processed");
       return;
     }
-    if (w.channel_message_id) {
+    if (w.channel_message_id > 0) {
       const editResult = await editMessage(env, ADMIN_CHANNEL_ID, w.channel_message_id, {
         text: buildWithdrawText("approved", withdrawRowArgs(w)),
         parse_mode: "HTML",
