@@ -1403,42 +1403,41 @@ async function handleWithdrawRequest(request, env) {
   const withdrawalId = insertResult.meta.last_row_id;
   const withdrawArgs = { telegramId, rawUsername, firstName, netGram, address };
   // the admin gets a private copy of the request, with no buttons: replying to it with the TxID approves it, replying
-  // with "reject" rejects it
-  let adminNotified = false;
-  try {
-    const adminMsg = await sendMessage(env, ADMIN_TELEGRAM_ID, {
-      text: buildAdminWithdrawText("pending", withdrawalId, withdrawArgs),
-      parse_mode: "HTML"
-    });
-    adminNotified = !!(adminMsg && adminMsg.ok);
-    if (!adminNotified) console.error("withdraw admin copy failed:", JSON.stringify(adminMsg));
-  } catch (e) {
-    console.error("withdraw admin copy threw:", e?.message || e);
+  // with "reject" rejects it. Nothing goes to the channel now: it only gets the success post, once approved.
+  // Telegram answering that the copy failed (a rate limit, an outage) means it was not sent, so it is sent once more;
+  // no answer in time may mean it was sent, so it is not sent again (no second copy of the same request)
+  const adminPayload = {
+    chat_id: ADMIN_TELEGRAM_ID,
+    text: buildAdminWithdrawText("pending", withdrawalId, withdrawArgs),
+    parse_mode: "HTML"
+  };
+  let adminCopy = await withdrawTelegramCall(env, "sendMessage", adminPayload);
+  if (adminCopy.state === "failed") {
+    const retryAfter = Number(adminCopy.data.parameters && adminCopy.data.parameters.retry_after) || 0;
+    await new Promise((resolve) => setTimeout(resolve, Math.min(Math.max(retryAfter, 0.5), 3) * 1000));
+    adminCopy = await withdrawTelegramCall(env, "sendMessage", adminPayload);
   }
-  try {
-    // the channel post has no buttons, so nobody in the channel can press them; only when the admin's copy could not
-    // be sent does it get the Approve / Reject buttons, so the request can still be handled
-    const channelMsg = await sendMessage(env, ADMIN_CHANNEL_ID, {
+  if (adminCopy.state !== "ok") {
+    console.error("withdraw admin copy not sent:", adminCopy.state, JSON.stringify(adminCopy.data || adminCopy.error || null));
+    // so the request is not missed it goes to the channel with the Approve / Reject buttons (only the admin can use them)
+    const fallbackPost = await withdrawTelegramCall(env, "sendMessage", {
+      chat_id: ADMIN_CHANNEL_ID,
       text: buildWithdrawText("pending", withdrawArgs),
       parse_mode: "HTML",
-      ...(adminNotified ? {} : {
-        reply_markup: {
-          inline_keyboard: [[
-            { text: "✅ Approve", callback_data: `wd_approve_${withdrawalId}` },
-            { text: "❌ Reject", callback_data: `wd_reject_${withdrawalId}` }
-          ]]
-        }
-      })
+      reply_markup: {
+        inline_keyboard: [[
+          { text: "✅ Approve", callback_data: `wd_approve_${withdrawalId}` },
+          { text: "❌ Reject", callback_data: `wd_reject_${withdrawalId}` }
+        ]]
+      }
     });
-    if (channelMsg && channelMsg.ok && channelMsg.result) {
-      await env.DB.prepare(
-        "UPDATE withdrawals SET channel_message_id = ? WHERE id = ?"
-      ).bind(channelMsg.result.message_id, withdrawalId).run();
+    if (fallbackPost.state === "ok") {
+      if (!(await saveWithdrawChannelPost(env, withdrawalId, fallbackPost.result.message_id))) {
+        console.error("withdraw fallback post number not saved:", withdrawalId, fallbackPost.result.message_id);
+      }
     } else {
-      console.error("withdraw channel notification failed:", JSON.stringify(channelMsg));
+      console.error("withdraw fallback post not sent:", fallbackPost.state, JSON.stringify(fallbackPost.data || fallbackPost.error || null));
     }
-  } catch (e) {
-    console.error("withdraw channel notification threw:", e?.message || e);
   }
   try {
     await sendMessage(env, telegramId, {
@@ -3199,7 +3198,63 @@ function withdrawNameLine(w) {
 function txLinkHtml(txHash) {
   return `<a href="https://tonviewer.com/transaction/${txHash}">${txHash.slice(0, 8)}…${txHash.slice(-8)}</a>`;
 }
-// The post in the withdrawals channel: the address while pending, the TxID link once approved with one
+// Withdraw posts: Telegram calls that end within WITHDRAW_TELEGRAM_TIMEOUT_MS, as "ok" (done), "failed" (Telegram
+// answered that it was not done, with its reason) or "unknown" (no answer in time or the connection dropped: it may
+// have been done)
+const WITHDRAW_TELEGRAM_TIMEOUT_MS = 8000;
+async function withdrawTelegramCall(env, method, payload) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), WITHDRAW_TELEGRAM_TIMEOUT_MS);
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/${method}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+    let data = null;
+    try { data = await res.json(); } catch (e) {   }
+    if (data && data.ok) return { state: "ok", result: data.result };
+    if (data) return { state: "failed", data };
+    return { state: "unknown", error: `HTTP ${res.status}` };
+  } catch (e) {
+    return { state: "unknown", error: e?.message || String(e) };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+// The admin's copy links its "Withdrawal #<id>" to the channel post (a t.me/c/ link, which opens for the channel's
+// members), so a TxID reply still finds the post if its number was not saved on the request
+const WITHDRAW_CHANNEL_LINK_ID = String(ADMIN_CHANNEL_ID).replace(/^-100/, "");
+function withdrawChannelPostUrl(postId) {
+  return `https://t.me/c/${WITHDRAW_CHANNEL_LINK_ID}/${postId}`;
+}
+function withdrawChannelPostFromMessage(message) {
+  const prefix = `https://t.me/c/${WITHDRAW_CHANNEL_LINK_ID}/`;
+  for (const entity of (message && message.entities) || []) {
+    if (entity.type === "text_link" && typeof entity.url === "string" && entity.url.startsWith(prefix)) {
+      const postId = Number(entity.url.slice(prefix.length));
+      if (Number.isInteger(postId) && postId > 0) return postId;
+    }
+  }
+  return null;
+}
+const WITHDRAW_POST_CLAIM_S = 30;
+// tried twice, so a passing database error does not lose the number
+async function saveWithdrawChannelPost(env, withdrawalId, postId) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      await env.DB.prepare("UPDATE withdrawals SET channel_message_id = ? WHERE id = ?").bind(postId, withdrawalId).run();
+      return true;
+    } catch (e) {
+      console.error("withdraw channel post number save failed:", e?.message || e);
+      if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+  }
+  return false;
+}
+// The post in the withdrawals channel: the success post with the TxID link once approved, or (only when the admin's
+// copy could not be sent) the pending request with its address
 function buildWithdrawText(status, w) {
   const title = status === "approved" ? "✅ Withdrawal Successful!" : "⏰ Pending Withdrawal";
   return (
@@ -3213,11 +3268,14 @@ function buildWithdrawText(status, w) {
 // The admin's private copy of a request; its first line carries "Withdrawal #<id>", which tells a TxID reply which
 // request it is for
 function buildAdminWithdrawText(status, withdrawalId, w) {
+  const name = w.channelPostId
+    ? `<a href="${withdrawChannelPostUrl(w.channelPostId)}">Withdrawal #${withdrawalId}</a>`
+    : `Withdrawal #${withdrawalId}`;
   const title = status === "approved"
-    ? `✅ Withdrawal #${withdrawalId} Approved`
+    ? `✅ ${name} Approved`
     : status === "rejected"
-    ? `❌ Withdrawal #${withdrawalId} Rejected`
-    : `🆕 Withdrawal #${withdrawalId}`;
+    ? `❌ ${name} Rejected`
+    : `🆕 ${name}`;
   const footer = status === "approved"
     ? "\n↩️ Reply with a new TxID to correct it"
     : status === "rejected" ? "" : "\n↩️ Reply with the TxID to approve\n↩️ Reply with reject to reject";
@@ -3239,7 +3297,8 @@ function withdrawRowArgs(row, txHash) {
     firstName: row.first_name,
     netGram: row.net_gram,
     address: row.address,
-    txHash: txHash || null
+    txHash: txHash || null,
+    channelPostId: row.channel_message_id > 0 ? row.channel_message_id : null
   };
 }
 const WITHDRAW_APPROVED_KEYBOARD = {
@@ -3282,7 +3341,8 @@ function parseTxHash(text) {
 // Withdraw approve / reject: the admin replies to the private copy of a request with its TxID, or with "reject".
 // A pending request is approved / rejected with one guarded write, so it is approved, refunded and announced once
 // however often the reply arrives; replying with a TxID again to an approved one only puts the new TxID in the posts,
-// with no write and no second message to the user. The channel post is not touched on a reject: the admin deletes it
+// with no second message to the user. The approval publishes the success post in the channel (a new post); a reject
+// posts nothing there, and a request that went to the channel is left for the admin to delete
 async function handleWithdrawTxReply(message, env) {
   const replied = message.reply_to_message;
   const botId = Number(String(env.BOT_TOKEN || "").split(":")[0]);
@@ -3310,7 +3370,8 @@ async function handleWithdrawTxReply(message, env) {
       await Promise.all([
         editMessage(env, ADMIN_TELEGRAM_ID, replied.message_id, {
           text: buildAdminWithdrawText("rejected", withdrawalId, { ...withdrawRowArgs(w), reason }),
-          parse_mode: "HTML"
+          parse_mode: "HTML",
+          link_preview_options: { is_disabled: true }
         }).catch(() => null),
         sendMessage(env, w.telegram_id, { text: withdrawRejectedDm(reason) }).catch(() => null)
       ]);
@@ -3341,6 +3402,58 @@ async function handleWithdrawTxReply(message, env) {
     }
     const args = withdrawRowArgs(w, txHash);
     const noPreview = { is_disabled: true };
+    // the channel: a post that exists is updated (a request that went to the channel, an old pending post, or a TxID
+    // corrected later); otherwise the success post is published now, as a new post. Its number is on the request, or
+    // in the link of the admin's copy when it could not be saved there (a negative number there is a claim, below)
+    const savedPostId = w.channel_message_id > 0 ? w.channel_message_id : null;
+    let postId = savedPostId || withdrawChannelPostFromMessage(replied);
+    let channelProblem = null;
+    const postPayload = {
+      chat_id: ADMIN_CHANNEL_ID,
+      text: buildWithdrawText("approved", args),
+      parse_mode: "HTML",
+      link_preview_options: noPreview,
+      reply_markup: WITHDRAW_APPROVED_KEYBOARD
+    };
+    if (postId) {
+      if (!savedPostId) await saveWithdrawChannelPost(env, withdrawalId, postId);
+      const edited = await withdrawTelegramCall(env, "editMessageText", { ...postPayload, message_id: postId });
+      // "message is not modified" is the same TxID sent again, nothing to report
+      if (edited.state === "failed" && !/not modified/i.test(edited.data.description || "")) {
+        channelProblem = `⚠️ Approved, but the channel post could not be updated: ${edited.data.description || "error " + edited.data.error_code}\n↩️ Reply with the TxID again to retry`;
+      } else if (edited.state === "unknown") {
+        channelProblem = "⚠️ Approved, but Telegram did not confirm the channel post update\n↩️ Reply with the TxID again to retry";
+      }
+    } else {
+      // only one reply publishes: it first claims the request by writing minus the current second as its post number,
+      // so a second reply arriving at the same moment does not publish a second post. A claim older than
+      // WITHDRAW_POST_CLAIM_S (a reply that never finished) can be taken over
+      const claimMark = -Math.floor(Date.now() / 1000);
+      const claim = await env.DB.prepare(
+        `UPDATE withdrawals SET channel_message_id = ?
+         WHERE id = ? AND (channel_message_id IS NULL OR channel_message_id = 0 OR (channel_message_id < 0 AND channel_message_id > ?))`
+      ).bind(claimMark, withdrawalId, claimMark + WITHDRAW_POST_CLAIM_S).run();
+      if (!claim.meta || claim.meta.changes !== 1) {
+        channelProblem = "⏳ The channel post is being published by another reply right now\n🔎 Check the channel in a moment";
+      } else {
+        const posted = await withdrawTelegramCall(env, "sendMessage", postPayload);
+        if (posted.state === "ok") {
+          postId = posted.result.message_id;
+          if (!(await saveWithdrawChannelPost(env, withdrawalId, postId))) {
+            console.error("withdraw success post number not saved:", withdrawalId, postId);
+          }
+        } else {
+          // nothing known to be in the channel: the claim is released, so the next reply can publish it
+          await env.DB.prepare("UPDATE withdrawals SET channel_message_id = NULL WHERE id = ? AND channel_message_id = ?")
+            .bind(withdrawalId, claimMark).run().catch((e) => console.error("withdraw post claim release failed:", e?.message || e));
+          channelProblem = posted.state === "failed"
+            ? `⚠️ Approved, but the channel post could not be published: ${posted.data.description || "error " + posted.data.error_code}\n↩️ Reply with the TxID again to publish it`
+            // it may have been published: posting again on its own could show it twice
+            : "⚠️ Approved, but Telegram did not confirm the channel post\n🔎 Check the channel: if it is not there, reply with the TxID again";
+        }
+      }
+    }
+    args.channelPostId = postId || null;
     const jobs = [
       editMessage(env, ADMIN_TELEGRAM_ID, replied.message_id, {
         text: buildAdminWithdrawText("approved", withdrawalId, args),
@@ -3348,14 +3461,6 @@ async function handleWithdrawTxReply(message, env) {
         link_preview_options: noPreview
       })
     ];
-    if (w.channel_message_id) {
-      jobs.push(editMessage(env, ADMIN_CHANNEL_ID, w.channel_message_id, {
-        text: buildWithdrawText("approved", args),
-        parse_mode: "HTML",
-        link_preview_options: noPreview,
-        reply_markup: WITHDRAW_APPROVED_KEYBOARD
-      }));
-    }
     if (justApproved) {
       jobs.push(sendMessage(env, w.telegram_id, {
         text:
@@ -3369,6 +3474,10 @@ async function handleWithdrawTxReply(message, env) {
     // "message is not modified" is the same TxID sent again, nothing to report
     const failed = results.filter((r) => !r || (!r.ok && !/not modified/i.test(r.description || "")));
     if (failed.length) console.error("withdraw approve posts failed:", JSON.stringify(failed));
+    if (channelProblem) {
+      console.error("withdraw channel post problem:", withdrawalId, channelProblem);
+      await answer(channelProblem);
+    }
   } catch (e) {
     console.error("withdraw approve failed:", e?.message || e);
     await answer("⚠️ Something went wrong, try again.");
@@ -3422,7 +3531,7 @@ async function handleWithdrawCallback(cbq, env) {
       await answerCallbackQuery(env, cbq.id, "⚠️ Already processed");
       return;
     }
-    if (w.channel_message_id) {
+    if (w.channel_message_id > 0) {
       const editResult = await editMessage(env, ADMIN_CHANNEL_ID, w.channel_message_id, {
         text: buildWithdrawText("approved", withdrawRowArgs(w)),
         parse_mode: "HTML",
