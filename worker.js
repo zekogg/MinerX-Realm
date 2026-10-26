@@ -26,6 +26,11 @@ const SPIN_SEGMENTS = [
   { type: "gram",  amount: 0.01,   weight: 10   }
 ];
 
+// Lucky Dice config: one roll a day after an ad (like the Chest). The dice shows 1-6 (all equally likely) and the prize
+// is, at even odds, the dots x DICE_COINS_PER_DOT Coins or the dots x DICE_GRAM_PER_DOT Gram
+const DICE_COINS_PER_DOT = 12;
+const DICE_GRAM_PER_DOT = 0.0001;
+
 // Exchange config
 const EXCHANGE_RATE_COIN_TO_GRAM = 0.00001;
 const EXCHANGE_MIN_COINS = 1000;
@@ -246,6 +251,9 @@ async function routeRequest(request, env, url) {
     if (url.pathname === "/api/giftpick/claim" && request.method === "POST") {
       return handleGiftPickClaim(request, env);
     }
+    if (url.pathname === "/api/dice/claim" && request.method === "POST") {
+      return handleDiceClaim(request, env);
+    }
     const petMatch = request.method === "POST" && url.pathname.match(/^\/api\/pet\/([a-z_]+)\/(buy|upgrade)$/);
     if (petMatch) {
       const [, petId, action] = petMatch;
@@ -393,7 +401,7 @@ async function handleGetUser(request, env) {
     SELECT u.telegram_id, u.username, u.coins, u.gram, u.total_speed, u.total_mined,
            u.mining_started_at, u.mining_cycles_today, u.mining_cycle_date,
            u.streak_day, u.streak_last_claim_date,
-           u.last_spin_date, u.last_chest_date, u.last_giftpick_date,
+           u.last_spin_date, u.last_chest_date, u.last_giftpick_date, u.last_dice_date,
            u.last_withdraw_request_at,
            u.adsgram_task_count, u.adsgram_task_date,
            u.invites_count, u.active_referrals_count, u.referral_pending_earnings,
@@ -462,6 +470,7 @@ async function handleGetUser(request, env) {
   view = withDailyPrizeView(view, "last_spin_date", "spin_claimed_today", "spin_next_reset_utc");
   view = withDailyPrizeView(view, "last_chest_date", "chest_claimed_today", "chest_next_reset_utc");
   view = withDailyPrizeView(view, "last_giftpick_date", "giftpick_claimed_today", "giftpick_next_reset_utc");
+  view = withDailyPrizeView(view, "last_dice_date", "dice_claimed_today", "dice_next_reset_utc");
   view.exchange_rate_coin_to_gram = EXCHANGE_RATE_COIN_TO_GRAM;
   view.exchange_min_coins = EXCHANGE_MIN_COINS;
   view.withdraw_min_gram = WITHDRAW_MIN_GRAM;
@@ -738,6 +747,53 @@ async function handleDailyPrizeClaim(request, env, { dateColumn, errorCode }) {
     gram: updated.gram,
     next_reset_utc: nextUtcMidnightIso()
   });
+}
+
+// /api/dice/claim: the server rolls the dice and picks the prize, so the app only shows the result. Like the daily
+// prizes, the date guard in the WHERE allows one roll a day even when two requests arrive together
+async function handleDiceClaim(request, env) {
+  const auth = await authenticateRequest(request, env);
+  if (!auth.ok) return auth.response;
+  const { telegramId } = auth;
+  const row = await env.DB.prepare(
+    "SELECT last_dice_date FROM users WHERE telegram_id = ?"
+  ).bind(telegramId).first();
+  if (!row) return jsonResponse({ error: "user_not_found" }, 404);
+  const today = todayUTC();
+  if (row.last_dice_date === today) {
+    return jsonResponse({ error: "already_claimed_today", next_reset_utc: nextUtcMidnightIso() }, 409);
+  }
+  const face = randomInt(6) + 1;
+  const isGram = randomInt(2) === 1;
+  // face / 10000 rather than face * 0.0001, which would add float noise (3 * 0.0001 = 0.00030000000000000003)
+  const amount = isGram ? face / Math.round(1 / DICE_GRAM_PER_DOT) : face * DICE_COINS_PER_DOT;
+  const column = isGram ? "gram" : "coins";
+  const updated = await env.DB.prepare(
+    `UPDATE users SET ${column} = ${column} + ?, last_dice_date = ?
+     WHERE telegram_id = ? AND (last_dice_date IS NULL OR last_dice_date <> ?)
+     RETURNING coins, gram`
+  ).bind(amount, today, telegramId, today).first();
+  if (!updated) {
+    return jsonResponse({ error: "already_claimed_today", next_reset_utc: nextUtcMidnightIso() }, 409);
+  }
+  return jsonResponse({
+    face,
+    prize_type: isGram ? "gram" : "coins",
+    prize_amount: amount,
+    coins: updated.coins,
+    gram: updated.gram,
+    next_reset_utc: nextUtcMidnightIso()
+  });
+}
+// A random whole number from 0 to n - 1, every value equally likely (values past the last whole multiple of n are
+// drawn again, so none comes up more often)
+function randomInt(n) {
+  const limit = Math.floor(0x100000000 / n) * n;
+  const buf = new Uint32Array(1);
+  do {
+    crypto.getRandomValues(buf);
+  } while (buf[0] >= limit);
+  return buf[0] % n;
 }
 
 // Weighted spin pick
