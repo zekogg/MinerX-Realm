@@ -1831,8 +1831,14 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .add-task-card__link{ width:calc(20px * var(--s)); height:calc(20px * var(--s)); flex-shrink:0; }
 .checkin-copy-btn{
   flex-shrink:0; padding:calc(8.5px * var(--s)) calc(12px * var(--s)); border-radius:calc(11px * var(--s));
-  background:rgba(74,158,255,.14); border:1px solid rgba(74,158,255,.4);
-  color:#7ec4ff; font-weight:800; font-size:calc(9.5px * var(--s));
+  font-weight:800; font-size:calc(9.5px * var(--s));
+  /* solid purple, raised like the Check button beside it: top shine, darker lip and drop shadow */
+  background:linear-gradient(180deg, #a888ff, #7c55e6);
+  border:1px solid rgba(255,255,255,.2);
+  color:#ffffff; text-shadow:0 1px 0 rgba(0,0,0,.25);
+  box-shadow:inset 0 calc(1.5px * var(--s)) 0 rgba(255,255,255,.5), inset 0 calc(-2px * var(--s)) 0 rgba(0,0,0,.18),
+    0 calc(3px * var(--s)) 0 #4b2aa3, 0 calc(5px * var(--s)) calc(8px * var(--s)) rgba(0,0,0,.45);
+  transform:translateY(calc(-1.5px * var(--s)));
 }
 .free-pet-box{
   position:relative;
@@ -1872,7 +1878,21 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   background:var(--stone-2); display:flex; align-items:center; justify-content:center;
 }
 .ad-task__icon svg{ width:calc(13px * var(--s)); height:calc(13px * var(--s)); }
-.ad-task__emoji{ font-size:calc(15px * var(--s)); line-height:1; }
+/* Check in task icons: a colour tile per task filled by a white glyph, with a glossy top */
+.checkin-icon{
+  position:relative; overflow:hidden;
+  box-shadow:inset 0 calc(1.5px * var(--s)) 0 rgba(255,255,255,.45), 0 calc(3px * var(--s)) calc(8px * var(--s)) rgba(0,0,0,.4);
+}
+.checkin-icon::after{
+  content:""; position:absolute; left:0; right:0; top:0; height:50%; pointer-events:none;
+  background:linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,0));
+}
+.checkin-icon svg{ position:relative; width:calc(18px * var(--s)); height:calc(18px * var(--s)); }
+.checkin-icon--news{ background:linear-gradient(145deg, #4fb8ff, #2a7fe0); }
+.checkin-icon--share{ background:linear-gradient(145deg, #a888ff, #7044e0); }
+.checkin-icon--partner{ background:linear-gradient(145deg, #ffb357, #f07a2a); }
+.checkin-icon--name{ background:linear-gradient(145deg, #ff7fb0, #e0457e); }
+.checkin-icon--link{ background:linear-gradient(145deg, #5ee0a8, #1fa874); }
 .partner-task__btn:disabled:not(.is-claimed){ opacity:.5; }
 .ad-task__title{ font-weight:800; font-size:calc(10.8px * var(--s)); line-height:1.3; }
 .ad-task__meta{ display:flex; align-items:center; gap:calc(4px * var(--s)); flex-wrap:wrap; }
@@ -4410,8 +4430,8 @@ body.reduce-motion .firefly{
         <div class="task-warning"><span>⚠️ Reset Daily at 00:00 UTC</span></div>
         <div class="ad-tasks-grid">
           <div class="card partner-task">
-            <div class="ad-task__icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="var(--c-ad-watch-1)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 8.6c0-2.5-2-4.4-4.4-4.4-1.6 0-3 .8-3.8 2.1-.8-1.3-2.2-2.1-3.8-2.1-2.4 0-4.4 2-4.4 4.4 0 4.5 8.2 9.9 8.2 9.9s8.2-5.4 8.2-9.9z"/></svg>
+            <div class="ad-task__icon checkin-icon checkin-icon--news">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22 11 13 2 9z"/></svg>
             </div>
             <div class="partner-task__body">
               <div class="ad-task__title">Join Our News Channel</div>
@@ -4427,8 +4447,8 @@ body.reduce-motion .firefly{
             </div>
           </div>
           <div class="card partner-task">
-            <div class="ad-task__icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="var(--c-ad-watch-1)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5 l6.8 4M15.4 6.5 l-6.8 4"/></svg>
+            <div class="ad-task__icon checkin-icon checkin-icon--share">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5 15.4 17.5M15.4 6.5 8.6 10.5"/></svg>
             </div>
             <div class="partner-task__body">
               <div class="ad-task__title">Share with Friends</div>
@@ -4441,7 +4461,9 @@ body.reduce-motion .firefly{
             <button class="ad-task__watch partner-task__btn" id="checkin-btn-2" onclick="onCheckinShareClick(2)">Go</button>
           </div>
           <div class="card partner-task">
-            <div class="ad-task__icon"><span class="ad-task__emoji">🤝</span></div>
+            <div class="ad-task__icon checkin-icon checkin-icon--partner">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m11 17 2 2a1 1 0 1 0 3-3"/><path d="m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4"/><path d="m21 3 1 11h-2"/><path d="M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3"/><path d="M3 4h8"/></svg>
+            </div>
             <div class="partner-task__body">
               <div class="ad-task__title">Check Our Partner Channel</div>
               <div class="ad-task__meta">
@@ -4456,8 +4478,8 @@ body.reduce-motion .firefly{
             </div>
           </div>
           <div class="card partner-task">
-            <div class="ad-task__icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="var(--c-ad-watch-1)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4 L20 10 L10 20 L4 20 L4 14 Z"/></svg>
+            <div class="ad-task__icon checkin-icon checkin-icon--name">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/></svg>
             </div>
             <div class="partner-task__body">
               <div class="ad-task__title">Put This @MinerXRealmBot With Your Name</div>
@@ -4473,8 +4495,8 @@ body.reduce-motion .firefly{
             </div>
           </div>
           <div class="card partner-task">
-            <div class="ad-task__icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="var(--c-ad-watch-1)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>
+            <div class="ad-task__icon checkin-icon checkin-icon--link">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>
             </div>
             <div class="partner-task__body">
               <div class="ad-task__title">Put Your Link In Bio</div>
