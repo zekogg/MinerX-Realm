@@ -1821,22 +1821,25 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   position:absolute; left:50%; bottom:calc(8px * var(--s)); width:calc(84px * var(--s)); height:calc(12px * var(--s));
   transform:translateX(-50%); background:radial-gradient(closest-side, rgba(0,0,0,.55), transparent); filter:blur(2px);
 }
-/* the roll: it hops and bounces while it tumbles, and lands in the tilted pose (whole turns more) */
-.dice-hop.is-rolling{ animation:dice-hop 1.7s linear both; }
-.dice-hop.is-rolling .dice-cube{ animation:dice-tumble 1.7s cubic-bezier(.2,.55,.25,1) both; }
-.dice-hop.is-rolling + .dice-shadow{ animation:dice-shadow 1.7s linear both; }
+/* the roll (4s, like the Spin wheel): it hops and bounces while it tumbles, and lands in the tilted pose (whole turns more) */
+.dice-hop.is-rolling{ animation:dice-hop 4s linear both; }
+.dice-hop.is-rolling .dice-cube{ animation:dice-tumble 4s cubic-bezier(.2,.55,.25,1) both; }
+.dice-hop.is-rolling + .dice-shadow{ animation:dice-shadow 4s linear both; }
 @keyframes dice-hop{
-  0%{ transform:translateY(0); } 22%{ transform:translateY(calc(-30px * var(--s))); } 50%{ transform:translateY(0); }
-  64%{ transform:translateY(calc(-10px * var(--s))); } 78%{ transform:translateY(0); } 88%{ transform:translateY(calc(-4px * var(--s))); } 100%{ transform:translateY(0); }
+  0%{ transform:translateY(0); } 12%{ transform:translateY(calc(-30px * var(--s))); } 25%{ transform:translateY(0); }
+  35%{ transform:translateY(calc(-18px * var(--s))); } 46%{ transform:translateY(0); } 55%{ transform:translateY(calc(-10px * var(--s))); }
+  64%{ transform:translateY(0); } 72%{ transform:translateY(calc(-4px * var(--s))); } 80%, 100%{ transform:translateY(0); }
 }
 @keyframes dice-tumble{
   0%{ transform:rotateX(-24deg) rotateY(-32deg); }
-  100%{ transform:rotateX(-758deg) rotateY(-1110deg); }
+  100%{ transform:rotateX(-1478deg) rotateY(-2190deg); }
 }
 @keyframes dice-shadow{
-  0%, 50%, 78%, 100%{ transform:translateX(-50%) scale(1); opacity:1; }
-  22%{ transform:translateX(-50%) scale(.6); opacity:.5; }
-  64%{ transform:translateX(-50%) scale(.85); opacity:.8; }
+  0%, 25%, 46%, 64%, 80%, 100%{ transform:translateX(-50%) scale(1); opacity:1; }
+  12%{ transform:translateX(-50%) scale(.6); opacity:.5; }
+  35%{ transform:translateX(-50%) scale(.75); opacity:.65; }
+  55%{ transform:translateX(-50%) scale(.85); opacity:.8; }
+  72%{ transform:translateX(-50%) scale(.95); opacity:.9; }
 }
 /* the line under the dice keeps its height: the caption before a roll, the result after it */
 .dice-line{ height:calc(30px * var(--s)); margin-top:calc(6px * var(--s)); display:flex; align-items:center; justify-content:center; }
@@ -6769,7 +6772,7 @@ function runChestClaimRequest(initData){
 
 // Lucky Dice: one roll a day after an ad (like the Chest); the server rolls and picks the prize, the app shows it
 var DICE_PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
-var DICE_ROLL_MS = 1700;
+var DICE_ROLL_MS = 4000;
 var diceState = { claimedToday: false, nextResetUtc: null };
 var diceBusy = false;
 function setDiceFaces(faces){
@@ -6818,12 +6821,12 @@ function onDiceRollClick(){
     if (diceBtn) diceBtn.disabled = false;
   });
 }
-// the dice hops and tumbles, then lands tilted with the rolled number on top (at once with Animation off)
+// the dice hops and tumbles, then lands tilted with the rolled number on top (always, like the other gates)
 function playDiceRoll(face, done){
   var hop = document.getElementById('dice-hop');
   var cube = document.getElementById('dice-cube');
   var faces = diceFacesWithTop(face);
-  if (!hop || !cube || !areAnimationsEnabled()){
+  if (!hop || !cube){
     setDiceFaces(faces);
     if (cube) cube.classList.add('is-rolled');
     done();
