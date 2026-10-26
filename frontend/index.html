@@ -1774,8 +1774,13 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 /* Lucky Dice */
 .dice-card{
   position:relative; margin-top:calc(12px * var(--s)); text-align:center;
-  background:radial-gradient(62% calc(80px * var(--s)) at 50% 0%, rgba(255,190,90,.16), transparent 100%), #18122a;
+  /* a violet light behind the dice (its centre is 98px from the padding edge) with gold rays, and gold and violet
+     sparkles either side of it, on a solid dark fill; the frame below is drawn over the 1px border */
   border:1px solid transparent;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cdefs%3E%3CradialGradient id='g'%3E%3Cstop offset='0' stop-color='%23c9a2ff' stop-opacity='0.5'/%3E%3Cstop offset='0.3' stop-color='%238b5cf6' stop-opacity='0.36'/%3E%3Cstop offset='0.62' stop-color='%235b2fb8' stop-opacity='0.14'/%3E%3Cstop offset='1' stop-color='%233a1c80' stop-opacity='0'/%3E%3C/radialGradient%3E%3CradialGradient id='f'%3E%3Cstop offset='0.12' stop-color='%23fff' stop-opacity='1'/%3E%3Cstop offset='0.5' stop-color='%23fff' stop-opacity='0.45'/%3E%3Cstop offset='0.9' stop-color='%23fff' stop-opacity='0'/%3E%3C/radialGradient%3E%3Cmask id='m'%3E%3Crect width='200' height='200' fill='url%28%23f%29'/%3E%3C/mask%3E%3C/defs%3E%3Ccircle cx='100' cy='100' r='100' fill='url%28%23g%29'/%3E%3Cpath d='M100 100L229.9 94.2L229.9 105.8ZM100 100L227.0 128.0L223.9 139.3ZM100 100L215.4 159.9L209.5 170.0ZM100 100L196.0 187.7L187.7 196.0ZM100 100L170.0 209.5L159.9 215.4ZM100 100L139.3 223.9L128.0 227.0ZM100 100L105.8 229.9L94.2 229.9ZM100 100L72.0 227.0L60.7 223.9ZM100 100L40.1 215.4L30.0 209.5ZM100 100L12.3 196.0L4.0 187.7ZM100 100L-9.5 170.0L-15.4 159.9ZM100 100L-23.9 139.3L-27.0 128.0ZM100 100L-29.9 105.8L-29.9 94.2ZM100 100L-27.0 72.0L-23.9 60.7ZM100 100L-15.4 40.1L-9.5 30.0ZM100 100L4.0 12.3L12.3 4.0ZM100 100L30.0 -9.5L40.1 -15.4ZM100 100L60.7 -23.9L72.0 -27.0ZM100 100L94.2 -29.9L105.8 -29.9ZM100 100L128.0 -27.0L139.3 -23.9ZM100 100L159.9 -15.4L170.0 -9.5ZM100 100L187.7 4.0L196.0 12.3ZM100 100L209.5 30.0L215.4 40.1ZM100 100L223.9 60.7L227.0 72.0Z' fill='%23ffd27a' opacity='0.2' mask='url%28%23m%29'/%3E%3Cpath d='M58 69.8Q59.18 72.82 62.2 74Q59.18 75.18 58 78.2Q56.82 75.18 53.8 74Q56.82 72.82 58 69.8Z' fill='%23ffe9a8' opacity='0.9'/%3E%3Cpath d='M142 69.8Q143.18 72.82 146.2 74Q143.18 75.18 142 78.2Q140.82 75.18 137.8 74Q140.82 72.82 142 69.8Z' fill='%23ffe9a8' opacity='0.9'/%3E%3Cpath d='M34 89Q34.84 91.16 37 92Q34.84 92.84 34 95Q33.16 92.84 31 92Q33.16 91.16 34 89Z' fill='%23e6d4ff' opacity='0.9'/%3E%3Cpath d='M166 89Q166.84 91.16 169 92Q166.84 92.84 166 95Q165.16 92.84 163 92Q165.16 91.16 166 89Z' fill='%23e6d4ff' opacity='0.9'/%3E%3Cpath d='M40 112.4Q41.01 114.99 43.6 116Q41.01 117.01 40 119.6Q38.99 117.01 36.4 116Q38.99 114.99 40 112.4Z' fill='%23ffd27a' opacity='0.9'/%3E%3Cpath d='M160 112.4Q161.01 114.99 163.6 116Q161.01 117.01 160 119.6Q158.99 117.01 156.4 116Q158.99 114.99 160 112.4Z' fill='%23ffd27a' opacity='0.9'/%3E%3Cpath d='M62 125.4Q62.73 127.27 64.6 128Q62.73 128.73 62 130.6Q61.27 128.73 59.4 128Q61.27 127.27 62 125.4Z' fill='%23c9a2ff' opacity='0.9'/%3E%3Cpath d='M138 125.4Q138.73 127.27 140.6 128Q138.73 128.73 138 130.6Q137.27 128.73 135.4 128Q137.27 127.27 138 125.4Z' fill='%23c9a2ff' opacity='0.9'/%3E%3C/svg%3E") 50% calc(-62px * var(--s)) / calc(320px * var(--s)) calc(320px * var(--s)) no-repeat,
+    radial-gradient(62% calc(80px * var(--s)) at 50% 0%, rgba(255,190,90,.16), rgba(255,170,80,.05) 55%, transparent 100%),
+    #18122a;
 }
 /* the frame: gold on the top edge, dimming down the sides (as the Chest and Spin cards) */
 .dice-card::after{
@@ -1790,7 +1795,6 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   position:relative; height:calc(118px * var(--s)); margin-top:calc(4px * var(--s));
   display:flex; align-items:center; justify-content:center; perspective:600px;
 }
-.dice-scene::before{ content:""; position:absolute; inset:-30%; background:radial-gradient(closest-side, rgba(255,205,110,.45), transparent); pointer-events:none; }
 .dice-hop{ position:relative; transform-style:preserve-3d; }
 /* the dice: six faces around a core that fills the gaps at the rounded corners. Before a roll it shows its front;
    after one it is tilted so the rolled number faces up, like a real dice */
