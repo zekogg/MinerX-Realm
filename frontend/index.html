@@ -2005,6 +2005,11 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 }
 .invite-box__tiny{ font-size:calc(10px * var(--s)); font-weight:700; color:var(--ink-faint); align-self:flex-start; margin-inline-end:calc(2px * var(--s)); }
 .invite-box__plus{ font-size:calc(17px * var(--s)); }
+.invite-box__gram{
+  font-weight:800; font-size:calc(11px * var(--s)); color:#7ab8ff; margin-top:calc(2px * var(--s));
+  display:flex; align-items:center; justify-content:center; gap:calc(4px * var(--s));
+}
+.invite-box__gram img{ width:calc(13px * var(--s)); height:calc(13px * var(--s)); }
 .invite-box__sub{ font-weight:800; font-size:calc(10px * var(--s)); letter-spacing:.5px; text-transform:uppercase; color:var(--ink-faint); margin-top:calc(4px * var(--s)); margin-bottom:calc(16px * var(--s)); }
 .invite-link{
   display:flex; align-items:center; gap:calc(6.8px * var(--s));
@@ -4502,6 +4507,7 @@ body.reduce-motion .firefly{
         <img loading="lazy" draggable="false" class="invite-box__gift" src="/Friends%20icon.svg" alt="Friends">
         <div class="invite-box__title">Invite A Friend · Earn</div>
         <div class="invite-box__amount"><span class="invite-box__tiny">Up to</span> 1000<span class="invite-box__plus">+ 5%</span></div>
+        <div class="invite-box__gram" data-no-i18n><img loading="lazy" draggable="false" src="/Gram_symbol.png" alt="Gram">≈ 0.01 Gram</div>
         <div class="invite-box__sub">Coins + Commission · Per Referral</div>
         <div class="invite-link">
           <span class="invite-link__text" id="invite-link-text">t.me/MinerXRealmBot/app?startapp=ref_0</span>
