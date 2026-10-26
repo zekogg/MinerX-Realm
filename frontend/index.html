@@ -1771,6 +1771,87 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   display:flex; align-items:center; justify-content:center; white-space:nowrap;
 }
 
+/* Lucky Dice */
+.dice-card{
+  position:relative; margin-top:calc(12px * var(--s)); text-align:center;
+  background:radial-gradient(62% calc(80px * var(--s)) at 50% 0%, rgba(255,190,90,.16), transparent 100%), #18122a;
+  border:1px solid transparent;
+}
+/* the frame: gold on the top edge, dimming down the sides (as the Chest and Spin cards) */
+.dice-card::after{
+  content:""; position:absolute; inset:-1px; border-radius:inherit; padding:calc(1.25px * var(--s)); pointer-events:none;
+  background:linear-gradient(180deg, #f2c46d, #b9824a 22%, #5a3e3a 60%, #3a2c3e);
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+.dice-card__title{ font-family:var(--font-display); font-weight:800; font-size:calc(15px * var(--s)); color:#fff; }
+.dice-scene{
+  position:relative; height:calc(118px * var(--s)); margin-top:calc(4px * var(--s));
+  display:flex; align-items:center; justify-content:center; perspective:600px;
+}
+.dice-scene::before{ content:""; position:absolute; inset:-30%; background:radial-gradient(closest-side, rgba(255,205,110,.45), transparent); pointer-events:none; }
+.dice-hop{ position:relative; transform-style:preserve-3d; }
+/* the dice: six faces around a core that fills the gaps at the rounded corners. Before a roll it shows its front;
+   after one it is tilted so the rolled number faces up, like a real dice */
+.dice-cube{
+  --d:calc(74px * var(--s));
+  position:relative; width:var(--d); height:var(--d); transform-style:preserve-3d;
+  transform:rotateX(-24deg) rotateY(-32deg);
+}
+.dice-cube.is-rolled{ transform:rotateX(-38deg) rotateY(-30deg); }
+.dice-core{ position:absolute; inset:3%; background:#b9862a; }
+.dice-core--x{ transform:rotateX(90deg); }
+.dice-core--y{ transform:rotateY(90deg); }
+.dice-face{
+  position:absolute; inset:0; border-radius:20%; box-sizing:border-box; padding:14%;
+  display:grid; grid-template:repeat(3, 1fr) / repeat(3, 1fr); backface-visibility:hidden;
+  background:radial-gradient(circle at 30% 25%, #fff3c4, #f2c95a 50%, #b07a1c);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.5), inset 0 -6px 12px rgba(90,50,0,.35);
+}
+.dice-face--front{ transform:translateZ(calc(var(--d) / 2)); }
+.dice-face--back{ transform:rotateY(180deg) translateZ(calc(var(--d) / 2)); }
+.dice-face--right{ transform:rotateY(90deg) translateZ(calc(var(--d) / 2)); }
+.dice-face--left{ transform:rotateY(-90deg) translateZ(calc(var(--d) / 2)); }
+.dice-face--top{ transform:rotateX(90deg) translateZ(calc(var(--d) / 2)); }
+.dice-face--bottom{ transform:rotateX(-90deg) translateZ(calc(var(--d) / 2)); }
+.dice-face i{ width:72%; height:72%; margin:auto; border-radius:50%; background:radial-gradient(circle at 35% 30%, #5a3a12, #24160a); box-shadow:inset 0 2px 2px rgba(0,0,0,.5); }
+.dice-face i.is-off{ visibility:hidden; }
+.dice-shadow{
+  position:absolute; left:50%; bottom:calc(8px * var(--s)); width:calc(84px * var(--s)); height:calc(12px * var(--s));
+  transform:translateX(-50%); background:radial-gradient(closest-side, rgba(0,0,0,.55), transparent); filter:blur(2px);
+}
+/* the roll (4s, like the Spin wheel): it hops and bounces while it tumbles, and lands in the tilted pose (whole turns more) */
+.dice-hop.is-rolling{ animation:dice-hop 4s linear both; }
+.dice-hop.is-rolling .dice-cube{ animation:dice-tumble 4s cubic-bezier(.2,.55,.25,1) both; }
+.dice-hop.is-rolling + .dice-shadow{ animation:dice-shadow 4s linear both; }
+@keyframes dice-hop{
+  0%{ transform:translateY(0); } 12%{ transform:translateY(calc(-30px * var(--s))); } 25%{ transform:translateY(0); }
+  35%{ transform:translateY(calc(-18px * var(--s))); } 46%{ transform:translateY(0); } 55%{ transform:translateY(calc(-10px * var(--s))); }
+  64%{ transform:translateY(0); } 72%{ transform:translateY(calc(-4px * var(--s))); } 80%, 100%{ transform:translateY(0); }
+}
+@keyframes dice-tumble{
+  0%{ transform:rotateX(-24deg) rotateY(-32deg); }
+  100%{ transform:rotateX(-1478deg) rotateY(-2190deg); }
+}
+@keyframes dice-shadow{
+  0%, 25%, 46%, 64%, 80%, 100%{ transform:translateX(-50%) scale(1); opacity:1; }
+  12%{ transform:translateX(-50%) scale(.6); opacity:.5; }
+  35%{ transform:translateX(-50%) scale(.75); opacity:.65; }
+  55%{ transform:translateX(-50%) scale(.85); opacity:.8; }
+  72%{ transform:translateX(-50%) scale(.95); opacity:.9; }
+}
+/* the line under the dice keeps its height: the caption before a roll, the result after it */
+.dice-line{ height:calc(30px * var(--s)); margin-top:calc(6px * var(--s)); display:flex; align-items:center; justify-content:center; }
+.dice-caption{ font-size:calc(10.5px * var(--s)); color:var(--ink-faint); }
+.dice-result{
+  display:inline-flex; align-items:center; gap:6px; font-weight:800; font-size:calc(12px * var(--s));
+  color:#f0c14b; text-shadow:0 0 calc(8px * var(--s)) rgba(240,193,75,.45);
+}
+.dice-result.is-gram{ color:#9fcaff; text-shadow:0 0 calc(8px * var(--s)) rgba(74,158,255,.45); }
+.dice-result img{ width:calc(14px * var(--s)); height:calc(14px * var(--s)); }
+.dice-card .spin-btn{ margin-top:calc(8px * var(--s)); }
+
 /* Tasks Page */
 .task-tabs{ display:flex; gap:calc(6px * var(--s)); overflow-x:auto; overflow-y:visible; margin:0 calc(-3px * var(--s)) calc(14px * var(--s)); padding:calc(3px * var(--s)) calc(3px * var(--s)) calc(5px * var(--s)); }
 .task-tabs::-webkit-scrollbar{ display:none; }
@@ -2953,6 +3034,8 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .pet-exclusive-tip.is-visible{ opacity:1; visibility:visible; }
 #chest-help-tooltip{ left:auto; right:0; transform:translateY(calc(-6px * var(--s))); }
 #chest-help-tooltip::after{ left:auto; right:calc(10px * var(--s)); transform:none; }
+#dice-help-tooltip{ left:auto; right:0; transform:translateY(calc(-6px * var(--s))); }
+#dice-help-tooltip::after{ left:auto; right:calc(10px * var(--s)); transform:none; }
 .pet-card{ perspective:calc(600px * var(--s)); }
 .pet-card__art-wrap{ transition:transform .3s ease; will-change:transform; }
 
@@ -4258,6 +4341,40 @@ body.reduce-motion .firefly{
           </button>
         </div>
         <button class="gift-pick-open-btn ad-gate" id="btn-gift-open" onclick="onGiftOpenClick()">Open&nbsp;&nbsp;(1)</button>
+      </div>
+
+      <!-- Lucky Dice -->
+      <div class="card dice-card">
+        <span class="chest-card__help" style="cursor:pointer;" onclick="togglePriceTooltip('dice-help-tooltip')">?
+          <span class="price-tooltip price-tooltip--wide" id="dice-help-tooltip">
+            You get 1 free try every day, resetting at 00:00 UTC.
+            <span class="prize-tooltip-icons">
+              <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" style="width:calc(13px * var(--s));height:calc(13px * var(--s));">Coins
+              &amp;
+              <img loading="lazy" draggable="false" src="/Gram_symbol.png" alt="Gram" style="width:calc(11px * var(--s));height:calc(11px * var(--s));">Gram
+            </span>
+          </span>
+        </span>
+        <div class="dice-card__title">Lucky Dice</div>
+        <div class="dice-scene">
+          <div class="dice-hop" id="dice-hop">
+            <div class="dice-cube" id="dice-cube">
+              <div class="dice-core"></div><div class="dice-core dice-core--x"></div><div class="dice-core dice-core--y"></div>
+              <div class="dice-face dice-face--front" data-face="front"><i></i><i class="is-off"></i><i></i><i class="is-off"></i><i class="is-off"></i><i class="is-off"></i><i></i><i class="is-off"></i><i></i></div>
+              <div class="dice-face dice-face--back" data-face="back"><i></i><i class="is-off"></i><i class="is-off"></i><i class="is-off"></i><i></i><i class="is-off"></i><i class="is-off"></i><i class="is-off"></i><i></i></div>
+              <div class="dice-face dice-face--right" data-face="right"><i></i><i class="is-off"></i><i></i><i class="is-off"></i><i></i><i class="is-off"></i><i></i><i class="is-off"></i><i></i></div>
+              <div class="dice-face dice-face--left" data-face="left"><i></i><i class="is-off"></i><i class="is-off"></i><i class="is-off"></i><i class="is-off"></i><i class="is-off"></i><i class="is-off"></i><i class="is-off"></i><i></i></div>
+              <div class="dice-face dice-face--top" data-face="top"><i class="is-off"></i><i class="is-off"></i><i class="is-off"></i><i class="is-off"></i><i></i><i class="is-off"></i><i class="is-off"></i><i class="is-off"></i><i class="is-off"></i></div>
+              <div class="dice-face dice-face--bottom" data-face="bottom"><i></i><i class="is-off"></i><i></i><i></i><i class="is-off"></i><i></i><i></i><i class="is-off"></i><i></i></div>
+            </div>
+          </div>
+          <div class="dice-shadow"></div>
+        </div>
+        <div class="dice-line">
+          <span class="dice-caption" id="dice-caption">Roll the dice to win Coins or Gram.</span>
+          <span class="dice-result" id="dice-result" style="display:none;"><span id="dice-result-text"></span><img draggable="false" id="dice-result-icon" src="/Pet%20Coin.webp" alt=""></span>
+        </div>
+        <button class="spin-btn ad-gate" id="btn-dice-roll" onclick="onDiceRollClick()">Roll (1)</button>
       </div>
 
       <!-- Quick Actions -->
@@ -5916,6 +6033,10 @@ function fetchUserData(){
       claimed_today: data.user.giftpick_claimed_today,
       next_reset_utc: data.user.giftpick_next_reset_utc
     });
+    applyDiceState({
+      claimed_today: data.user.dice_claimed_today,
+      next_reset_utc: data.user.dice_next_reset_utc
+    });
     applyComboState({
       solved_today: data.user.combo_solved_today,
       attempts_used: data.user.combo_attempts_used,
@@ -6645,6 +6766,133 @@ function runChestClaimRequest(initData){
   })
   .finally(function(){
     chestBusy = false;
+    hideAdLoadingOverlay();
+  });
+}
+
+// Lucky Dice: one roll a day after an ad (like the Chest); the server rolls and picks the prize, the app shows it
+var DICE_PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
+var DICE_ROLL_MS = 4000;
+var diceState = { claimedToday: false, nextResetUtc: null };
+var diceBusy = false;
+function setDiceFaces(faces){
+  document.querySelectorAll('#dice-cube .dice-face').forEach(function(face){
+    var pips = DICE_PIPS[faces[face.dataset.face]];
+    Array.prototype.forEach.call(face.children, function(pip, i){ pip.classList.toggle('is-off', pips.indexOf(i) === -1); });
+  });
+}
+// the rolled number on top; the faces around it keep opposite sides adding up to 7, like a real dice
+function diceFacesWithTop(top){
+  var rest = [1, 2, 3, 4, 5, 6].filter(function(v){ return v !== top && v !== 7 - top; });
+  var front = rest[0];
+  var right = rest.filter(function(v){ return v !== front && v !== 7 - front; })[0];
+  return { front: front, back: 7 - front, right: right, left: 7 - right, top: top, bottom: 7 - top };
+}
+function renderDiceButton(){
+  var btn = document.getElementById('btn-dice-roll');
+  if (!btn) return;
+  delete btn.dataset.origHtml;
+  btn.textContent = diceState.claimedToday ? 'Roll (0)' : 'Roll (1)';
+  btn.classList.toggle('is-claimed', diceState.claimedToday);
+  btn.disabled = diceState.claimedToday;
+}
+function applyDiceState(data){
+  diceState.claimedToday = !!data.claimed_today;
+  diceState.nextResetUtc = data.next_reset_utc || null;
+  renderDiceButton();
+}
+function onDiceRollClick(){
+  if (diceBusy) return;
+  if (diceState.claimedToday){
+    showComeBackTomorrowToast();
+    return;
+  }
+  var initData = getTelegramInitData();
+  if (!initData){
+    alert(t('Open this app from Telegram to roll the dice.'));
+    return;
+  }
+  diceBusy = true;
+  setButtonBusy(document.getElementById('btn-dice-roll'), true);
+  runAdGate(function(){ runDiceRollRequest(initData); }, function(){
+    diceBusy = false;
+    var diceBtn = document.getElementById('btn-dice-roll');
+    setButtonBusy(diceBtn, false);
+    if (diceBtn) diceBtn.disabled = false;
+  });
+}
+// the dice hops and tumbles, then lands tilted with the rolled number on top (always, like the other gates)
+function playDiceRoll(face, done){
+  var hop = document.getElementById('dice-hop');
+  var cube = document.getElementById('dice-cube');
+  var faces = diceFacesWithTop(face);
+  if (!hop || !cube){
+    setDiceFaces(faces);
+    if (cube) cube.classList.add('is-rolled');
+    done();
+    return;
+  }
+  cube.classList.remove('is-rolled');
+  hop.classList.remove('is-rolling');
+  void hop.offsetWidth;
+  hop.classList.add('is-rolling');
+  // the new faces go on once it spins fast, so no number visibly changes
+  setTimeout(function(){ setDiceFaces(faces); }, 150);
+  setTimeout(function(){
+    // the end of the tumble is the tilted pose plus whole turns, so nothing jumps when it stops
+    cube.classList.add('is-rolled');
+    hop.classList.remove('is-rolling');
+    done();
+  }, DICE_ROLL_MS);
+}
+function showDiceResult(data){
+  var isGram = data.prize_type === 'gram';
+  var caption = document.getElementById('dice-caption');
+  var result = document.getElementById('dice-result');
+  var text = document.getElementById('dice-result-text');
+  var icon = document.getElementById('dice-result-icon');
+  if (!result || !text) return;
+  text.textContent = 'You rolled ' + data.face + ' · +' + data.prize_amount + (isGram ? ' Gram' : ' Coins');
+  if (icon) icon.src = isGram ? PRIZE_ICON_URLS.gram : PRIZE_ICON_URLS.coins;
+  result.classList.toggle('is-gram', isGram);
+  if (caption) caption.style.display = 'none';
+  result.style.display = '';
+}
+function runDiceRollRequest(initData){
+  var btn = document.getElementById('btn-dice-roll');
+  fetch('/api/dice/claim', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: initData })
+  })
+  .then(function(res){ return res.json().then(function(data){ return { status: res.status, data: data }; }); })
+  .then(function(result){
+    var data = result.data;
+    if (data.error){
+      if (data.error === 'already_claimed_today'){
+        applyDiceState({ claimed_today: true, next_reset_utc: data.next_reset_utc });
+      } else {
+        console.error('dice claim error:', data.error);
+        setButtonBusy(btn, false);
+        if (btn) btn.disabled = false;
+      }
+      return;
+    }
+    playDiceRoll(data.face, function(){
+      updateBalanceDisplay({ coins: data.coins, gram: data.gram , locked_coins: data.locked_coins });
+      applyDiceState({ claimed_today: true, next_reset_utc: data.next_reset_utc });
+      showDiceResult(data);
+      showPrizeToast(data.prize_type, data.prize_amount);
+      celebrateReward(data.prize_type);
+    });
+  })
+  .catch(function(err){
+    console.error('dice request failed:', err);
+    setButtonBusy(btn, false);
+    if (btn) btn.disabled = false;
+  })
+  .finally(function(){
+    diceBusy = false;
     hideAdLoadingOverlay();
   });
 }
