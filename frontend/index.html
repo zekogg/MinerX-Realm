@@ -782,6 +782,9 @@ img{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; poi
   background:linear-gradient(90deg, #a9701f, #ffe9b8 45%, #f0d878 55%, #a9701f);
   -webkit-background-clip:text; background-clip:text; color:transparent;
 }
+/* a third line some toasts add (the bonus of a deposit) */
+.prize-toast__sub{ margin-top:calc(2px * var(--s)); font-size:calc(10px * var(--s)); font-weight:700; color:#7fe3a0; white-space:nowrap; }
+.prize-toast__sub:empty{ display:none; }
 
 /* Maintenance Screen */
 .maintenance-screen{
@@ -3205,8 +3208,8 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   content:""; position:absolute; top:0; left:12%; right:12%; height:calc(2px * var(--s)); border-radius:calc(2px * var(--s));
   background:linear-gradient(90deg, transparent, #4a9eff, transparent); box-shadow:0 0 calc(7px * var(--s)) #4a9effaa;
 }
-#modal-deposit .modal-sheet, #modal-withdraw .modal-sheet{ max-height:none; overflow-y:visible; }
-#modal-deposit .modal-sheet{
+#modal-deposit .modal-sheet, #modal-deposit-bonus .modal-sheet, #modal-withdraw .modal-sheet{ max-height:none; overflow-y:visible; }
+#modal-deposit .modal-sheet, #modal-deposit-bonus .modal-sheet{
   background:
     radial-gradient(calc(220px * var(--s)) calc(200px * var(--s)) at 50% 0%, rgba(227,165,66,.14), transparent 70%),
     radial-gradient(calc(180px * var(--s)) calc(160px * var(--s)) at 100% 100%, rgba(165,108,240,.14), transparent 70%),
@@ -3214,7 +3217,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   border:1px solid transparent;
   border-radius:var(--radius-lg);
 }
-#modal-deposit .modal-sheet::before{
+#modal-deposit .modal-sheet::before, #modal-deposit-bonus .modal-sheet::before{
   top:auto; left:auto; right:auto; height:auto; inset:0; border-radius:inherit; padding:calc(1.6px * var(--s));
   background:linear-gradient(135deg, #f0d878 0%, #a9701f 28%, var(--c-royal-purple-2) 55%, #f0d878 100%);
   box-shadow:none;
@@ -3222,6 +3225,54 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   -webkit-mask-composite:xor; mask-composite:exclude;
   pointer-events:none;
 }
+/* Deposit Bonus: a ticket on Earn (in the empty corner across from the rate pill), its window, and the amount in
+   the deposit window shown as the deposit, the bonus and the total */
+.earn-top-row-spacer{ position:relative; }
+.deposit-bonus-icon{
+  position:absolute; left:0; top:calc(-6px * var(--s)); width:calc(76px * var(--s));
+  display:flex; flex-direction:column; align-items:center; gap:calc(3px * var(--s)); font:inherit; line-height:inherit;
+}
+.deposit-bonus-icon:active{ transform:scale(.97); }
+.db-ticket{
+  position:relative; padding:calc(5px * var(--s)) calc(9px * var(--s)); border-radius:calc(8px * var(--s)); text-align:center; line-height:1.05;
+  background:linear-gradient(160deg,#7c55e6,#3d2290); border:1px solid rgba(240,196,109,.7); box-shadow:0 0 calc(12px * var(--s)) rgba(139,92,246,.5);
+  -webkit-mask:radial-gradient(circle calc(4px * var(--s)) at 0 50%, transparent 98%, #000) left/51% 100% no-repeat, radial-gradient(circle calc(4px * var(--s)) at 100% 50%, transparent 98%, #000) right/51% 100% no-repeat;
+  mask:radial-gradient(circle calc(4px * var(--s)) at 0 50%, transparent 98%, #000) left/51% 100% no-repeat, radial-gradient(circle calc(4px * var(--s)) at 100% 50%, transparent 98%, #000) right/51% 100% no-repeat;
+}
+.db-ticket b{ display:block; font-family:var(--font-display); font-size:calc(17px * var(--s)); color:#ffd76a; }
+.db-ticket span{ font-size:calc(8px * var(--s)); font-weight:800; letter-spacing:.6px; color:#fff; text-transform:uppercase; }
+.db-timer{ font-family:var(--font-display); font-size:calc(9.5px * var(--s)); font-weight:700; color:#f0d878; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.bw-hero{ text-align:center; margin:calc(4px * var(--s)) 0 calc(12px * var(--s)); }
+.bw-hero__row{ margin-top:calc(8px * var(--s)); }
+.bw-ticket{
+  display:inline-block; padding:calc(12px * var(--s)) calc(26px * var(--s)); border-radius:calc(14px * var(--s));
+  -webkit-mask:radial-gradient(circle calc(9px * var(--s)) at 0 50%, transparent 98%, #000) left/51% 100% no-repeat, radial-gradient(circle calc(9px * var(--s)) at 100% 50%, transparent 98%, #000) right/51% 100% no-repeat;
+  mask:radial-gradient(circle calc(9px * var(--s)) at 0 50%, transparent 98%, #000) left/51% 100% no-repeat, radial-gradient(circle calc(9px * var(--s)) at 100% 50%, transparent 98%, #000) right/51% 100% no-repeat;
+}
+.bw-ticket b{ font-size:calc(38px * var(--s)); }
+.bw-ticket span{ font-size:calc(11px * var(--s)); letter-spacing:1px; }
+.bw-ribbon{ display:inline-block; padding:calc(3px * var(--s)) calc(10px * var(--s)); border-radius:999px; background:linear-gradient(135deg,#ff5a6e,#e0457e); color:#fff; font-size:calc(10px * var(--s)); font-weight:800; letter-spacing:.6px; text-transform:uppercase; }
+.bw-big{
+  margin-top:calc(8px * var(--s)); font-family:var(--font-display); font-weight:800; font-size:calc(34px * var(--s)); line-height:1;
+  background:linear-gradient(180deg,#fff1b8,#f0c14b 55%,#c98a2c); -webkit-background-clip:text; background-clip:text; color:transparent;
+  filter:drop-shadow(0 0 calc(12px * var(--s)) rgba(255,190,80,.45));
+}
+.bw-tline{ display:inline-block; padding:calc(6px * var(--s)) calc(12px * var(--s)); border-radius:999px; background:rgba(240,216,120,.08); border:1px solid rgba(240,216,120,.3); color:#f0d878; font-weight:800; font-size:calc(12px * var(--s)); font-variant-numeric:tabular-nums; }
+/* Arabic / Persian read from the right: "ends in", then the days, then the clock (like the leaderboard's countdown) */
+:root[data-lang="ar"] .bw-tline, :root[data-lang="fa"] .bw-tline{ direction:rtl; }
+:root[data-lang="ar"] .js-deposit-bonus-time, :root[data-lang="fa"] .js-deposit-bonus-time{ direction:rtl; unicode-bidi:isolate; }
+.bw-list{ margin:0 0 calc(12px * var(--s)); padding:0; list-style:none; display:flex; flex-direction:column; gap:calc(8px * var(--s)); }
+.bw-list li{ display:flex; gap:calc(8px * var(--s)); align-items:flex-start; font-size:calc(12px * var(--s)); color:var(--ink); line-height:1.45; }
+.bw-list li::before{ content:""; flex-shrink:0; margin-top:calc(5px * var(--s)); width:calc(7px * var(--s)); height:calc(7px * var(--s)); border-radius:2px; transform:rotate(45deg); background:linear-gradient(135deg,#f7e2a0,#a9701f); }
+.bw-list li img{ width:calc(13px * var(--s)); height:calc(13px * var(--s)); vertical-align:middle; }
+.dp-rows{ display:flex; flex-direction:column; gap:calc(8px * var(--s)); font-family:var(--font-body); font-size:calc(12px * var(--s)); }
+.dp-rows > div{ display:flex; justify-content:space-between; align-items:center; color:#a3acb8; font-weight:700; }
+.dp-rows > div > span:last-child{ color:var(--ink); font-family:var(--font-display); }
+.dp-rows .is-bonus > span:last-child{ color:#7fe3a0; }
+.dp-rows .is-total{ border-top:1px solid var(--stone-border-2); padding-top:calc(8px * var(--s)); color:#fff; font-size:calc(13px * var(--s)); }
+.dp-rows .is-total > span:last-child{ color:#ffd76a; font-size:calc(16px * var(--s)); display:inline-flex; align-items:center; gap:5px; }
+.dp-rows .is-total img{ width:calc(18px * var(--s)); height:calc(18px * var(--s)); }
+.dp-chip{ display:inline-block; font-family:var(--font-display); padding:calc(1px * var(--s)) calc(6px * var(--s)); border-radius:999px; background:rgba(127,227,160,.14); border:1px solid rgba(127,227,160,.5); color:#7fe3a0; font-size:calc(9.5px * var(--s)); font-weight:800; margin-left:4px; }
 #modal-withdraw .modal-sheet{
   background:
     radial-gradient(calc(220px * var(--s)) calc(200px * var(--s)) at 50% 0%, rgba(227,165,66,.14), transparent 70%),
@@ -3280,18 +3331,18 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   -webkit-mask-composite:xor; mask-composite:exclude;
   pointer-events:none;
 }
-#modal-exchange, #modal-deposit, #modal-withdraw, #modal-withdraw-req, #modal-quick-free-pet{
+#modal-exchange, #modal-deposit, #modal-deposit-bonus, #modal-withdraw, #modal-withdraw-req, #modal-quick-free-pet{
   display:flex; align-items:flex-end; padding:0;
   background:rgba(8,6,14,0);
   visibility:hidden; pointer-events:none;
   transition:background .32s ease, visibility 0s linear .32s;
 }
-#modal-exchange.is-open, #modal-deposit.is-open, #modal-withdraw.is-open, #modal-withdraw-req.is-open, #modal-quick-free-pet.is-open{
+#modal-exchange.is-open, #modal-deposit.is-open, #modal-deposit-bonus.is-open, #modal-withdraw.is-open, #modal-withdraw-req.is-open, #modal-quick-free-pet.is-open{
   visibility:visible; pointer-events:auto;
   background:rgba(8,6,14,.72);
   transition:background .32s ease, visibility 0s linear 0s;
 }
-#modal-exchange .modal-sheet, #modal-deposit .modal-sheet, #modal-withdraw .modal-sheet, #modal-withdraw-req .modal-sheet, #modal-quick-free-pet .modal-sheet{
+#modal-exchange .modal-sheet, #modal-deposit .modal-sheet, #modal-deposit-bonus .modal-sheet, #modal-withdraw .modal-sheet, #modal-withdraw-req .modal-sheet, #modal-quick-free-pet .modal-sheet{
   width:100%; max-width:460px; margin:0 auto;
   max-height:92vh; overflow-y:auto;
   border-radius:calc(26px * var(--s)) calc(26px * var(--s)) 0 0;
@@ -3301,6 +3352,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 }
 #modal-exchange.is-open .modal-sheet,
 #modal-deposit.is-open .modal-sheet,
+#modal-deposit-bonus.is-open .modal-sheet,
 #modal-withdraw.is-open .modal-sheet,
 #modal-withdraw-req.is-open .modal-sheet,
 #modal-quick-free-pet.is-open .modal-sheet{
@@ -3392,7 +3444,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   color:#f5f3ff;
   border-color:transparent;
 }
-#modal-deposit .modal-cta.is-ready{ background:linear-gradient(135deg, var(--c-btn-deposit-1), var(--c-btn-deposit-2)); color:var(--c-btn-deposit-text); }
+#modal-deposit .modal-cta.is-ready, #modal-deposit-bonus .modal-cta.is-ready{ background:linear-gradient(135deg, var(--c-btn-deposit-1), var(--c-btn-deposit-2)); color:var(--c-btn-deposit-text); }
 #modal-withdraw .modal-cta.is-ready{ background:linear-gradient(135deg, var(--c-btn-withdraw-1), var(--c-btn-withdraw-2)); color:var(--c-btn-withdraw-text); }
 .modal-plain-input{
   width:100%; background:var(--c-topbar-badge-bg); border:1px solid var(--stone-border-2);
@@ -4129,7 +4181,12 @@ body.reduce-motion .firefly{
       <div class="earn-hero">
         <span class="realm-label realm-label--nav-gold">MinerX</span>
         <div class="earn-top-row">
-          <div class="earn-top-row-spacer"></div>
+          <div class="earn-top-row-spacer">
+            <button class="deposit-bonus-icon" id="deposit-bonus-icon" onclick="openDepositBonusModal()" style="display:none;">
+              <span class="db-ticket"><b class="js-deposit-bonus-pct" data-no-i18n>+0%</b><span>Deposit</span></span>
+              <span class="db-timer"><span class="js-deposit-bonus-time" data-no-i18n>00:00:00</span></span>
+            </button>
+          </div>
           <div class="char-slot-wrap">
             <div class="char-slot" id="char-slot">
               <div class="char-slot__outer-ring"></div>
@@ -5128,6 +5185,7 @@ body.reduce-motion .firefly{
     <div class="prize-toast__text">
       <div class="prize-toast__title">You Won!</div>
       <div class="prize-toast__amount" id="prize-toast-amount">+0</div>
+      <div class="prize-toast__sub" id="prize-toast-sub"></div>
     </div>
   </div>
 
@@ -5584,9 +5642,16 @@ body.reduce-motion .firefly{
         <div class="modal-field-label"><span>Deposit Amount (Gram):</span> <img draggable="false" loading="lazy" src="/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:calc(14px * var(--s));height:calc(14px * var(--s));flex-shrink:0;vertical-align:middle;"></div>
         <input type="number" class="modal-plain-input" id="deposit-input" placeholder="0" oninput="updateDeposit()">
         <div class="modal-field-label"><span>You will Get</span></div>
-        <div class="modal-plain-box" style="display:flex;flex-direction:column;align-items:center;gap:calc(4px * var(--s));">
+        <div class="modal-plain-box" id="deposit-plain-box" style="display:flex;flex-direction:column;align-items:center;gap:calc(4px * var(--s));">
           <span><span id="deposit-output">0</span> +Coins</span>
           <img draggable="false" loading="lazy" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:calc(30px * var(--s));height:calc(30px * var(--s));flex-shrink:0;">
+        </div>
+        <div class="modal-plain-box" id="deposit-bonus-box" style="display:none;">
+          <div class="dp-rows">
+            <div><span>Deposit</span><span id="deposit-bonus-base" data-no-i18n>0</span></div>
+            <div class="is-bonus"><span><span>Bonus</span> <span class="dp-chip js-deposit-bonus-pct" data-no-i18n>+0%</span></span><span id="deposit-bonus-extra" data-no-i18n>+0</span></div>
+            <div class="is-total"><span>Total</span><span><span id="deposit-bonus-total" data-no-i18n>0</span><img draggable="false" loading="lazy" src="/Pet%20Coin.webp" alt="Coin"></span></div>
+          </div>
         </div>
         <button class="modal-cta" id="deposit-cta" disabled onclick="goDepositStep2()" style="margin-top:calc(6px * var(--s));">Deposit</button>
       </div>
@@ -5606,6 +5671,29 @@ body.reduce-motion .firefly{
   </div>
 
   <!-- Withdraw Modal -->
+  <div class="modal-overlay" id="modal-deposit-bonus">
+    <div class="modal-sheet">
+      <span class="fp-corner fp-corner--tl"></span>
+      <span class="fp-corner fp-corner--tr"></span>
+      <div class="modal-head">
+        <div class="modal-head__title">Deposit Bonus</div>
+        <button class="modal-close" onclick="closeModal('modal-deposit-bonus')">✕</button>
+      </div>
+      <div class="bw-hero">
+        <span class="db-ticket bw-ticket"><b class="js-deposit-bonus-pct" data-no-i18n>+0%</b><span>Deposit</span></span>
+        <div class="bw-hero__row"><span class="bw-ribbon">Limited Time</span></div>
+        <div class="bw-big">Extra Coins</div>
+        <div class="bw-hero__row"><span class="bw-tline"><span>Ends in</span> <span class="js-deposit-bonus-time" data-no-i18n>00:00:00</span></span></div>
+      </div>
+      <ul class="bw-list">
+        <li>Deposit any amount of Gram from<img draggable="false" loading="lazy" src="/Gram_symbol.png" alt="Gram">2 Gram.</li>
+        <li id="deposit-bonus-more">Get 0% more Coins on top, added at once.</li>
+        <li>Use them for pets and upgrades.</li>
+      </ul>
+      <button class="modal-cta is-ready" onclick="onDepositBonusDepositClick()">Deposit Now</button>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="modal-withdraw">
     <div class="modal-sheet">
       <span class="fp-corner fp-corner--tl"></span>
@@ -6041,6 +6129,7 @@ function fetchUserData(){
       claimed_today: data.user.dice_claimed_today,
       next_reset_utc: data.user.dice_next_reset_utc
     });
+    applyDepositBonus(data.user.deposit_bonus);
     applyComboState({
       solved_today: data.user.combo_solved_today,
       attempts_used: data.user.combo_attempts_used,
@@ -6574,6 +6663,8 @@ function showAppToast(opts){
   toast.classList.toggle('is-rect', !!opts.rect);
   if (titleEl) titleEl.textContent = opts.title || 'You Won!';
   if (amountEl) amountEl.textContent = opts.amount || '';
+  var subEl = document.getElementById('prize-toast-sub');
+  if (subEl) subEl.textContent = opts.sub || '';
   toast.classList.add('is-visible');
   clearTimeout(prizeToastTimer);
   prizeToastTimer = setTimeout(function(){
@@ -9655,12 +9746,12 @@ function onAdminTaskCheckClick(taskId, section){
 // Admin Panel: its windows, styles and code are in /admin.js, loaded the first time the admin opens it
 var adminPanelLoading = false;
 function openAdminPanel(){
-  if (document.getElementById('modal-admin')){ openModal('modal-admin'); return; }
+  if (document.getElementById('modal-admin')){ openModal('modal-admin'); adminFetchDepositBonus(); return; }
   if (adminPanelLoading) return;
   adminPanelLoading = true;
   var script = document.createElement('script');
   script.src = '/admin.js';
-  script.onload = function(){ adminPanelLoading = false; openModal('modal-admin'); };
+  script.onload = function(){ adminPanelLoading = false; openModal('modal-admin'); adminFetchDepositBonus(); };
   script.onerror = function(){
     adminPanelLoading = false;
     script.remove();
@@ -10208,6 +10299,7 @@ var DEPOSIT_POLL_LIMIT_MS = 3 * 60 * 1000;
 function openDepositModal(){
   document.getElementById('deposit-input').value = '';
   document.getElementById('deposit-output').textContent = '0';
+  renderDepositBonusAmount(0);
   document.getElementById('deposit-cta').disabled = true;
   document.getElementById('deposit-cta').classList.remove('is-ready');
   document.getElementById('deposit-step1').style.display = 'block';
@@ -10234,6 +10326,7 @@ function updateDeposit(){
   var val = parseFloat(input.value) || 0;
   var output = Math.round(val * 100000);
   document.getElementById('deposit-output').textContent = output.toLocaleString('en-US');
+  renderDepositBonusAmount(output);
   var cta = document.getElementById('deposit-cta');
   if (val > 0 && val < DEPOSIT_MIN_GRAM){
     cta.textContent = 'Minimum ' + DEPOSIT_MIN_GRAM + ' Gram';
@@ -10244,6 +10337,74 @@ function updateDeposit(){
     cta.disabled = val <= 0;
     cta.classList.toggle('is-ready', val > 0);
   }
+}
+// during a deposit bonus the amount shows as the deposit, the bonus and the total
+function renderDepositBonusAmount(coins){
+  var bonusOn = isDepositBonusActive();
+  document.getElementById('deposit-plain-box').style.display = bonusOn ? 'none' : 'flex';
+  document.getElementById('deposit-bonus-box').style.display = bonusOn ? '' : 'none';
+  if (!bonusOn) return;
+  var extra = Math.round(coins * depositBonusState.percent / 100);
+  document.getElementById('deposit-bonus-base').textContent = coins.toLocaleString('en-US');
+  document.getElementById('deposit-bonus-extra').textContent = '+' + extra.toLocaleString('en-US');
+  document.getElementById('deposit-bonus-total').textContent = (coins + extra).toLocaleString('en-US');
+}
+
+// Deposit Bonus: started from the admin panel; the user data brings its percent and end, and the ticket on Earn,
+// its window and the deposit window show it until it ends (on the server's clock)
+var depositBonusState = { percent: 0, endsAt: 0 };
+var depositBonusTimer = null;
+function isDepositBonusActive(){
+  return depositBonusState.percent > 0 && serverNow() < depositBonusState.endsAt;
+}
+function applyDepositBonus(bonus){
+  depositBonusState.percent = bonus && Number(bonus.percent) > 0 ? Number(bonus.percent) : 0;
+  depositBonusState.endsAt = bonus ? Number(bonus.ends_at) || 0 : 0;
+  document.querySelectorAll('.js-deposit-bonus-pct').forEach(function(el){ el.textContent = '+' + depositBonusState.percent + '%'; });
+  var more = document.getElementById('deposit-bonus-more');
+  if (more) more.textContent = 'Get ' + depositBonusState.percent + '% more Coins on top, added at once.';
+  clearInterval(depositBonusTimer);
+  depositBonusTimer = isDepositBonusActive() ? setInterval(renderDepositBonusTime, 1000) : null;
+  renderDepositBonusTime();
+  updateDeposit();
+}
+function renderDepositBonusTime(){
+  var active = isDepositBonusActive();
+  var icon = document.getElementById('deposit-bonus-icon');
+  if (icon) icon.style.display = active ? '' : 'none';
+  if (!active){
+    clearInterval(depositBonusTimer);
+    depositBonusTimer = null;
+    var modal = document.getElementById('modal-deposit-bonus');
+    if (modal && modal.classList.contains('is-open')) closeModal('modal-deposit-bonus');
+    // it just ended: the deposit window goes back to the plain amount
+    if (depositBonusState.percent > 0){
+      depositBonusState.percent = 0;
+      updateDeposit();
+    }
+    return;
+  }
+  var total = Math.max(0, Math.floor((depositBonusState.endsAt - serverNow()) / 1000));
+  var days = Math.floor(total / 86400);
+  var pad = function(n){ return String(n).padStart(2, '0'); };
+  var text = (days ? days + depositBonusDayUnit() + ' ' : '') +
+    pad(Math.floor(total % 86400 / 3600)) + ':' + pad(Math.floor(total % 3600 / 60)) + ':' + pad(total % 60);
+  document.querySelectorAll('.js-deposit-bonus-time').forEach(function(el){ el.textContent = text; });
+}
+// the day letter of the countdown in the current language, taken from the leaderboard's "Rewards in 3D 12:00:00"
+function depositBonusDayUnit(){
+  var all = i18n.dict && i18n.dict['Rewards in {0}D {1}'];
+  var m = all && all[i18n.lang] && /\{0\}(.*?) \{1\}/.exec(all[i18n.lang]);
+  return m ? m[1] : 'd';
+}
+function openDepositBonusModal(){
+  if (!isDepositBonusActive()) return;
+  renderDepositBonusTime();
+  openModal('modal-deposit-bonus');
+}
+function onDepositBonusDepositClick(){
+  closeModal('modal-deposit-bonus');
+  openDepositModal();
 }
 function goDepositStep2(){
   var val = parseFloat(document.getElementById('deposit-input').value) || 0;
@@ -10322,10 +10483,12 @@ function pollDepositStatus(initData){
       localCacheClear('profile');
       localCacheClear('wallet_history');
       closeModal('modal-deposit');
+      var bonusCoins = data.status === 'found' ? Math.round(data.bonus_coins || 0) : 0;
       showAppToast({
         title: data.status === 'found' ? 'Deposit Confirmed!' : 'Deposit Already Processed',
         icon: PRIZE_ICON_URLS.coins,
-        amount: '+' + Math.round(data.coins_credited || 0).toLocaleString('en-US') + ' Coins'
+        amount: '+' + Math.round(data.coins_credited || 0).toLocaleString('en-US') + ' Coins',
+        sub: bonusCoins > 0 ? 'Includes +' + bonusCoins.toLocaleString('en-US') + ' Bonus (' + data.bonus_percent + '%)' : ''
       });
       return;
     }

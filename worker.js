@@ -42,6 +42,13 @@ const DEPOSIT_CHECK_TIMEOUT_MS = 120_000;
 const DEPOSIT_CHECK_MAX_ATTEMPTS = 8;
 const DEPOSIT_CHECK_FIRST_DELAY_MS = 5_000;
 const DEPOSIT_CHECK_RETRY_DELAY_MS = 15_000;
+// every user sends to the same address, so the check looks through the address's latest transactions for the user's memo
+const DEPOSIT_TX_SCAN_LIMIT = 50;
+// Deposit bonus: started and stopped from the admin panel (one row in deposit_bonus); a deposit gets it when its
+// transaction was sent between the start and the end
+const DEPOSIT_BONUS_MAX_PERCENT = 100;
+const DEPOSIT_BONUS_MAX_DAYS = 30;
+const DEPOSIT_BONUS_MEMO_MS = 60_000;
 
 // Withdraw config
 const WITHDRAW_MIN_GRAM = 0.1;
@@ -356,6 +363,15 @@ async function routeRequest(request, env, url) {
     if (url.pathname === "/api/admin/tasks/pin" && request.method === "POST") {
       return handleAdminTasksPin(request, env);
     }
+    if (url.pathname === "/api/admin/deposit_bonus/get" && request.method === "POST") {
+      return handleAdminDepositBonusGet(request, env);
+    }
+    if (url.pathname === "/api/admin/deposit_bonus/start" && request.method === "POST") {
+      return handleAdminDepositBonusStart(request, env);
+    }
+    if (url.pathname === "/api/admin/deposit_bonus/stop" && request.method === "POST") {
+      return handleAdminDepositBonusStop(request, env);
+    }
     if (url.pathname === "/api/admin/promo/create" && request.method === "POST") {
       return handleAdminPromoCreate(request, env);
     }
@@ -510,6 +526,8 @@ async function handleGetUser(request, env) {
   view.sponsored_task_daily_limit = SPONSORED_TASK_DAILY_LIMIT;
   view.sponsored_task_reward_coins = SPONSORED_TASK_REWARD_COINS;
   view.locked_coins = user.locked_coins || 0;
+  const depositBonus = depositBonusAt(await getDepositBonusMemo(env), Date.now());
+  view.deposit_bonus = depositBonus ? { percent: depositBonus.percent, ends_at: depositBonus.ends_at } : null;
   return jsonResponse({ user: view });
 }
 
@@ -1180,6 +1198,100 @@ async function handleDepositInfo(request, env) {
   });
 }
 
+// Deposit bonus: one row (id 1) with the percent and when it starts and ends
+let depositBonusMemo = { at: 0, row: null };
+async function readDepositBonus(env) {
+  try {
+    return await env.DB.prepare("SELECT percent, starts_at, ends_at FROM deposit_bonus WHERE id = 1").first();
+  } catch (e) {
+    return null;
+  }
+}
+// the app asks on every open, so each worker instance keeps the row for a minute (Cloudflare's cache does nothing on
+// workers.dev); a change from the admin panel reaches everyone within that minute
+async function getDepositBonusMemo(env) {
+  const now = Date.now();
+  if (now - depositBonusMemo.at < DEPOSIT_BONUS_MEMO_MS) return depositBonusMemo.row;
+  const row = await readDepositBonus(env);
+  depositBonusMemo = { at: now, row };
+  return row;
+}
+function depositBonusAt(row, at) {
+  return row && row.percent > 0 && row.starts_at <= at && at < row.ends_at ? row : null;
+}
+function depositBonusAdminView(row) {
+  const now = Date.now();
+  return {
+    percent: row ? row.percent : 0,
+    starts_at: row ? row.starts_at : null,
+    ends_at: row ? row.ends_at : null,
+    active: !!depositBonusAt(row, now),
+    now
+  };
+}
+
+// /api/admin/deposit_bonus/get
+async function handleAdminDepositBonusGet(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "invalid_body" }, 400);
+  }
+  const auth = await authenticateAdmin(request, env, body);
+  if (!auth.ok) return auth.response;
+  return jsonResponse(depositBonusAdminView(await readDepositBonus(env)));
+}
+
+// /api/admin/deposit_bonus/start: only when no bonus is running, so the percent never changes while one runs (a
+// deposit sent at one percent is never paid at another)
+async function handleAdminDepositBonusStart(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "invalid_body" }, 400);
+  }
+  const auth = await authenticateAdmin(request, env, body);
+  if (!auth.ok) return auth.response;
+  const percent = Math.round(Number(body.percent) * 100) / 100;
+  const days = Number(body.days);
+  if (!Number.isFinite(percent) || percent <= 0 || percent > DEPOSIT_BONUS_MAX_PERCENT) {
+    return jsonResponse({ error: "invalid_percent" }, 400);
+  }
+  if (!Number.isInteger(days) || days < 1 || days > DEPOSIT_BONUS_MAX_DAYS) {
+    return jsonResponse({ error: "invalid_days" }, 400);
+  }
+  const now = Date.now();
+  const result = await env.DB.prepare(
+    `INSERT INTO deposit_bonus (id, percent, starts_at, ends_at) VALUES (1, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET percent = excluded.percent, starts_at = excluded.starts_at, ends_at = excluded.ends_at
+     WHERE deposit_bonus.ends_at <= ?`
+  ).bind(percent, now, now + days * 86_400_000, now).run();
+  const row = await readDepositBonus(env);
+  if (!result.meta?.changes) {
+    return jsonResponse({ error: "already_active", ...depositBonusAdminView(row) }, 409);
+  }
+  depositBonusMemo = { at: 0, row: null };
+  return jsonResponse(depositBonusAdminView(row));
+}
+
+// /api/admin/deposit_bonus/stop: ends it now; deposits sent before this moment keep their bonus
+async function handleAdminDepositBonusStop(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "invalid_body" }, 400);
+  }
+  const auth = await authenticateAdmin(request, env, body);
+  if (!auth.ok) return auth.response;
+  const now = Date.now();
+  await env.DB.prepare("UPDATE deposit_bonus SET ends_at = ? WHERE id = 1 AND ends_at > ?").bind(now, now).run();
+  depositBonusMemo = { at: 0, row: null };
+  return jsonResponse(depositBonusAdminView(await readDepositBonus(env)));
+}
+
 // /api/deposit/check
 async function handleDepositCheck(request, env) {
   const auth = await authenticateRequest(request, env);
@@ -1240,6 +1352,8 @@ export class DepositChecker {
       await this.state.storage.put("attempts", 0);
       await this.state.storage.delete("amountGram");
       await this.state.storage.delete("coinsCredited");
+      await this.state.storage.delete("bonusCoins");
+      await this.state.storage.delete("bonusPercent");
       const nextCheckAt = Date.now() + DEPOSIT_CHECK_FIRST_DELAY_MS;
       await this.state.storage.setAlarm(nextCheckAt);
       return jsonResponse({ status: "pending", next_check_at: nextCheckAt });
@@ -1248,8 +1362,10 @@ export class DepositChecker {
       const status = (await this.state.storage.get("status")) ?? "idle";
       const amountGram = (await this.state.storage.get("amountGram")) ?? null;
       const coinsCredited = (await this.state.storage.get("coinsCredited")) ?? null;
+      const bonusCoins = (await this.state.storage.get("bonusCoins")) ?? 0;
+      const bonusPercent = (await this.state.storage.get("bonusPercent")) ?? 0;
       const nextCheckAt = status === "pending" ? await this.state.storage.getAlarm() : null;
-      return jsonResponse({ status, amount_gram: amountGram, coins_credited: coinsCredited, next_check_at: nextCheckAt });
+      return jsonResponse({ status, amount_gram: amountGram, coins_credited: coinsCredited, bonus_coins: bonusCoins, bonus_percent: bonusPercent, next_check_at: nextCheckAt });
     }
     return jsonResponse({ error: "not_found" }, 404);
   }
@@ -1267,14 +1383,19 @@ export class DepositChecker {
     const depositAddress = this.env.DEPOSIT_ADDRESS || "";
     const headers = { "Accept": "application/json" };
     if (this.env.TONCENTER_API_KEY) headers["X-API-Key"] = this.env.TONCENTER_API_KEY;
+    // the user's earlier transactions stay in the list for a while: they are passed over so a new deposit is still
+    // found, and only decide the answer when no new one has shown up by the last check
+    let seenCredited = false;
+    let seenBelowMinimum = null;
     try {
       const tonRes = await fetch(
-        `https://toncenter.com/api/v2/getTransactions?address=${encodeURIComponent(depositAddress)}&limit=10&archival=false`,
+        `https://toncenter.com/api/v2/getTransactions?address=${encodeURIComponent(depositAddress)}&limit=${DEPOSIT_TX_SCAN_LIMIT}&archival=false`,
         { headers }
       );
       if (tonRes.ok) {
         const tonData = await tonRes.json();
         if (tonData?.ok && Array.isArray(tonData.result)) {
+          let creditedHashes = null;
           for (const tx of tonData.result) {
             const inMsg = tx.in_msg;
             if (!inMsg || !inMsg.value || Number(inMsg.value) === 0) continue;
@@ -1294,23 +1415,38 @@ export class DepositChecker {
             if (txComment.trim() !== String(memo).trim()) continue;
             const txHash = tx.transaction_id?.hash;
             if (!txHash) continue;
+            if (!creditedHashes) {
+              const credited = await this.env.DB.prepare(
+                "SELECT tx_hash FROM deposits WHERE telegram_id = ?"
+              ).bind(telegramId).all();
+              creditedHashes = new Set((credited.results || []).map((row) => row.tx_hash));
+            }
+            if (creditedHashes.has(txHash)) {
+              seenCredited = true;
+              continue;
+            }
             const amountGram = Number(inMsg.value) / 1e9;
             if (amountGram < DEPOSIT_MIN_GRAM) {
-              await this.state.storage.put("status", "below_minimum");
-              await this.state.storage.put("amountGram", amountGram);
-              return;
+              if (seenBelowMinimum === null) seenBelowMinimum = amountGram;
+              continue;
             }
-            const coinsCredited = amountGram * DEPOSIT_GRAM_TO_COINS_RATE;
+            // the bonus goes by when the transaction was sent (its time is in the transaction), read straight from D1
+            const bonus = depositBonusAt(await readDepositBonus(this.env), Number(tx.utime) * 1000);
+            const bonusPercent = bonus ? bonus.percent : 0;
+            const baseCoins = amountGram * DEPOSIT_GRAM_TO_COINS_RATE;
+            const bonusCoins = Math.round(baseCoins * bonusPercent / 100);
+            const coinsCredited = baseCoins + bonusCoins;
             const depositor = await this.env.DB.prepare(
               "SELECT referred_by FROM users WHERE telegram_id = ?"
             ).bind(telegramId).first();
             const referrerId = depositor?.referred_by || null;
-            const referralCommission = referrerId ? coinsCredited * REFERRAL_DEPOSIT_COMMISSION_RATE : 0;
+            // the inviter's commission is on the deposit itself, never on the bonus
+            const referralCommission = referrerId ? baseCoins * REFERRAL_DEPOSIT_COMMISSION_RATE : 0;
             const depositBatch = [
               this.env.DB.prepare(
-                "INSERT INTO deposits (telegram_id, tx_hash, amount_gram, coins_credited, status, memo, created_at) VALUES (?, ?, ?, ?, 'confirmed', ?, ?)"
-              ).bind(telegramId, txHash, amountGram, coinsCredited, memo, Date.now()),
-              // deposited coins are also locked: usable for pets and upgrades, never exchangeable to Gram
+                "INSERT INTO deposits (telegram_id, tx_hash, amount_gram, coins_credited, bonus_coins, bonus_percent, status, memo, created_at) VALUES (?, ?, ?, ?, ?, ?, 'confirmed', ?, ?)"
+              ).bind(telegramId, txHash, amountGram, coinsCredited, bonusCoins, bonusPercent, memo, Date.now()),
+              // deposited coins (bonus included) are also locked: usable for pets and upgrades, never exchangeable to Gram
               this.env.DB.prepare(
                 "UPDATE users SET coins = coins + ?, locked_coins = COALESCE(locked_coins, 0) + ? WHERE telegram_id = ?"
               ).bind(coinsCredited, coinsCredited, telegramId)
@@ -1342,7 +1478,9 @@ export class DepositChecker {
             await this.state.storage.put("status", "found");
             await this.state.storage.put("amountGram", amountGram);
             await this.state.storage.put("coinsCredited", coinsCredited);
-            await this.notifyUser(telegramId, amountGram, coinsCredited);
+            await this.state.storage.put("bonusCoins", bonusCoins);
+            await this.state.storage.put("bonusPercent", bonusPercent);
+            await this.notifyUser(telegramId, amountGram, coinsCredited, bonusCoins, bonusPercent);
             return;
           }
         }
@@ -1351,18 +1489,28 @@ export class DepositChecker {
     }
     if (attempts < DEPOSIT_CHECK_MAX_ATTEMPTS) {
       await this.state.storage.setAlarm(Date.now() + DEPOSIT_CHECK_RETRY_DELAY_MS);
+    } else if (seenBelowMinimum !== null) {
+      await this.state.storage.put("status", "below_minimum");
+      await this.state.storage.put("amountGram", seenBelowMinimum);
     } else {
-      await this.state.storage.put("status", "timeout");
+      await this.state.storage.put("status", seenCredited ? "already_processed" : "timeout");
     }
   }
-  async notifyUser(telegramId, amountGram, coinsCredited) {
+  async notifyUser(telegramId, amountGram, coinsCredited, bonusCoins, bonusPercent) {
     if (!this.env.BOT_TOKEN) return;
+    const coins = (value) => Math.round(value).toLocaleString("en-US");
+    // with a bonus, "Credited" stays the deposit itself and the bonus and the total follow it
+    const lines = bonusCoins > 0
+      ? `🪙 Credited: <b>${coins(coinsCredited - bonusCoins)} Coins</b>\n` +
+        `🎁 Bonus (+${bonusPercent}%): <b>${coins(bonusCoins)} Coins</b>\n` +
+        `💰 Total: <b>${coins(coinsCredited)} Coins</b>`
+      : `🪙 Credited: <b>${coins(coinsCredited)} Coins</b>`;
     try {
       await sendMessage(this.env, telegramId, {
         text:
           `✅ <b>Deposit Confirmed!</b>\n\n` +
           `💎 Amount: <b>${amountGram.toFixed(4)} Gram</b>\n` +
-          `🪙 Credited: <b>${Math.round(coinsCredited).toLocaleString("en-US")} Coins</b>`,
+          lines,
         parse_mode: "HTML"
       });
     } catch (e) {}
