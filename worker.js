@@ -44,7 +44,8 @@ const DEPOSIT_CHECK_FIRST_DELAY_MS = 5_000;
 const DEPOSIT_CHECK_RETRY_DELAY_MS = 15_000;
 // Deposit bonus: started and stopped from the admin panel (one row in deposit_bonus); a deposit gets it when its
 // transaction was sent between the start and the end
-const DEPOSIT_BONUS_MAX_PERCENT = 100;
+const DEPOSIT_BONUS_MIN_PERCENT = 5;
+const DEPOSIT_BONUS_MAX_PERCENT = 200;
 const DEPOSIT_BONUS_MAX_DAYS = 30;
 const DEPOSIT_BONUS_MEMO_MS = 60_000;
 
@@ -1252,9 +1253,10 @@ async function handleAdminDepositBonusStart(request, env) {
   }
   const auth = await authenticateAdmin(request, env, body);
   if (!auth.ok) return auth.response;
-  const percent = Math.round(Number(body.percent) * 100) / 100;
+  // whole numbers only, from 5% to 200%
+  const percent = Number(body.percent);
   const days = Number(body.days);
-  if (!Number.isFinite(percent) || percent <= 0 || percent > DEPOSIT_BONUS_MAX_PERCENT) {
+  if (!Number.isInteger(percent) || percent < DEPOSIT_BONUS_MIN_PERCENT || percent > DEPOSIT_BONUS_MAX_PERCENT) {
     return jsonResponse({ error: "invalid_percent" }, 400);
   }
   if (!Number.isInteger(days) || days < 1 || days > DEPOSIT_BONUS_MAX_DAYS) {
@@ -2268,7 +2270,12 @@ async function handleAdminPromoList(request, env) {
   const result = await env.DB.prepare(
     "SELECT code, reward, currency, max_uses, uses_count, expires_at FROM promo_codes ORDER BY code ASC"
   ).all();
-  return jsonResponse({ codes: result.results || [] });
+  // codes that can still be redeemed come first, then the ones used up (at their limit) or past their end date, each
+  // group by name (the same tests as a redeem)
+  const now = Date.now();
+  const isOver = (c) => (c.max_uses != null && (c.uses_count || 0) >= c.max_uses) || (!!c.expires_at && now > Date.parse(c.expires_at));
+  const codes = (result.results || []).sort((a, b) => Number(isOver(a)) - Number(isOver(b)));
+  return jsonResponse({ codes });
 }
 
 // /api/admin/promo/delete — removes only the code's own row (one write). Its redemption records stay: they are
