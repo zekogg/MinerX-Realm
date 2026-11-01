@@ -138,9 +138,19 @@ CREATE TABLE deposits (
   tx_hash TEXT NOT NULL UNIQUE,
   amount_gram REAL NOT NULL,
   coins_credited REAL NOT NULL,
+  bonus_coins REAL NOT NULL DEFAULT 0,
+  bonus_percent REAL NOT NULL DEFAULT 0,
   status TEXT NOT NULL,
   memo TEXT,
   created_at INTEGER NOT NULL
+);
+
+-- the deposit bonus started from the admin panel: a single row (id 1), replaced by every new start
+CREATE TABLE deposit_bonus (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  percent REAL NOT NULL,
+  starts_at INTEGER NOT NULL,
+  ends_at INTEGER NOT NULL
 );
 
 CREATE TABLE withdrawals (
