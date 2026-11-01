@@ -42,8 +42,6 @@ const DEPOSIT_CHECK_TIMEOUT_MS = 120_000;
 const DEPOSIT_CHECK_MAX_ATTEMPTS = 8;
 const DEPOSIT_CHECK_FIRST_DELAY_MS = 5_000;
 const DEPOSIT_CHECK_RETRY_DELAY_MS = 15_000;
-// every user sends to the same address, so the check looks through the address's latest transactions for the user's memo
-const DEPOSIT_TX_SCAN_LIMIT = 50;
 // Deposit bonus: started and stopped from the admin panel (one row in deposit_bonus); a deposit gets it when its
 // transaction was sent between the start and the end
 const DEPOSIT_BONUS_MAX_PERCENT = 100;
@@ -1383,19 +1381,14 @@ export class DepositChecker {
     const depositAddress = this.env.DEPOSIT_ADDRESS || "";
     const headers = { "Accept": "application/json" };
     if (this.env.TONCENTER_API_KEY) headers["X-API-Key"] = this.env.TONCENTER_API_KEY;
-    // the user's earlier transactions stay in the list for a while: they are passed over so a new deposit is still
-    // found, and only decide the answer when no new one has shown up by the last check
-    let seenCredited = false;
-    let seenBelowMinimum = null;
     try {
       const tonRes = await fetch(
-        `https://toncenter.com/api/v2/getTransactions?address=${encodeURIComponent(depositAddress)}&limit=${DEPOSIT_TX_SCAN_LIMIT}&archival=false`,
+        `https://toncenter.com/api/v2/getTransactions?address=${encodeURIComponent(depositAddress)}&limit=10&archival=false`,
         { headers }
       );
       if (tonRes.ok) {
         const tonData = await tonRes.json();
         if (tonData?.ok && Array.isArray(tonData.result)) {
-          let creditedHashes = null;
           for (const tx of tonData.result) {
             const inMsg = tx.in_msg;
             if (!inMsg || !inMsg.value || Number(inMsg.value) === 0) continue;
@@ -1415,20 +1408,11 @@ export class DepositChecker {
             if (txComment.trim() !== String(memo).trim()) continue;
             const txHash = tx.transaction_id?.hash;
             if (!txHash) continue;
-            if (!creditedHashes) {
-              const credited = await this.env.DB.prepare(
-                "SELECT tx_hash FROM deposits WHERE telegram_id = ?"
-              ).bind(telegramId).all();
-              creditedHashes = new Set((credited.results || []).map((row) => row.tx_hash));
-            }
-            if (creditedHashes.has(txHash)) {
-              seenCredited = true;
-              continue;
-            }
             const amountGram = Number(inMsg.value) / 1e9;
             if (amountGram < DEPOSIT_MIN_GRAM) {
-              if (seenBelowMinimum === null) seenBelowMinimum = amountGram;
-              continue;
+              await this.state.storage.put("status", "below_minimum");
+              await this.state.storage.put("amountGram", amountGram);
+              return;
             }
             // the bonus goes by when the transaction was sent (its time is in the transaction), read straight from D1
             const bonus = depositBonusAt(await readDepositBonus(this.env), Number(tx.utime) * 1000);
@@ -1489,11 +1473,8 @@ export class DepositChecker {
     }
     if (attempts < DEPOSIT_CHECK_MAX_ATTEMPTS) {
       await this.state.storage.setAlarm(Date.now() + DEPOSIT_CHECK_RETRY_DELAY_MS);
-    } else if (seenBelowMinimum !== null) {
-      await this.state.storage.put("status", "below_minimum");
-      await this.state.storage.put("amountGram", seenBelowMinimum);
     } else {
-      await this.state.storage.put("status", seenCredited ? "already_processed" : "timeout");
+      await this.state.storage.put("status", "timeout");
     }
   }
   async notifyUser(telegramId, amountGram, coinsCredited, bonusCoins, bonusPercent) {
