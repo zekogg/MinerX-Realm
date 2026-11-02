@@ -4073,12 +4073,16 @@ async function hmacSha512(key, data) {
   const k = await crypto.subtle.importKey("raw", key, { name: "HMAC", hash: "SHA-512" }, false, ["sign"]);
   return new Uint8Array(await crypto.subtle.sign("HMAC", k, data));
 }
-// The bot wallet's keys from its words: BIP-39 seed, then SLIP-0010 ed25519 m/44'/607'/0' (Tonkeeper multichain)
+// The bot wallet's keys from its words: BIP-39 seed, then SLIP-0010 ed25519 m/44'/607'/0' (Tonkeeper multichain).
+// Kept in memory while this instance lives, so the next send does not spend CPU on them again
+let withdrawKeysMemo = { words: null, keys: null };
 async function withdrawWalletKeys(env) {
   const words = String(env.WITHDRAW_WALLET_MNEMONIC || "").trim().toLowerCase().split(/\s+/).filter(Boolean);
   if (words.length !== 12 && words.length !== 24) throw new Error("the wallet words must be 12 or 24 words");
+  const phrase = words.join(" ");
+  if (withdrawKeysMemo.words === phrase) return withdrawKeysMemo.keys;
   const enc = new TextEncoder();
-  const password = await crypto.subtle.importKey("raw", enc.encode(words.join(" ").normalize("NFKD")), "PBKDF2", false, ["deriveBits"]);
+  const password = await crypto.subtle.importKey("raw", enc.encode(phrase.normalize("NFKD")), "PBKDF2", false, ["deriveBits"]);
   const seed = new Uint8Array(await crypto.subtle.deriveBits(
     { name: "PBKDF2", hash: "SHA-512", salt: enc.encode("mnemonic"), iterations: 2048 }, password, 512
   ));
@@ -4093,7 +4097,8 @@ async function withdrawWalletKeys(env) {
   const privateKey = await crypto.subtle.importKey("pkcs8", pkcs8, { name: "Ed25519" }, true, ["sign"]);
   const jwk = await crypto.subtle.exportKey("jwk", privateKey);
   const publicKey = Uint8Array.from(atob(jwk.x.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
-  return { privateKey, publicKey };
+  withdrawKeysMemo = { words: phrase, keys: { privateKey, publicKey } };
+  return withdrawKeysMemo.keys;
 }
 // The W5 (v5r1) wallet address of this public key
 async function w5r1Address(publicKey) {
@@ -4254,70 +4259,70 @@ async function finishWithdrawAutoUnknown(env, row, detail) {
   await withdrawAdminNotice(env, w,
     `⚠️ Auto-send result unknown for request #${w.id}\n${detail}\n\nCheck the bot wallet on Tonviewer:\n• Sent: reply to the request with its TxID\n• Not sent: send it yourself and reply with the TxID, or reject it\n\nAccept is turned off for this request, so it is never sent twice.`);
 }
-// One queued request, start to end. The attempt (seqno, valid until) is saved before sending, so a run that stops in
-// the middle continues by looking for the transaction and never signs a second one
-async function processWithdrawAutoSend(env, storage, withdrawalId) {
+// One step of the queued request; returns true when it is finished, false when the next step is due in
+// WITHDRAW_AUTO_POLL_MS. Each step is its own alarm run, so every run stays small (the free plan allows 10 ms of CPU
+// and 50 outside calls per run): the first step checks, signs and sends; each later step looks once for the transfer.
+// The attempt (seqno, valid until) is saved before sending, so a run that stops in the middle continues by looking for
+// the transfer and never signs a second one
+async function stepWithdrawAutoSend(env, storage, withdrawalId) {
   const row = await env.DB.prepare("SELECT * FROM withdrawals WHERE id = ?").bind(withdrawalId).first();
-  if (!row || row.status !== "sending") return;
+  if (!row || row.status !== "sending") return true;
   const key = "attempt:" + withdrawalId;
-  let attempt = await storage.get(key);
+  const attempt = await storage.get(key);
   if (!attempt) {
     const prepared = await prepareWithdrawAutoSend(env, row);
     if (!prepared.ok) {
       await finishWithdrawAutoFailed(env, row, prepared.reason);
-      return;
+      return true;
     }
-    attempt = prepared.attempt;
-    await storage.put(key, attempt);
+    await storage.put(key, prepared.attempt);
     try {
       await toncenterCall(env, "/sendBoc", { boc: prepared.boc });
     } catch (e) {
-      // it may still have reached the network: the chain decides below
-      attempt.sendError = String(e?.message || e);
-      await storage.put(key, attempt);
+      // it may still have reached the network: the chain decides in the next steps
+      await storage.put(key, { ...prepared.attempt, sendError: String(e?.message || e) });
     }
+    return false;
   }
   // look until the transfer can no longer be accepted (valid until) plus a margin. Not found by then: the wallet's
   // seqno says whether it sent anything since we signed. Unchanged → surely not sent; changed (it sent something the
   // search did not find) → unknown, so Accept is turned off and it can't be sent twice
-  const deadline = (attempt.validUntil + WITHDRAW_AUTO_SETTLE_S) * 1000;
-  let lastError = null;
-  for (let extra = 0; ; ) {
-    const afterDeadline = Date.now() >= deadline;
-    try {
-      const txHash = await findWithdrawAutoTx(env, attempt, row.address);
-      if (txHash) {
-        await approveWithdrawalWithTx(env, withdrawalId, txHash, {
-          fromStatus: "sending",
-          answer: (text) => withdrawAdminNotice(env, row, text)
-        });
-        return;
-      }
-      if (afterDeadline) {
-        const seqnoNow = await readWalletSeqno(env, attempt.wallet);
-        if (seqnoNow === attempt.seqno) {
-          await finishWithdrawAutoFailed(env, row, attempt.sendError
-            ? `the network did not accept it (${attempt.sendError})`
-            : "the network did not accept it");
-        } else {
-          await finishWithdrawAutoUnknown(env, row,
-            `the bot wallet sent a transfer (seqno ${attempt.seqno} → ${seqnoNow}) but it was not found in its latest transactions`);
-        }
-        return;
-      }
-    } catch (e) {
-      lastError = String(e?.message || e);
-      if (afterDeadline && ++extra >= 3) {
-        await finishWithdrawAutoUnknown(env, row, `toncenter could not be reached (${lastError})`);
-        return;
-      }
+  const afterDeadline = Date.now() >= (attempt.validUntil + WITHDRAW_AUTO_SETTLE_S) * 1000;
+  try {
+    const txHash = await findWithdrawAutoTx(env, attempt, row.address);
+    if (txHash) {
+      await approveWithdrawalWithTx(env, withdrawalId, txHash, {
+        fromStatus: "sending",
+        answer: (text) => withdrawAdminNotice(env, row, text)
+      });
+      return true;
     }
-    await new Promise((resolve) => setTimeout(resolve, WITHDRAW_AUTO_POLL_MS));
+    if (afterDeadline) {
+      const seqnoNow = await readWalletSeqno(env, attempt.wallet);
+      if (seqnoNow === attempt.seqno) {
+        await finishWithdrawAutoFailed(env, row, attempt.sendError
+          ? `the network did not accept it (${attempt.sendError})`
+          : "the network did not accept it");
+      } else {
+        await finishWithdrawAutoUnknown(env, row,
+          `the bot wallet sent a transfer (seqno ${attempt.seqno} → ${seqnoNow}) but it was not found in its latest transactions`);
+      }
+      return true;
+    }
+  } catch (e) {
+    // toncenter could not be read: tried again in the next step; after the deadline, 3 failures make it unknown
+    const errors = (attempt.lateErrors || 0) + (afterDeadline ? 1 : 0);
+    if (errors >= 3) {
+      await finishWithdrawAutoUnknown(env, row, `toncenter could not be reached (${e?.message || e})`);
+      return true;
+    }
+    await storage.put(key, { ...attempt, lateErrors: errors });
   }
+  return false;
 }
 
 // WithdrawSender (Durable Object, one instance): the queue of accepted requests, sent one at a time by its alarm,
-// one request per alarm run
+// one small step per alarm run
 export class WithdrawSender {
   constructor(state, env) {
     this.state = state;
@@ -4334,7 +4339,7 @@ export class WithdrawSender {
     if (!(await this.state.storage.getAlarm())) await this.state.storage.setAlarm(Date.now());
     return jsonResponse({ ok: true });
   }
-  // one request per run (each run has its own limit of outside calls); the next run starts at once if more are queued
+  // one step of the first queued request per run (see stepWithdrawAutoSend); the next request starts once it is done
   async alarm() {
     if (this.running) return;
     this.running = true;
@@ -4343,37 +4348,39 @@ export class WithdrawSender {
       const queue = (await storage.get("queue")) || [];
       if (!queue.length) return;
       const id = queue[0];
-      // a request whose run keeps failing (not a normal "not sent", which is handled) is let go after 3 tries:
-      // with an attempt saved it may have been sent, so it is marked unknown; without one nothing was sent
-      // (counted before the run, so runs that were stopped without an error, a restart or a limit, count too)
-      const tries = ((await storage.get("tries:" + id)) || 0) + 1;
-      await storage.put("tries:" + id, tries);
-      const giveUp = async (detail) => {
+      // runs of this request that stopped in a row (an error, a restart or a limit; counted before the run, cleared
+      // after a normal step). After 3 it is let go: with an attempt saved it may have been sent, so it is marked
+      // unknown; without one nothing was sent
+      const stops = ((await storage.get("stops:" + id)) || 0) + 1;
+      await storage.put("stops:" + id, stops);
+      let done;
+      if (stops > 3) {
         const row = await this.env.DB.prepare("SELECT * FROM withdrawals WHERE id = ?").bind(id).first().catch(() => null);
-        if (!row || row.status !== "sending") return;
-        if (await storage.get("attempt:" + id)) {
-          await finishWithdrawAutoUnknown(this.env, row, "the send stopped (" + detail + ")").catch(() => null);
-        } else {
-          await finishWithdrawAutoFailed(this.env, row, "error (" + detail + ")").catch(() => null);
+        if (row && row.status === "sending") {
+          if (await storage.get("attempt:" + id)) {
+            await finishWithdrawAutoUnknown(this.env, row, "the send stopped 3 times").catch(() => null);
+          } else {
+            await finishWithdrawAutoFailed(this.env, row, "the send stopped 3 times").catch(() => null);
+          }
         }
-      };
-      if (tries > 3) {
-        await giveUp("it stopped 3 times");
+        done = true;
       } else {
         try {
-          await processWithdrawAutoSend(this.env, storage, id);
+          done = await stepWithdrawAutoSend(this.env, storage, id);
+          await storage.put("stops:" + id, 0);
         } catch (e) {
-          console.error("withdraw auto-send run failed:", id, e?.message || e);
-          if (tries < 3) {
-            await storage.setAlarm(Date.now() + 30000);
-            return;
-          }
-          await giveUp(String(e?.message || e));
+          console.error("withdraw auto-send step failed:", id, e?.message || e);
+          await storage.setAlarm(Date.now() + 10000);
+          return;
         }
+      }
+      if (!done) {
+        await storage.setAlarm(Date.now() + WITHDRAW_AUTO_POLL_MS);
+        return;
       }
       const rest = ((await storage.get("queue")) || []).filter((x) => x !== id);
       await storage.put("queue", rest);
-      await storage.delete(["attempt:" + id, "tries:" + id]);
+      await storage.delete(["attempt:" + id, "stops:" + id]);
       if (rest.length) await storage.setAlarm(Date.now());
     } finally {
       this.running = false;
