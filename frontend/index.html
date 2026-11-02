@@ -1981,6 +1981,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .checkin-icon--partner{ background:linear-gradient(145deg, #ffb357, #f07a2a); }
 .checkin-icon--name{ background:linear-gradient(145deg, #ff7fb0, #e0457e); }
 .checkin-icon--link{ background:linear-gradient(145deg, #5ee0a8, #1fa874); }
+.checkin-icon--nextcrypto{ background:linear-gradient(145deg, #3fe0e8, #0e8fb8); }
 .partner-task__btn:disabled:not(.is-claimed){ opacity:.5; }
 .ad-task__title{ font-weight:800; font-size:calc(10.8px * var(--s)); line-height:1.3; }
 .ad-task__meta{ display:flex; align-items:center; gap:calc(4px * var(--s)); flex-wrap:wrap; }
@@ -4653,6 +4654,23 @@ body.reduce-motion .firefly{
             <div class="partner-task__actions">
               <button class="checkin-copy-btn" onclick="onCheckinJoinClick(5, 'https://t.me/XTreasuryX')">Join</button>
               <button class="ad-task__watch partner-task__btn" id="checkin-btn-5" onclick="onCheckinVerifyClick(5)" disabled>Check</button>
+            </div>
+          </div>
+          <div class="card partner-task">
+            <div class="ad-task__icon checkin-icon checkin-icon--nextcrypto">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>
+            </div>
+            <div class="partner-task__body">
+              <div class="ad-task__title" data-no-i18n>Check NextCryptoEarn Channel</div>
+              <div class="ad-task__meta">
+                <img draggable="false" loading="lazy" src="/Pet%20Coin.webp" alt="Coin" class="icon-coin" style="width:calc(18px * var(--s));height:calc(18px * var(--s));flex-shrink:0;vertical-align:middle;">
+                <span class="ad-task__reward">+5</span>
+                <span class="ad-task__avail">Available</span>
+              </div>
+            </div>
+            <div class="partner-task__actions">
+              <button class="checkin-copy-btn" onclick="onCheckinJoinClick(6, 'https://t.me/NextCryptoEarn')">Join</button>
+              <button class="ad-task__watch partner-task__btn" id="checkin-btn-6" onclick="onCheckinVerifyClick(6)" disabled>Check</button>
             </div>
           </div>
           <div class="card partner-task">
@@ -9402,14 +9420,14 @@ function runAdGateFailed(onFail, message){
 
 // Check-in
 var checkinState = {
-  claimedToday: { 1: false, 2: false, 3: false, 4: false, 5: false },
-  rewards: { 1: 10, 2: 10, 3: 20, 4: 20, 5: 5 },
-  ready: { 1: false, 2: false, 3: false, 4: false, 5: false },
-  busy: { 1: false, 2: false, 3: false, 4: false, 5: false }
+  claimedToday: { 1: false, 2: false, 3: false, 4: false, 5: false, 6: false },
+  rewards: { 1: 10, 2: 10, 3: 20, 4: 20, 5: 5, 6: 5 },
+  ready: { 1: false, 2: false, 3: false, 4: false, 5: false, 6: false },
+  busy: { 1: false, 2: false, 3: false, 4: false, 5: false, 6: false }
 };
-// Check on the channel tasks (1: news channel, 5: partner channel) unlocks only after Join is tapped that UTC day
-// (kept on the device, no request)
-var CHECKIN_JOIN_TASKS = { 1: true, 5: true };
+// Check on the channel tasks (1: news channel, 5: partner channel, 6: NextCryptoEarn) unlocks only after Join is tapped
+// that UTC day (kept on the device, no request)
+var CHECKIN_JOIN_TASKS = { 1: true, 5: true, 6: true };
 var CHECKIN_JOIN_KEY = 'checkin_join_date_';
 function checkinUtcDate(){ return new Date(serverNow()).toISOString().slice(0, 10); }
 function isCheckinJoinedToday(task){
@@ -9431,7 +9449,7 @@ var checkinCountdownTimers = { 2: null };
 function applyCheckinState(claimedToday, rewards){
   checkinState.claimedToday = claimedToday || checkinState.claimedToday;
   checkinState.rewards = rewards || checkinState.rewards;
-  for (var t = 1; t <= 5; t++){
+  for (var t = 1; t <= 6; t++){
     if (checkinState.claimedToday[t]) checkinState.ready[t] = false;
     renderCheckinButton(t);
   }
