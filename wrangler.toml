@@ -21,9 +21,18 @@ database_id = "9ebdd2c5-85f9-45d2-8d3b-0eb0f86ab0d3"
 name = "DEPOSIT_CHECKER"
 class_name = "DepositChecker"
 
+# زر Accept في رسالة السحب: طابور يرسل السحوبات واحداً تلو الآخر من محفظة البوت
+[[durable_objects.bindings]]
+name = "WITHDRAW_SENDER"
+class_name = "WithdrawSender"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["DepositChecker"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["WithdrawSender"]
 
 # يشغّل scheduled() في worker.js (لا علاقة له بحصة الطلبات العادية):
 # - "0 0 * * *"   كل يوم 00:00 UTC: يختار تركيبة Daily Combo الجديدة ويرسلها للأدمن فقط.
@@ -32,6 +41,9 @@ new_sqlite_classes = ["DepositChecker"]
 #   في Cloudflare الأحد = 1 والجمعة = 6، لذلك يُكتب اليوم بالاسم FRI وليس بالرقم.
 [triggers]
 crons = ["0 0 * * *", "5 0 * * FRI"]
+
+# WITHDRAW_WALLET_MNEMONIC (كلمات محفظة البوت) و WITHDRAW_WALLET_ADDRESS (عنوانها) يُضبطان كـ Cloudflare Secrets
+# لزر Accept في رسائل السحب؛ بدونهما (أو بدون TELEGRAM_WEBHOOK_SECRET) لا يُرسل شيء ويبقى السحب يدوياً
 
 # DEPOSIT_ADDRESS و TONCENTER_API_KEY (اختياري) يُضبطان كـ Cloudflare Secrets
 # لا كـ [vars] — عبر: wrangler secret put DEPOSIT_ADDRESS

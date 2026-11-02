@@ -166,7 +166,9 @@ CREATE TABLE withdrawals (
   status TEXT NOT NULL DEFAULT 'pending',
   channel_message_id INTEGER,
   created_at INTEGER NOT NULL,
-  resolved_at INTEGER
+  resolved_at INTEGER,
+  admin_message_id INTEGER,
+  auto_send TEXT
 );
 
 CREATE TABLE referral_commission_log (

@@ -1591,14 +1591,16 @@ async function handleWithdrawRequest(request, env) {
   }
   const withdrawalId = insertResult.meta.last_row_id;
   const withdrawArgs = { telegramId, rawUsername, firstName, netGram, address };
-  // the admin gets a private copy of the request, with no buttons: replying to it with the TxID approves it, replying
-  // with "reject" rejects it. Nothing goes to the channel now: it only gets the success post, once approved.
+  // the admin gets a private copy of the request: replying to it with the TxID approves it, replying with "reject"
+  // rejects it; its Accept button (requests up to WITHDRAW_AUTO_MAX_GRAM) sends it from the bot wallet, its Reject
+  // button asks for the reason. Nothing goes to the channel now: it only gets the success post, once approved.
   // Telegram answering that the copy failed (a rate limit, an outage) means it was not sent, so it is sent once more;
   // no answer in time may mean it was sent, so it is not sent again (no second copy of the same request)
   const adminPayload = {
     chat_id: ADMIN_TELEGRAM_ID,
     text: buildAdminWithdrawText("pending", withdrawalId, withdrawArgs),
-    parse_mode: "HTML"
+    parse_mode: "HTML",
+    reply_markup: withdrawAdminKeyboard({ id: withdrawalId, net_gram: netGram, auto_send: null })
   };
   let adminCopy = await withdrawTelegramCall(env, "sendMessage", adminPayload);
   if (adminCopy.state === "failed") {
@@ -1606,7 +1608,12 @@ async function handleWithdrawRequest(request, env) {
     await new Promise((resolve) => setTimeout(resolve, Math.min(Math.max(retryAfter, 0.5), 3) * 1000));
     adminCopy = await withdrawTelegramCall(env, "sendMessage", adminPayload);
   }
-  if (adminCopy.state !== "ok") {
+  if (adminCopy.state === "ok") {
+    // the buttons' messages (the Reject question, a failed send) refer to the copy by this number
+    await env.DB.prepare("UPDATE withdrawals SET admin_message_id = ? WHERE id = ?")
+      .bind(adminCopy.result.message_id, withdrawalId).run()
+      .catch((e) => console.error("withdraw admin copy number not saved:", e?.message || e));
+  } else {
     console.error("withdraw admin copy not sent:", adminCopy.state, JSON.stringify(adminCopy.data || adminCopy.error || null));
     // so the request is not missed it goes to the channel with the Approve / Reject buttons (only the admin can use them)
     const fallbackPost = await withdrawTelegramCall(env, "sendMessage", {
@@ -1666,7 +1673,8 @@ async function handleWalletHistory(request, env) {
     items.push({ type: "deposit", amount: row.amount, status: "confirmed", created_at: row.created_at });
   }
   for (const row of (withdrawalsResult.results || [])) {
-    items.push({ type: "withdraw", amount: row.amount, status: row.status, created_at: row.created_at });
+    // a request being sent by the Accept button still shows as pending
+    items.push({ type: "withdraw", amount: row.amount, status: row.status === "sending" ? "pending" : row.status, created_at: row.created_at });
   }
   for (const row of (referralCommissionResult.results || [])) {
     items.push({ type: "referral_commission", amount: row.amount, created_at: row.created_at });
@@ -3472,10 +3480,12 @@ function buildAdminWithdrawText(status, withdrawalId, w) {
     ? `✅ ${name} Approved`
     : status === "rejected"
     ? `❌ ${name} Rejected`
+    : status === "sending"
+    ? `⏳ ${name} Sending`
     : `🆕 ${name}`;
   const footer = status === "approved"
     ? "\n↩️ Reply with a new TxID to correct it"
-    : status === "rejected" ? "" : "\n↩️ Reply with the TxID to approve\n↩️ Reply with reject to reject";
+    : status === "rejected" || status === "sending" ? "" : "\n↩️ Reply with the TxID to approve\n↩️ Reply with reject to reject";
   return (
     `${title}\n` +
     `👤 ${withdrawNameLine(w)}\n` +
@@ -3484,6 +3494,8 @@ function buildAdminWithdrawText(status, withdrawalId, w) {
     `📍 Address:\n<code>${escapeHtml(w.address)}</code>` +
     (w.txHash ? `\n🔗 TxID:\n${txLinkHtml(w.txHash)}` : "") +
     (w.reason ? `\n📝 Reason: ${escapeHtml(w.reason)}` : "") +
+    // a line from the Accept button (asking to confirm, sending, or why it was not sent), already HTML
+    (w.note ? `\n\n${w.note}` : "") +
     footer
   );
 }
@@ -3544,13 +3556,19 @@ async function handleWithdrawTxReply(message, env) {
   const replied = message.reply_to_message;
   const botId = Number(String(env.BOT_TOKEN || "").split(":")[0]);
   if (!replied.from || replied.from.id !== botId || typeof replied.text !== "string") return;
-  const idMatch = replied.text.match(/^[^\n]*Withdrawal #(\d+)/);
-  if (!idMatch) return;
-  const withdrawalId = Number(idMatch[1]);
   const answer = (text) => sendMessage(env, ADMIN_TELEGRAM_ID, {
     text,
     reply_parameters: { message_id: message.message_id }
   }).catch(() => null);
+  // a reply to the question the Reject button asks: the whole reply is the reason
+  const reasonMatch = replied.text.match(WITHDRAW_REASON_PROMPT_PATTERN);
+  if (reasonMatch) {
+    await handleWithdrawReasonReply(message, env, Number(reasonMatch[1]), answer);
+    return;
+  }
+  const idMatch = replied.text.match(/^[^\n]*Withdrawal #(\d+)/);
+  if (!idMatch) return;
+  const withdrawalId = Number(idMatch[1]);
   // "reject", optionally followed by a reason (after a space or a new line) that the user is shown
   const rejectMatch = typeof message.text === "string" ? message.text.trim().match(/^reject(?:\s+([\s\S]*))?$/i) : null;
   if (rejectMatch) {
@@ -3559,9 +3577,7 @@ async function handleWithdrawTxReply(message, env) {
       const w = await rejectWithdrawal(env, withdrawalId);
       if (!w) {
         const current = await env.DB.prepare("SELECT status FROM withdrawals WHERE id = ?").bind(withdrawalId).first();
-        await answer(!current ? "⚠️ Withdrawal not found."
-          : current.status === "approved" ? "⚠️ This withdrawal was already approved, it can't be rejected."
-          : "⚠️ This withdrawal was already rejected.");
+        await answer(withdrawNotPendingText(current));
         return;
       }
       await Promise.all([
@@ -3583,10 +3599,21 @@ async function handleWithdrawTxReply(message, env) {
     await answer("⚠️ Invalid reply. Send the transaction hash, its Tonviewer / Tonscan link, or reject.");
     return;
   }
+  await approveWithdrawalWithTx(env, withdrawalId, txHash, {
+    fromStatus: "pending",
+    adminMessage: replied,
+    answer
+  });
+}
+
+// Approves a request with its TxID: the request (from fromStatus: "pending" for a TxID reply, "sending" for the Accept
+// button) becomes approved once, the channel gets the success post, the admin's copy shows the TxID and the user is
+// told once. A request already approved only gets the new TxID in the posts. answer(text) tells the admin
+async function approveWithdrawalWithTx(env, withdrawalId, txHash, { fromStatus, adminMessage = null, answer }) {
   try {
     const approvedResult = await env.DB.prepare(
-      "UPDATE withdrawals SET status = 'approved', resolved_at = ? WHERE id = ? AND status = 'pending' RETURNING *"
-    ).bind(Date.now(), withdrawalId).all();
+      "UPDATE withdrawals SET status = 'approved', resolved_at = ? WHERE id = ? AND status = ? RETURNING *"
+    ).bind(Date.now(), withdrawalId, fromStatus).all();
     const justApproved = approvedResult.results && approvedResult.results[0];
     const w = justApproved || await env.DB.prepare("SELECT * FROM withdrawals WHERE id = ?").bind(withdrawalId).first();
     if (!w) {
@@ -3594,7 +3621,7 @@ async function handleWithdrawTxReply(message, env) {
       return;
     }
     if (w.status !== "approved") {
-      await answer("⚠️ This withdrawal was rejected.");
+      await answer(w.status === "sending" ? WITHDRAW_SENDING_TEXT : "⚠️ This withdrawal was rejected.");
       return;
     }
     const args = withdrawRowArgs(w, txHash);
@@ -3603,7 +3630,7 @@ async function handleWithdrawTxReply(message, env) {
     // corrected later); otherwise the success post is published now, as a new post. Its number is on the request, or
     // in the link of the admin's copy when it could not be saved there (a negative number there is a claim, below)
     const savedPostId = w.channel_message_id > 0 ? w.channel_message_id : null;
-    let postId = savedPostId || withdrawChannelPostFromMessage(replied);
+    let postId = savedPostId || withdrawChannelPostFromMessage(adminMessage);
     let channelProblem = null;
     const postPayload = {
       chat_id: ADMIN_CHANNEL_ID,
@@ -3651,13 +3678,15 @@ async function handleWithdrawTxReply(message, env) {
       }
     }
     args.channelPostId = postId || null;
-    const jobs = [
-      editMessage(env, ADMIN_TELEGRAM_ID, replied.message_id, {
+    // the admin's copy: the message replied to, or the one the Accept button is on
+    const adminMessageId = adminMessage ? adminMessage.message_id : w.admin_message_id;
+    const jobs = adminMessageId ? [
+      editMessage(env, ADMIN_TELEGRAM_ID, adminMessageId, {
         text: buildAdminWithdrawText("approved", withdrawalId, args),
         parse_mode: "HTML",
         link_preview_options: noPreview
       })
-    ];
+    ] : [];
     if (justApproved) {
       jobs.push(sendMessage(env, w.telegram_id, {
         text:
@@ -3696,10 +3725,655 @@ async function rejectWithdrawal(env, withdrawalId) {
   return (statusResult.results && statusResult.results[0]) || null;
 }
 
+// ===== Withdraw Accept button: sends the request from the bot wallet (WITHDRAW_WALLET_MNEMONIC) =====
+// Requests up to WITHDRAW_AUTO_MAX_GRAM get ✅ Accept and ❌ Reject on the admin's copy (bigger ones only Reject; they
+// are paid by hand with a TxID reply, as before). Accept asks to confirm; Yes moves the request to "sending" (so a
+// TxID reply or a reject cannot touch it meanwhile) and queues it in WithdrawSender, which sends one request at a time:
+// exactly net_gram Gram, non-bounceable, comment WITHDRAW_AUTO_COMMENT, the network fee paid by the bot wallet on top.
+// It then looks for the transaction on the chain: found → approved as with a TxID reply; surely not sent → back to
+// pending with the reason (Accept can be pressed again); the result could not be learned → back to pending with
+// Accept turned off, so it is never sent twice, and the admin checks the wallet
+const WITHDRAW_AUTO_MAX_GRAM = 0.2;
+const WITHDRAW_AUTO_COMMENT = "MinerXRealm";
+// kept in the bot wallet above the amount, for the network fee (about 0.003 Gram)
+const WITHDRAW_AUTO_FEE_RESERVE_NANO = 10000000n;
+// the signed transfer is valid this long; after it (plus the wait below) it can no longer be sent
+const WITHDRAW_AUTO_VALID_S = 60;
+const WITHDRAW_AUTO_SETTLE_S = 30;
+const WITHDRAW_AUTO_POLL_MS = 4000;
+const TONCENTER_API_URL = "https://toncenter.com/api/v2";
+const TONCENTER_TIMEOUT_MS = 10000;
+// wallet v5r1 (W5) on mainnet, workchain 0, subwallet 0: its wallet id, and its code cell's hash and depth (only these
+// two enter the address)
+const W5R1_WALLET_ID = 2147483409;
+const W5R1_CODE_HASH = "20834b7b72b112147e1b2fb457b84e74d1a30f04f737d4f62a668e9552d2b72f";
+const W5R1_CODE_DEPTH = 6;
+const WITHDRAW_REASON_PROMPT_PATTERN = /^✍️ Reply with the reason to reject Withdrawal #(\d+)/;
+const WITHDRAW_SENDING_TEXT = "⏳ This withdrawal is being sent by the Accept button right now. Wait for the result.";
+
+function withdrawNotPendingText(row) {
+  return !row ? "⚠️ Withdrawal not found."
+    : row.status === "approved" ? "⚠️ This withdrawal was already approved, it can't be rejected."
+    : row.status === "sending" ? WITHDRAW_SENDING_TEXT
+    : "⚠️ This withdrawal was already rejected.";
+}
+function withdrawCanAutoSend(row) {
+  return Math.round(Number(row.net_gram) * 100) <= Math.round(WITHDRAW_AUTO_MAX_GRAM * 100) && !row.auto_send;
+}
+// The admin's copy of a pending request: Accept (when it can be sent from the bot wallet) and Reject
+function withdrawAdminKeyboard(row) {
+  const reject = { text: "❌ Reject", callback_data: `wd_rj_${row.id}` };
+  return withdrawCanAutoSend(row)
+    ? { inline_keyboard: [[{ text: "✅ Accept", callback_data: `wd_ac_${row.id}` }, reject]] }
+    : { inline_keyboard: [[reject]] };
+}
+// Puts the admin's copy in the given state (note: an HTML line above the footer); keyboard null removes the buttons
+async function editWithdrawAdminCopy(env, messageId, status, row, note, keyboard) {
+  if (!messageId) return null;
+  const payload = {
+    text: buildAdminWithdrawText(status, row.id, { ...withdrawRowArgs(row), reason: row.reason || null, note }),
+    parse_mode: "HTML",
+    link_preview_options: { is_disabled: true }
+  };
+  if (keyboard) payload.reply_markup = keyboard;
+  return editMessage(env, ADMIN_TELEGRAM_ID, messageId, payload).catch(() => null);
+}
+function withdrawAdminNotice(env, row, text) {
+  const payload = { text };
+  if (row.admin_message_id) payload.reply_parameters = { message_id: row.admin_message_id, allow_sending_without_reply: true };
+  return sendMessage(env, ADMIN_TELEGRAM_ID, payload).catch(() => null);
+}
+
+// The buttons on the admin's copy: wd_ac (Accept) asks to confirm, wd_yes sends, wd_back returns, wd_rj (Reject)
+// asks for the reason
+async function handleWithdrawAutoCallback(cbq, env, action, withdrawalId) {
+  const messageId = cbq.message && cbq.message.message_id;
+  try {
+    let row = await env.DB.prepare("SELECT * FROM withdrawals WHERE id = ?").bind(withdrawalId).first();
+    if (!row) {
+      await answerCallbackQuery(env, cbq.id, "⚠️ Withdrawal not found");
+      return;
+    }
+    if (messageId && row.admin_message_id !== messageId) {
+      await env.DB.prepare("UPDATE withdrawals SET admin_message_id = ? WHERE id = ?").bind(messageId, withdrawalId).run();
+      row = { ...row, admin_message_id: messageId };
+    }
+    if (row.status !== "pending") {
+      await answerCallbackQuery(env, cbq.id, row.status === "sending" ? "⏳ Being sent right now"
+        : row.status === "approved" ? "⚠️ Already approved" : "⚠️ Already rejected");
+      if (row.status !== "sending") {
+        await withdrawTelegramCall(env, "editMessageReplyMarkup", {
+          chat_id: ADMIN_TELEGRAM_ID, message_id: messageId, reply_markup: { inline_keyboard: [] }
+        });
+      }
+      return;
+    }
+    const amount = formatWithdrawGram(row.net_gram);
+    if (action === "rj") {
+      await sendMessage(env, ADMIN_TELEGRAM_ID, {
+        text: `✍️ Reply with the reason to reject Withdrawal #${withdrawalId}\n\n💵 ${amount} Gram · 🆔 ${row.telegram_id}\nThe user gets the reason and the refund.`,
+        reply_parameters: { message_id: messageId, allow_sending_without_reply: true },
+        reply_markup: { force_reply: true, input_field_placeholder: "Reason" }
+      });
+      await answerCallbackQuery(env, cbq.id, "✍️ Write the reason");
+      return;
+    }
+    if (action === "back") {
+      await editWithdrawAdminCopy(env, messageId, "pending", row, null, withdrawAdminKeyboard(row));
+      await answerCallbackQuery(env, cbq.id, "");
+      return;
+    }
+    if (!withdrawCanAutoSend(row)) {
+      await editWithdrawAdminCopy(env, messageId, "pending", row, null, withdrawAdminKeyboard(row));
+      await answerCallbackQuery(env, cbq.id, "⚠️ Send this one yourself and reply with the TxID");
+      return;
+    }
+    if (action === "ac") {
+      await editWithdrawAdminCopy(env, messageId, "pending", row, `❓ <b>Send ${amount} Gram?</b>`, {
+        inline_keyboard: [[
+          { text: "✅ Yes", callback_data: `wd_yes_${withdrawalId}` },
+          { text: "↩️ Back", callback_data: `wd_back_${withdrawalId}` }
+        ]]
+      });
+      await answerCallbackQuery(env, cbq.id, "");
+      return;
+    }
+    // Yes. The webhook secret proves the button press came from Telegram: without it nothing is sent
+    const missing = ["TELEGRAM_WEBHOOK_SECRET", "WITHDRAW_WALLET_MNEMONIC", "WITHDRAW_WALLET_ADDRESS"].filter((k) => !env[k]);
+    if (missing.length) {
+      await editWithdrawAdminCopy(env, messageId, "pending", row,
+        `⚠️ Not sent: ${escapeHtml(missing.join(", "))} missing in Cloudflare`, withdrawAdminKeyboard(row));
+      await answerCallbackQuery(env, cbq.id, "⚠️ Not sent: wallet settings missing");
+      return;
+    }
+    const claimed = await env.DB.prepare(
+      `UPDATE withdrawals SET status = 'sending'
+       WHERE id = ? AND status = 'pending' AND auto_send IS NULL AND ROUND(net_gram * 100) <= ? RETURNING *`
+    ).bind(withdrawalId, Math.round(WITHDRAW_AUTO_MAX_GRAM * 100)).all();
+    const sending = claimed.results && claimed.results[0];
+    if (!sending) {
+      await answerCallbackQuery(env, cbq.id, "⚠️ Already processed");
+      return;
+    }
+    await editWithdrawAdminCopy(env, messageId, "sending", sending, `⏳ Sending ${amount} Gram…`, null);
+    let queued = false;
+    try {
+      const stub = env.WITHDRAW_SENDER.get(env.WITHDRAW_SENDER.idFromName("main"));
+      const res = await stub.fetch("https://do/enqueue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: withdrawalId })
+      });
+      queued = res.ok;
+    } catch (e) {
+      console.error("withdraw queue failed:", e?.message || e);
+    }
+    if (!queued) {
+      // nothing was signed or sent: back to pending
+      await env.DB.prepare("UPDATE withdrawals SET status = 'pending' WHERE id = ? AND status = 'sending'").bind(withdrawalId).run();
+      await editWithdrawAdminCopy(env, messageId, "pending", row,
+        "⚠️ Not sent: the send could not start. Press Accept to try again", withdrawAdminKeyboard(row));
+      await answerCallbackQuery(env, cbq.id, "⚠️ Not sent, try again");
+      return;
+    }
+    await answerCallbackQuery(env, cbq.id, "⏳ Sending…");
+  } catch (e) {
+    console.error("withdraw button failed:", e?.message || e);
+    await answerCallbackQuery(env, cbq.id, "⚠️ Something went wrong");
+  }
+}
+
+// The admin's reply to the Reject button's question: rejects with that reason (refund + message to the user)
+async function handleWithdrawReasonReply(message, env, withdrawalId, answer) {
+  const reason = typeof message.text === "string"
+    ? Array.from(message.text.trim()).slice(0, WITHDRAW_REJECT_REASON_MAX).join("").trim()
+    : "";
+  if (!reason) {
+    await answer("⚠️ Send the reason as text, as a reply to the question.");
+    return;
+  }
+  try {
+    const w = await rejectWithdrawal(env, withdrawalId);
+    if (!w) {
+      const current = await env.DB.prepare("SELECT status FROM withdrawals WHERE id = ?").bind(withdrawalId).first();
+      await answer(withdrawNotPendingText(current));
+      return;
+    }
+    await Promise.all([
+      editWithdrawAdminCopy(env, w.admin_message_id, "rejected", { ...w, reason }, null, null),
+      sendMessage(env, w.telegram_id, { text: withdrawRejectedDm(reason) }).catch(() => null)
+    ]);
+    await answer(`❌ Withdrawal #${withdrawalId} rejected. The user got the reason and the refund.`);
+  } catch (e) {
+    console.error("withdraw reason reject failed:", e?.message || e);
+    await answer("⚠️ Something went wrong, try again.");
+  }
+}
+
+// --- TON: cells, addresses and the W5 transfer (built here, without libraries) ---
+function tonBuilder() {
+  const bits = [];
+  const refs = [];
+  const b = {
+    uint(value, n) {
+      const v = BigInt(value);
+      for (let i = n - 1; i >= 0; i--) bits.push(Number((v >> BigInt(i)) & 1n));
+      return b;
+    },
+    bytes(u8) {
+      for (const x of u8) b.uint(x, 8);
+      return b;
+    },
+    // VarUInteger 16 (Grams)
+    coins(value) {
+      const v = BigInt(value);
+      let len = 0;
+      while ((v >> BigInt(8 * len)) > 0n) len++;
+      b.uint(len, 4);
+      if (len) b.uint(v, 8 * len);
+      return b;
+    },
+    // MsgAddressInt addr_std, no anycast
+    address(a) {
+      return b.uint(2, 2).uint(0, 1).uint(BigInt.asUintN(8, BigInt(a.wc)), 8).bytes(a.hash);
+    },
+    ref(cell) {
+      refs.push(cell);
+      return b;
+    },
+    // another cell's bits and refs, appended
+    append(cell) {
+      bits.push(...cell.bits);
+      refs.push(...cell.refs);
+      return b;
+    },
+    end() {
+      if (bits.length > 1023 || refs.length > 4) throw new Error("cell overflow");
+      return { bits, refs };
+    }
+  };
+  return b;
+}
+function tonCellData(cell) {
+  const n = cell.bits.length;
+  const out = new Uint8Array(Math.ceil(n / 8));
+  cell.bits.forEach((bit, i) => { if (bit) out[i >> 3] |= 0x80 >> (i & 7); });
+  if (n % 8) out[n >> 3] |= 0x80 >> (n % 8);
+  return out;
+}
+function concatBytes(parts) {
+  const out = new Uint8Array(parts.reduce((sum, p) => sum + p.length, 0));
+  let offset = 0;
+  for (const p of parts) { out.set(p, offset); offset += p.length; }
+  return out;
+}
+function hexToBytes(hex) {
+  return Uint8Array.from(hex.match(/../g).map((h) => parseInt(h, 16)));
+}
+function bytesToHex(u8) {
+  return Array.from(u8, (x) => x.toString(16).padStart(2, "0")).join("");
+}
+// The cell's representation hash (ordinary cells); a cell given only as { hash, depth } is used as is
+async function tonCellHash(cell) {
+  if (cell.hash) return cell.hash;
+  let depth = 0;
+  for (const r of cell.refs) {
+    await tonCellHash(r);
+    depth = Math.max(depth, r.depth + 1);
+  }
+  const n = cell.bits.length;
+  const repr = concatBytes([
+    Uint8Array.from([cell.refs.length, Math.floor(n / 8) + Math.ceil(n / 8)]),
+    tonCellData(cell),
+    ...cell.refs.map((r) => Uint8Array.from([r.depth >> 8, r.depth & 255])),
+    ...cell.refs.map((r) => r.hash)
+  ]);
+  cell.depth = depth;
+  cell.hash = new Uint8Array(await crypto.subtle.digest("SHA-256", repr));
+  return cell.hash;
+}
+function crc32c(bytes) {
+  let crc = 0xffffffff;
+  for (const x of bytes) {
+    crc ^= x;
+    for (let k = 0; k < 8; k++) crc = crc & 1 ? (crc >>> 1) ^ 0x82f63b78 : crc >>> 1;
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+// Bag of cells with one root and a CRC32C, as base64
+async function tonBocBase64(root) {
+  await tonCellHash(root);
+  const order = [];
+  const seen = new Set();
+  const visit = (cell) => {
+    const key = bytesToHex(cell.hash);
+    if (seen.has(key)) return;
+    seen.add(key);
+    cell.refs.forEach(visit);
+    order.push(cell);
+  };
+  visit(root);
+  order.reverse(); // the root first, every cell before the cells it refers to
+  const index = new Map(order.map((cell, i) => [bytesToHex(cell.hash), i]));
+  const byteLen = (v) => { let n = 1; while (v >= 256 ** n) n++; return n; };
+  const sizeBytes = byteLen(order.length);
+  const num = (v, n) => Array.from({ length: n }, (_, i) => Number((BigInt(v) >> BigInt(8 * (n - 1 - i))) & 255n));
+  const cellsData = concatBytes(order.map((cell) => {
+    const n = cell.bits.length;
+    return concatBytes([
+      Uint8Array.from([cell.refs.length, Math.floor(n / 8) + Math.ceil(n / 8)]),
+      tonCellData(cell),
+      Uint8Array.from(cell.refs.flatMap((r) => num(index.get(bytesToHex(r.hash)), sizeBytes)))
+    ]);
+  }));
+  const offBytes = byteLen(cellsData.length);
+  const head = concatBytes([
+    Uint8Array.from([0xb5, 0xee, 0x9c, 0x72, 0x40 | sizeBytes, offBytes]),
+    Uint8Array.from([...num(order.length, sizeBytes), ...num(1, sizeBytes), ...num(0, sizeBytes)]),
+    Uint8Array.from([...num(cellsData.length, offBytes), ...num(0, sizeBytes)]),
+    cellsData
+  ]);
+  const crc = crc32c(head);
+  const boc = concatBytes([head, Uint8Array.from([crc & 255, (crc >>> 8) & 255, (crc >>> 16) & 255, crc >>> 24])]);
+  let bin = "";
+  for (const x of boc) bin += String.fromCharCode(x);
+  return btoa(bin);
+}
+function crc16(bytes) {
+  let crc = 0;
+  for (const x of bytes) {
+    crc ^= x << 8;
+    for (let k = 0; k < 8; k++) crc = crc & 0x8000 ? ((crc << 1) ^ 0x1021) & 0xffff : (crc << 1) & 0xffff;
+  }
+  return crc;
+}
+// A TON address on workchain 0 or -1 (user-friendly, with its checksum, or raw "0:<hex>") → { wc, hash }, or null
+function parseTonAddress(text) {
+  const s = String(text || "").trim();
+  const raw = s.match(/^(0|-1):([0-9a-fA-F]{64})$/);
+  if (raw) return { wc: Number(raw[1]), hash: hexToBytes(raw[2].toLowerCase()) };
+  if (!/^[A-Za-z0-9+/_-]{48}$/.test(s)) return null;
+  let bin;
+  try {
+    bin = atob(s.replace(/-/g, "+").replace(/_/g, "/"));
+  } catch (e) {
+    return null;
+  }
+  const b = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+  if (b.length !== 36 || ((b[0] & 0x7f) !== 0x11 && (b[0] & 0x7f) !== 0x51)) return null;
+  if (crc16(b.subarray(0, 34)) !== ((b[34] << 8) | b[35])) return null;
+  if (b[1] !== 0 && b[1] !== 0xff) return null;
+  return { wc: b[1] === 0xff ? -1 : 0, hash: b.slice(2, 34) };
+}
+function sameTonAddress(a, b) {
+  return !!a && !!b && a.wc === b.wc && bytesToHex(a.hash) === bytesToHex(b.hash);
+}
+async function hmacSha512(key, data) {
+  const k = await crypto.subtle.importKey("raw", key, { name: "HMAC", hash: "SHA-512" }, false, ["sign"]);
+  return new Uint8Array(await crypto.subtle.sign("HMAC", k, data));
+}
+// The bot wallet's keys from its words: BIP-39 seed, then SLIP-0010 ed25519 m/44'/607'/0' (Tonkeeper multichain)
+async function withdrawWalletKeys(env) {
+  const words = String(env.WITHDRAW_WALLET_MNEMONIC || "").trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (words.length !== 12 && words.length !== 24) throw new Error("the wallet words must be 12 or 24 words");
+  const enc = new TextEncoder();
+  const password = await crypto.subtle.importKey("raw", enc.encode(words.join(" ").normalize("NFKD")), "PBKDF2", false, ["deriveBits"]);
+  const seed = new Uint8Array(await crypto.subtle.deriveBits(
+    { name: "PBKDF2", hash: "SHA-512", salt: enc.encode("mnemonic"), iterations: 2048 }, password, 512
+  ));
+  let node = await hmacSha512(enc.encode("ed25519 seed"), seed);
+  for (const index of [44, 607, 0]) {
+    const data = new Uint8Array(37);
+    data.set(node.subarray(0, 32), 1);
+    new DataView(data.buffer).setUint32(33, (index | 0x80000000) >>> 0);
+    node = await hmacSha512(node.slice(32), data);
+  }
+  const pkcs8 = concatBytes([hexToBytes("302e020100300506032b657004220420"), node.subarray(0, 32)]);
+  const privateKey = await crypto.subtle.importKey("pkcs8", pkcs8, { name: "Ed25519" }, true, ["sign"]);
+  const jwk = await crypto.subtle.exportKey("jwk", privateKey);
+  const publicKey = Uint8Array.from(atob(jwk.x.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
+  return { privateKey, publicKey };
+}
+// The W5 (v5r1) wallet address of this public key
+async function w5r1Address(publicKey) {
+  const data = tonBuilder().uint(1, 1).uint(0, 32).uint(W5R1_WALLET_ID, 32).bytes(publicKey).uint(0, 1).end();
+  const code = { hash: hexToBytes(W5R1_CODE_HASH), depth: W5R1_CODE_DEPTH };
+  // StateInit: no split_depth, no special, code, data, no library
+  const stateInit = tonBuilder().uint(0, 1).uint(0, 1).uint(1, 1).uint(1, 1).uint(0, 1).ref(code).ref(data).end();
+  return { wc: 0, hash: await tonCellHash(stateInit) };
+}
+// The signed external message (BOC, base64) that makes the W5 wallet send nano to dest, non-bounceable, with the comment;
+// send mode 3 (the fee paid on top, errors ignored as W5 requires for signed messages)
+async function buildW5Transfer(keys, wallet, seqno, validUntil, dest, nano, comment) {
+  const message = tonBuilder()
+    .uint(0, 1)                  // int_msg_info
+    .uint(1, 1)                  // ihr_disabled
+    .uint(0, 1)                  // bounce: no, the money stays even in a wallet that was never used
+    .uint(0, 1)                  // bounced
+    .uint(0, 2)                  // src: addr_none (the wallet's own)
+    .address(dest)
+    .coins(nano)
+    .uint(0, 1)                  // no other currencies
+    .coins(0).coins(0)           // ihr_fee, fwd_fee
+    .uint(0, 64).uint(0, 32)     // created_lt, created_at
+    .uint(0, 1)                  // no init
+    .uint(0, 1)                  // body here
+    .uint(0, 32).bytes(new TextEncoder().encode(comment))
+    .end();
+  const outList = tonBuilder().ref({ bits: [], refs: [] }).uint(0x0ec3c86d, 32).uint(3, 8).ref(message).end();
+  const signing = tonBuilder()
+    .uint(0x7369676e, 32)        // auth_signed_external
+    .uint(W5R1_WALLET_ID, 32)
+    .uint(validUntil, 32)
+    .uint(seqno, 32)
+    .uint(1, 1).ref(outList)     // the actions
+    .uint(0, 1)                  // no extended actions
+    .end();
+  const signature = new Uint8Array(await crypto.subtle.sign("Ed25519", keys.privateKey, await tonCellHash(signing)));
+  const body = tonBuilder().append(signing).bytes(signature).end();
+  const external = tonBuilder()
+    .uint(2, 2)                  // ext_in_msg_info
+    .uint(0, 2)                  // src: addr_none
+    .address(wallet)
+    .coins(0)                    // import_fee
+    .uint(0, 1)                  // no init
+    .uint(0, 1)                  // body here
+    .append(body)
+    .end();
+  return tonBocBase64(external);
+}
+
+// toncenter (TONCENTER_API_KEY raises its limit); a rate limit is retried once. Returns result, throws on failure
+async function toncenterCall(env, path, body) {
+  for (let attempt = 0; ; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TONCENTER_TIMEOUT_MS);
+    let res, data = null;
+    try {
+      const headers = { "Content-Type": "application/json" };
+      if (env.TONCENTER_API_KEY) headers["X-API-Key"] = env.TONCENTER_API_KEY;
+      res = await fetch(TONCENTER_API_URL + path, {
+        method: body ? "POST" : "GET",
+        headers,
+        body: body ? JSON.stringify(body) : undefined,
+        signal: controller.signal
+      });
+      try { data = await res.json(); } catch (e) {   }
+    } finally {
+      clearTimeout(timer);
+    }
+    if (res.status === 429 && attempt === 0) {
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+      continue;
+    }
+    if (data && data.ok) return data.result;
+    throw new Error((data && data.error) || `toncenter HTTP ${res.status}`);
+  }
+}
+function formatNanoGram(nano) {
+  return (Number(nano) / 1e9).toFixed(3);
+}
+// Everything before sending: the words give WITHDRAW_WALLET_ADDRESS, the address is valid, the wallet is active with
+// enough Gram; then the signed transfer. { ok: false, reason } means nothing was sent
+async function prepareWithdrawAutoSend(env, row) {
+  const fail = (reason) => ({ ok: false, reason });
+  const dest = parseTonAddress(row.address);
+  if (!dest || dest.wc !== 0) return fail("the address is not a valid TON address");
+  let keys;
+  try {
+    keys = await withdrawWalletKeys(env);
+  } catch (e) {
+    return fail("WITHDRAW_WALLET_MNEMONIC is not valid (" + (e?.message || e) + ")");
+  }
+  const wallet = await w5r1Address(keys.publicKey);
+  if (!sameTonAddress(wallet, parseTonAddress(env.WITHDRAW_WALLET_ADDRESS))) {
+    return fail("Wallet not matched: the words do not give the address in WITHDRAW_WALLET_ADDRESS");
+  }
+  if (sameTonAddress(wallet, dest)) return fail("the address is the bot wallet itself");
+  const units = Math.round(Number(row.net_gram) * 100);
+  if (!(units > 0) || units > Math.round(WITHDRAW_AUTO_MAX_GRAM * 100)) return fail("the amount can't be sent automatically");
+  const nano = BigInt(units) * 10000000n;
+  const walletRaw = "0:" + bytesToHex(wallet.hash);
+  let info, seqno;
+  try {
+    info = await toncenterCall(env, "/getAddressInformation?address=" + encodeURIComponent(walletRaw));
+    if (info.state !== "active") {
+      return fail("the bot wallet is not active yet: send any small amount from it once in Tonkeeper");
+    }
+    const balance = BigInt(info.balance || 0);
+    if (balance < nano + WITHDRAW_AUTO_FEE_RESERVE_NANO) {
+      return fail(`not enough Gram in the bot wallet (balance ${formatNanoGram(balance)} Gram)`);
+    }
+    const got = await toncenterCall(env, "/runGetMethod", { address: walletRaw, method: "seqno", stack: [] });
+    const top = got && got.exit_code === 0 && got.stack && got.stack[0];
+    if (!top || top[0] !== "num") return fail("the bot wallet's seqno could not be read");
+    seqno = Number(BigInt(top[1]));
+  } catch (e) {
+    return fail("network error (" + (e?.message || e) + ")");
+  }
+  const validUntil = Math.floor(Date.now() / 1000) + WITHDRAW_AUTO_VALID_S;
+  const boc = await buildW5Transfer(keys, wallet, seqno, validUntil, dest, nano, WITHDRAW_AUTO_COMMENT);
+  return { ok: true, boc, attempt: { seqno, validUntil, nano: String(nano), wallet: walletRaw, startedAt: Date.now() } };
+}
+// Our transfer in the bot wallet's latest transactions (going out to this address, this exact amount, after we
+// started); its hash as 64 hex characters, or null. Throws when toncenter can't be read
+async function findWithdrawAutoTx(env, attempt, address) {
+  const dest = parseTonAddress(address);
+  const txs = await toncenterCall(env,
+    "/getTransactions?address=" + encodeURIComponent(attempt.wallet) + "&limit=20&archival=false");
+  for (const tx of txs || []) {
+    if (Number(tx.utime) * 1000 < attempt.startedAt - 60000) continue;
+    for (const out of tx.out_msgs || []) {
+      if (sameTonAddress(parseTonAddress(out.destination), dest) && String(out.value) === attempt.nano) {
+        return parseTxHash(tx.transaction_id && tx.transaction_id.hash);
+      }
+    }
+  }
+  return null;
+}
+async function finishWithdrawAutoFailed(env, row, reason) {
+  const res = await env.DB.prepare("UPDATE withdrawals SET status = 'pending' WHERE id = ? AND status = 'sending' RETURNING *")
+    .bind(row.id).all();
+  const w = (res.results && res.results[0]) || row;
+  await editWithdrawAdminCopy(env, w.admin_message_id, "pending", w, `⚠️ Not sent: ${escapeHtml(reason)}`, withdrawAdminKeyboard(w));
+  await withdrawAdminNotice(env, w,
+    `⚠️ Auto-send failed for request #${w.id}\n${reason}\n\nNothing was sent. Press Accept to try again, or send it yourself and reply to the request with the TxID.`);
+}
+async function finishWithdrawAutoUnknown(env, row, detail) {
+  const res = await env.DB.prepare(
+    "UPDATE withdrawals SET status = 'pending', auto_send = 'unknown' WHERE id = ? AND status = 'sending' RETURNING *"
+  ).bind(row.id).all();
+  const w = (res.results && res.results[0]) || { ...row, auto_send: "unknown" };
+  await editWithdrawAdminCopy(env, w.admin_message_id, "pending", w,
+    "⚠️ Auto-send result unknown: check the bot wallet on Tonviewer first. Accept is off for this request", withdrawAdminKeyboard(w));
+  await withdrawAdminNotice(env, w,
+    `⚠️ Auto-send result unknown for request #${w.id}\n${detail}\n\nCheck the bot wallet on Tonviewer:\n• Sent: reply to the request with its TxID\n• Not sent: send it yourself and reply with the TxID, or reject it\n\nAccept is turned off for this request, so it is never sent twice.`);
+}
+// One queued request, start to end. The attempt (seqno, valid until) is saved before sending, so a run that stops in
+// the middle continues by looking for the transaction and never signs a second one
+async function processWithdrawAutoSend(env, storage, withdrawalId) {
+  const row = await env.DB.prepare("SELECT * FROM withdrawals WHERE id = ?").bind(withdrawalId).first();
+  if (!row || row.status !== "sending") return;
+  const key = "attempt:" + withdrawalId;
+  let attempt = await storage.get(key);
+  if (!attempt) {
+    const prepared = await prepareWithdrawAutoSend(env, row);
+    if (!prepared.ok) {
+      await finishWithdrawAutoFailed(env, row, prepared.reason);
+      return;
+    }
+    attempt = prepared.attempt;
+    await storage.put(key, attempt);
+    try {
+      await toncenterCall(env, "/sendBoc", { boc: prepared.boc });
+    } catch (e) {
+      // it may still have reached the network: the chain decides below
+      attempt.sendError = String(e?.message || e);
+      await storage.put(key, attempt);
+    }
+  }
+  // look until the transfer can no longer be accepted (valid until) plus a margin; after that a successful look that
+  // does not find it means it was not sent
+  const deadline = (attempt.validUntil + WITHDRAW_AUTO_SETTLE_S) * 1000;
+  let lastError = null;
+  for (let extra = 0; ; ) {
+    const afterDeadline = Date.now() >= deadline;
+    try {
+      const txHash = await findWithdrawAutoTx(env, attempt, row.address);
+      if (txHash) {
+        await approveWithdrawalWithTx(env, withdrawalId, txHash, {
+          fromStatus: "sending",
+          answer: (text) => withdrawAdminNotice(env, row, text)
+        });
+        return;
+      }
+      if (afterDeadline) {
+        await finishWithdrawAutoFailed(env, row, attempt.sendError
+          ? `the network did not accept it (${attempt.sendError})`
+          : "the network did not accept it");
+        return;
+      }
+    } catch (e) {
+      lastError = String(e?.message || e);
+      if (afterDeadline && ++extra >= 6) {
+        await finishWithdrawAutoUnknown(env, row, `toncenter could not be reached (${lastError})`);
+        return;
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, WITHDRAW_AUTO_POLL_MS));
+  }
+}
+
+// WithdrawSender (Durable Object, one instance): the queue of accepted requests, sent one at a time by its alarm
+export class WithdrawSender {
+  constructor(state, env) {
+    this.state = state;
+    this.env = env;
+    this.running = false;
+  }
+  async fetch(request) {
+    const url = new URL(request.url);
+    if (url.pathname !== "/enqueue" || request.method !== "POST") return new Response("not found", { status: 404 });
+    const { id } = await request.json();
+    const queue = (await this.state.storage.get("queue")) || [];
+    if (!queue.includes(id)) queue.push(id);
+    await this.state.storage.put("queue", queue);
+    if (!(await this.state.storage.getAlarm())) await this.state.storage.setAlarm(Date.now());
+    return jsonResponse({ ok: true });
+  }
+  async alarm() {
+    if (this.running) return;
+    this.running = true;
+    try {
+      const storage = this.state.storage;
+      for (;;) {
+        const queue = (await storage.get("queue")) || [];
+        if (!queue.length) break;
+        const id = queue[0];
+        // a request whose run keeps failing (not a normal "not sent", which is handled) is let go after 3 tries:
+        // with an attempt saved it may have been sent, so it is marked unknown; without one nothing was sent
+        const tries = ((await storage.get("tries:" + id)) || 0) + 1;
+        await storage.put("tries:" + id, tries);
+        try {
+          await processWithdrawAutoSend(this.env, storage, id);
+        } catch (e) {
+          console.error("withdraw auto-send run failed:", id, e?.message || e);
+          if (tries < 3) {
+            await storage.setAlarm(Date.now() + 30000);
+            return;
+          }
+          const row = await this.env.DB.prepare("SELECT * FROM withdrawals WHERE id = ?").bind(id).first().catch(() => null);
+          if (row && row.status === "sending") {
+            if (await storage.get("attempt:" + id)) {
+              await finishWithdrawAutoUnknown(this.env, row, "the send stopped with an error (" + (e?.message || e) + ")").catch(() => null);
+            } else {
+              await finishWithdrawAutoFailed(this.env, row, "error (" + (e?.message || e) + ")").catch(() => null);
+            }
+          }
+        }
+        const rest = ((await storage.get("queue")) || []).filter((x) => x !== id);
+        await storage.put("queue", rest);
+        await storage.delete(["attempt:" + id, "tries:" + id]);
+      }
+    } finally {
+      this.running = false;
+    }
+  }
+}
+
 // Withdraw buttons: Approve / Reject on the channel posts of requests made before the private copy existed, or whose
 // copy could not be sent. A reject does not touch the channel post: the admin deletes it
 async function handleWithdrawCallback(cbq, env) {
   const data = cbq.data || "";
+  const autoMatch = data.match(/^wd_(ac|yes|back|rj)_(\d+)$/);
+  if (autoMatch) {
+    if (cbq.from.id !== ADMIN_TELEGRAM_ID) {
+      await answerCallbackQuery(env, cbq.id, "⛔ Not authorized");
+      return;
+    }
+    await handleWithdrawAutoCallback(cbq, env, autoMatch[1], Number(autoMatch[2]));
+    return;
+  }
   const match = data.match(/^wd_(approve|reject)_(\d+)$/);
   if (!match) return;
   if (cbq.from.id !== ADMIN_TELEGRAM_ID) {
