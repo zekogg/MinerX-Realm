@@ -59,6 +59,7 @@ CREATE TABLE users (
   ads_today INTEGER NOT NULL DEFAULT 0,
   ads_today_date TEXT,
   checkin5_claimed_date TEXT,
+  checkin6_claimed_date TEXT,
   sponsored_task_count INTEGER DEFAULT 0,
   sponsored_task_date TEXT,
   FOREIGN KEY (referred_by) REFERENCES users(telegram_id)
