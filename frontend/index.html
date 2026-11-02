@@ -1828,10 +1828,10 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   position:absolute; left:50%; bottom:calc(8px * var(--s)); width:calc(84px * var(--s)); height:calc(12px * var(--s));
   transform:translateX(-50%); background:radial-gradient(closest-side, rgba(0,0,0,.55), transparent); filter:blur(2px);
 }
-/* the roll (4s, like the Spin wheel): it hops and bounces while it tumbles, and lands in the tilted pose (whole turns more) */
-.dice-hop.is-rolling{ animation:dice-hop 4s linear both; }
-.dice-hop.is-rolling .dice-cube{ animation:dice-tumble 4s cubic-bezier(.2,.55,.25,1) both; }
-.dice-hop.is-rolling + .dice-shadow{ animation:dice-shadow 4s linear both; }
+/* the roll (5s, like the Spin wheel): it hops and bounces while it tumbles, and lands in the tilted pose (whole turns more) */
+.dice-hop.is-rolling{ animation:dice-hop 5s linear both; }
+.dice-hop.is-rolling .dice-cube{ animation:dice-tumble 5s cubic-bezier(.2,.55,.25,1) both; }
+.dice-hop.is-rolling + .dice-shadow{ animation:dice-shadow 5s linear both; }
 @keyframes dice-hop{
   0%{ transform:translateY(0); } 12%{ transform:translateY(calc(-30px * var(--s))); } 25%{ transform:translateY(0); }
   35%{ transform:translateY(calc(-18px * var(--s))); } 46%{ transform:translateY(0); } 55%{ transform:translateY(calc(-10px * var(--s))); }
@@ -6789,7 +6789,7 @@ function rotateSpinWheelToSegment(index){
   var deltaToTarget = ((targetMod - currentMod) + 360) % 360;
   var fullSpins = 5 * 360;
   spinWheelRotation += deltaToTarget + fullSpins + jitter;
-  wheelEl.style.transition = 'transform 4s cubic-bezier(0.12, 0.67, 0.14, 0.99)';
+  wheelEl.style.transition = 'transform 5s cubic-bezier(0.12, 0.67, 0.14, 0.99)';
   wheelEl.style.transform = 'rotate(' + spinWheelRotation + 'deg)';
 }
 function onSpinButtonClick(){
@@ -6837,7 +6837,7 @@ function runSpinClaimRequest(initData, btn){
       applySpinState({ claimed_today: true, next_reset_utc: data.next_reset_utc });
       showPrizeToast(data.prize_type, data.prize_amount);
       celebrateReward(data.prize_type);
-    }, 4000);
+    }, 5000);
   })
   .catch(function(err){
     console.error('spin request failed:', err);
@@ -6929,7 +6929,7 @@ function runChestClaimRequest(initData){
 
 // Lucky Dice: one roll a day after an ad (like the Chest); the server rolls and picks the prize, the app shows it
 var DICE_PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
-var DICE_ROLL_MS = 4000;
+var DICE_ROLL_MS = 5000;
 var diceState = { claimedToday: false, nextResetUtc: null };
 var diceBusy = false;
 function setDiceFaces(faces){
