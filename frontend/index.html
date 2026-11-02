@@ -1983,6 +1983,15 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .checkin-icon--link{ background:linear-gradient(145deg, #5ee0a8, #1fa874); }
 .checkin-icon--nextcrypto{ background:linear-gradient(145deg, #3fe0e8, #0e8fb8); }
 .partner-task__btn:disabled:not(.is-claimed){ opacity:.5; }
+/* a used gate (Chest, Spin, Gifts, Dice): a clock and the time left to 00:00 UTC drawn over the button's own label,
+   which stays in place but unseen, so the button keeps its size and its label is translated and fitted as before */
+.gate-clock-btn{ position:relative; }
+.gate-clock-btn.is-clock{ -webkit-text-fill-color:transparent; }
+.gate-clock{
+  position:absolute; inset:0; overflow:hidden; display:flex; align-items:center; justify-content:center; gap:calc(5px * var(--s));
+  font-size:calc(11.6px * var(--s)); font-variant-numeric:tabular-nums; -webkit-text-fill-color:currentColor;
+}
+.gate-clock svg{ width:1.05em; height:1.05em; flex-shrink:0; }
 .ad-task__title{ font-weight:800; font-size:calc(10.8px * var(--s)); line-height:1.3; }
 .ad-task__meta{ display:flex; align-items:center; gap:calc(4px * var(--s)); flex-wrap:wrap; }
 .ad-task__meta svg{ width:calc(10px * var(--s)); height:calc(10px * var(--s)); }
@@ -6720,6 +6729,39 @@ function showStorageUpgradeToast(level, hours){
   celebrateCannons();
 }
 
+// Used gates (Chest, Spin, Gifts, Dice): the button shows a clock and the time left to 00:00 UTC, on the server's
+// clock, so it reads the same for everyone; one shared timer runs while any gate shows it. At 00:00 the app reloads
+// the user (the Daily Rewards timer does it, this only if that one has not) and the buttons come back
+var GATE_CLOCK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 7v5l3.2 2"/></svg>';
+var gateClockTimer = null;
+function gateClockText(){
+  var now = serverNow(), next = new Date(now);
+  next.setUTCHours(24, 0, 0, 0);
+  var total = Math.max(0, Math.floor((next.getTime() - now) / 1000));
+  var pad = function(n){ return String(n).padStart(2, '0'); };
+  return pad(Math.floor(total / 3600)) + ':' + pad(Math.floor(total % 3600 / 60)) + ':' + pad(total % 60);
+}
+// the label stays the button's own text (unseen), so the button keeps its size; the clock sits over it
+function setGateClockLabel(btn, labelHtml){
+  btn.classList.add('gate-clock-btn', 'is-clock');
+  btn.innerHTML = labelHtml + '<span class="gate-clock" data-no-i18n>' + GATE_CLOCK_SVG + '<span class="js-gate-clock">' + gateClockText() + '</span></span>';
+  if (!gateClockTimer) gateClockTimer = setInterval(renderGateClocks, 1000);
+}
+function renderGateClocks(){
+  var clocks = document.querySelectorAll('.js-gate-clock');
+  if (!clocks.length){
+    clearInterval(gateClockTimer);
+    gateClockTimer = null;
+    return;
+  }
+  var text = gateClockText();
+  clocks.forEach(function(el){ el.textContent = text; });
+  if (text === '00:00:00' && Date.now() - streakResetRefreshAt >= 5000){
+    streakResetRefreshAt = Date.now();
+    fetchUserData();
+  }
+}
+
 // Spin
 var spinState = { claimedToday: false, nextResetUtc: null };
 var spinBusy = false;
@@ -6727,7 +6769,8 @@ var spinWheelRotation = 0;
 function renderSpinButton(){
   var btn = document.getElementById('btn-spin');
   if (!btn) return;
-  btn.textContent = spinState.claimedToday ? 'Spin (0)' : 'Spin (1)';
+  if (spinState.claimedToday) setGateClockLabel(btn, 'Spin (0)');
+  else { btn.classList.remove('is-clock'); btn.textContent = 'Spin (1)'; }
   btn.classList.toggle('is-claimed', spinState.claimedToday);
   btn.disabled = spinState.claimedToday;
 }
@@ -6813,7 +6856,8 @@ var chestBusy = false;
 function renderChestButton(){
   var btn = document.getElementById('btn-open-chest');
   if (!btn) return;
-  btn.innerHTML = chestState.claimedToday ? 'Open Chest&nbsp;&nbsp;(0)' : 'Open Chest&nbsp;&nbsp;(1)';
+  if (chestState.claimedToday) setGateClockLabel(btn, 'Open Chest&nbsp;&nbsp;(0)');
+  else { btn.classList.remove('is-clock'); btn.innerHTML = 'Open Chest&nbsp;&nbsp;(1)'; }
   btn.classList.toggle('is-claimed', chestState.claimedToday);
   btn.disabled = chestState.claimedToday;
 }
@@ -6905,7 +6949,8 @@ function renderDiceButton(){
   var btn = document.getElementById('btn-dice-roll');
   if (!btn) return;
   delete btn.dataset.origHtml;
-  btn.textContent = diceState.claimedToday ? 'Roll (0)' : 'Roll (1)';
+  if (diceState.claimedToday) setGateClockLabel(btn, 'Roll (0)');
+  else { btn.classList.remove('is-clock'); btn.textContent = 'Roll (1)'; }
   btn.classList.toggle('is-claimed', diceState.claimedToday);
   btn.disabled = diceState.claimedToday;
 }
@@ -7016,7 +7061,8 @@ var giftPickBusy = false;
 function renderGiftOpenButton(){
   var btn = document.getElementById('btn-gift-open');
   if (!btn) return;
-  btn.innerHTML = giftPickState.claimedToday ? 'Open&nbsp;&nbsp;(0)' : 'Open&nbsp;&nbsp;(1)';
+  if (giftPickState.claimedToday) setGateClockLabel(btn, 'Open&nbsp;&nbsp;(0)');
+  else { btn.classList.remove('is-clock'); btn.innerHTML = 'Open&nbsp;&nbsp;(1)'; }
   btn.classList.toggle('is-claimed', giftPickState.claimedToday);
   btn.disabled = giftPickState.claimedToday;
 }
