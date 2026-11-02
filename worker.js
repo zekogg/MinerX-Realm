@@ -3493,6 +3493,9 @@ function buildAdminWithdrawText(status, withdrawalId, w) {
     `💵 Amount: ${formatWithdrawGram(w.netGram)} Gram\n\n` +
     `📍 Address:\n<code>${escapeHtml(w.address)}</code>` +
     (w.txHash ? `\n🔗 TxID:\n${txLinkHtml(w.txHash)}` : "") +
+    // after a send by the Accept button: the bot wallet's balance (read before sending, minus the amount; the network
+    // fee is not taken off, so it is about), in Gram with 2 decimals, rounded down
+    (w.walletNano != null ? `\n💼 Bot wallet: ≈ ${formatNanoGram2(w.walletNano)} Gram` : "") +
     (w.reason ? `\n📝 Reason: ${escapeHtml(w.reason)}` : "") +
     // a line from the Accept button (asking to confirm, sending, or why it was not sent), already HTML
     (w.note ? `\n\n${w.note}` : "") +
@@ -3609,7 +3612,7 @@ async function handleWithdrawTxReply(message, env) {
 // Approves a request with its TxID: the request (from fromStatus: "pending" for a TxID reply, "sending" for the Accept
 // button) becomes approved once, the channel gets the success post, the admin's copy shows the TxID and the user is
 // told once. A request already approved only gets the new TxID in the posts. answer(text) tells the admin
-async function approveWithdrawalWithTx(env, withdrawalId, txHash, { fromStatus, adminMessage = null, answer }) {
+async function approveWithdrawalWithTx(env, withdrawalId, txHash, { fromStatus, adminMessage = null, answer, walletNano = null }) {
   try {
     const approvedResult = await env.DB.prepare(
       "UPDATE withdrawals SET status = 'approved', resolved_at = ? WHERE id = ? AND status = ? RETURNING *"
@@ -3682,7 +3685,7 @@ async function approveWithdrawalWithTx(env, withdrawalId, txHash, { fromStatus, 
     const adminMessageId = adminMessage ? adminMessage.message_id : w.admin_message_id;
     const jobs = adminMessageId ? [
       editMessage(env, ADMIN_TELEGRAM_ID, adminMessageId, {
-        text: buildAdminWithdrawText("approved", withdrawalId, args),
+        text: buildAdminWithdrawText("approved", withdrawalId, { ...args, walletNano }),
         parse_mode: "HTML",
         link_preview_options: noPreview
       })
@@ -4183,6 +4186,10 @@ async function readWalletSeqno(env, walletRaw) {
   if (!top || top[0] !== "num") throw new Error("the bot wallet's seqno could not be read");
   return Number(BigInt(top[1]));
 }
+function formatNanoGram2(nano) {
+  const cents = BigInt(nano) / 10000000n;
+  return (cents / 100n).toString() + "." + (cents % 100n).toString().padStart(2, "0");
+}
 function formatNanoGram(nano) {
   return (Number(nano) / 1e9).toFixed(3);
 }
@@ -4207,13 +4214,13 @@ async function prepareWithdrawAutoSend(env, row) {
   if (!(units > 0) || units > Math.round(WITHDRAW_AUTO_MAX_GRAM * 100)) return fail("the amount can't be sent automatically");
   const nano = BigInt(units) * 10000000n;
   const walletRaw = "0:" + bytesToHex(wallet.hash);
-  let info, seqno;
+  let info, seqno, balance;
   try {
     info = await toncenterCall(env, "/getAddressInformation?address=" + encodeURIComponent(walletRaw));
     if (info.state !== "active") {
       return fail("the bot wallet is not active yet: send any small amount from it once in Tonkeeper");
     }
-    const balance = BigInt(info.balance || 0);
+    balance = BigInt(info.balance || 0);
     if (balance < nano + WITHDRAW_AUTO_FEE_RESERVE_NANO) {
       return fail(`not enough Gram in the bot wallet (balance ${formatNanoGram(balance)} Gram)`);
     }
@@ -4223,7 +4230,11 @@ async function prepareWithdrawAutoSend(env, row) {
   }
   const validUntil = Math.floor(Date.now() / 1000) + WITHDRAW_AUTO_VALID_S;
   const boc = await buildW5Transfer(keys, wallet, seqno, validUntil, dest, nano, WITHDRAW_AUTO_COMMENT);
-  return { ok: true, boc, attempt: { seqno, validUntil, nano: String(nano), wallet: walletRaw, startedAt: Date.now() } };
+  return {
+    ok: true,
+    boc,
+    attempt: { seqno, validUntil, nano: String(nano), wallet: walletRaw, startedAt: Date.now(), walletAfter: String(balance - nano) }
+  };
 }
 // Our transfer in the bot wallet's latest transactions (going out to this address, this exact amount, after we
 // started); its hash as 64 hex characters, or null. Throws when toncenter can't be read
@@ -4293,7 +4304,8 @@ async function stepWithdrawAutoSend(env, storage, withdrawalId) {
     if (txHash) {
       await approveWithdrawalWithTx(env, withdrawalId, txHash, {
         fromStatus: "sending",
-        answer: (text) => withdrawAdminNotice(env, row, text)
+        answer: (text) => withdrawAdminNotice(env, row, text),
+        walletNano: attempt.walletAfter != null ? attempt.walletAfter : null
       });
       return true;
     }
