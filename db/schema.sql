@@ -23,6 +23,7 @@ CREATE TABLE users (
   last_chest_date TEXT,
   last_giftpick_date TEXT,
   last_dice_date TEXT,
+  last_plinko_date TEXT,
   last_withdraw_request_at INTEGER,
   adsgram_task_count INTEGER DEFAULT 0,
   adsgram_task_date TEXT,

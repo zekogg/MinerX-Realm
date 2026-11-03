@@ -261,6 +261,9 @@ async function routeRequest(request, env, url) {
     if (url.pathname === "/api/dice/claim" && request.method === "POST") {
       return handleDiceClaim(request, env);
     }
+    if (url.pathname === "/api/plinko/claim" && request.method === "POST") {
+      return handlePlinkoClaim(request, env);
+    }
     const petMatch = request.method === "POST" && url.pathname.match(/^\/api\/pet\/([a-z_]+)\/(buy|upgrade)$/);
     if (petMatch) {
       const [, petId, action] = petMatch;
@@ -417,7 +420,7 @@ async function handleGetUser(request, env) {
     SELECT u.telegram_id, u.username, u.coins, u.gram, u.total_speed, u.total_mined,
            u.mining_started_at, u.mining_cycles_today, u.mining_cycle_date,
            u.streak_day, u.streak_last_claim_date,
-           u.last_spin_date, u.last_chest_date, u.last_giftpick_date, u.last_dice_date,
+           u.last_spin_date, u.last_chest_date, u.last_giftpick_date, u.last_dice_date, u.last_plinko_date,
            u.last_withdraw_request_at,
            u.adsgram_task_count, u.adsgram_task_date,
            u.invites_count, u.active_referrals_count, u.referral_pending_earnings,
@@ -487,6 +490,7 @@ async function handleGetUser(request, env) {
   view = withDailyPrizeView(view, "last_chest_date", "chest_claimed_today", "chest_next_reset_utc");
   view = withDailyPrizeView(view, "last_giftpick_date", "giftpick_claimed_today", "giftpick_next_reset_utc");
   view = withDailyPrizeView(view, "last_dice_date", "dice_claimed_today", "dice_next_reset_utc");
+  view = withDailyPrizeView(view, "last_plinko_date", "plinko_claimed_today", "plinko_next_reset_utc");
   view.exchange_rate_coin_to_gram = EXCHANGE_RATE_COIN_TO_GRAM;
   view.exchange_min_coins = EXCHANGE_MIN_COINS;
   view.withdraw_min_gram = WITHDRAW_MIN_GRAM;
@@ -797,6 +801,46 @@ async function handleDiceClaim(request, env) {
   }
   return jsonResponse({
     face,
+    prize_type: isGram ? "gram" : "coins",
+    prize_amount: amount,
+    coins: updated.coins,
+    gram: updated.gram,
+    next_reset_utc: nextUtcMidnightIso()
+  });
+}
+// /api/plinko/claim: one drop a day after an ad, like the Dice and with its prizes: Coins or Gram at even odds, 1 to 6
+// x the Dice amounts. The server also picks the slot the ball lands in (Gram: one of the 2 middle slots, Coins: one of
+// the other 6), so the app only shows it; the date guard in the WHERE allows one drop a day
+const PLINKO_COIN_SLOTS = [0, 1, 2, 5, 6, 7];
+const PLINKO_GRAM_SLOTS = [3, 4];
+async function handlePlinkoClaim(request, env) {
+  const auth = await authenticateRequest(request, env);
+  if (!auth.ok) return auth.response;
+  const { telegramId } = auth;
+  const row = await env.DB.prepare(
+    "SELECT last_plinko_date FROM users WHERE telegram_id = ?"
+  ).bind(telegramId).first();
+  if (!row) return jsonResponse({ error: "user_not_found" }, 404);
+  const today = todayUTC();
+  if (row.last_plinko_date === today) {
+    return jsonResponse({ error: "already_claimed_today", next_reset_utc: nextUtcMidnightIso() }, 409);
+  }
+  const dots = randomInt(6) + 1;
+  const isGram = randomInt(2) === 1;
+  const slots = isGram ? PLINKO_GRAM_SLOTS : PLINKO_COIN_SLOTS;
+  const slot = slots[randomInt(slots.length)];
+  const amount = isGram ? dots / Math.round(1 / DICE_GRAM_PER_DOT) : dots * DICE_COINS_PER_DOT;
+  const column = isGram ? "gram" : "coins";
+  const updated = await env.DB.prepare(
+    `UPDATE users SET ${column} = ${column} + ?, last_plinko_date = ?
+     WHERE telegram_id = ? AND (last_plinko_date IS NULL OR last_plinko_date <> ?)
+     RETURNING coins, gram`
+  ).bind(amount, today, telegramId, today).first();
+  if (!updated) {
+    return jsonResponse({ error: "already_claimed_today", next_reset_utc: nextUtcMidnightIso() }, 409);
+  }
+  return jsonResponse({
+    slot,
     prize_type: isGram ? "gram" : "coins",
     prize_amount: amount,
     coins: updated.coins,

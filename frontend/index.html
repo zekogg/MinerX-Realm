@@ -1858,6 +1858,40 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .dice-result.is-gram{ color:#9fcaff; text-shadow:0 0 calc(8px * var(--s)) rgba(74,158,255,.45); }
 .dice-result img{ width:calc(14px * var(--s)); height:calc(14px * var(--s)); }
 .dice-card .spin-btn{ margin-top:calc(8px * var(--s)); }
+/* Plinko: a blue light behind the pegs, the frame light blue on the top edge; the pegs and the ball are drawn on a
+   canvas, the 8 slots under it are page text (translated and fitted like any label, so they never grow) */
+.plinko-card{
+  position:relative; margin-top:calc(12px * var(--s)); text-align:center; border:1px solid transparent;
+  background:
+    radial-gradient(70% calc(130px * var(--s)) at 50% 46%, rgba(120,170,255,.18), transparent 72%),
+    radial-gradient(62% calc(80px * var(--s)) at 50% 0%, rgba(255,190,90,.16), rgba(255,170,80,.05) 55%, transparent 100%),
+    #18122a;
+}
+.plinko-card::after{
+  content:""; position:absolute; inset:-1px; border-radius:inherit; padding:calc(1.25px * var(--s)); pointer-events:none;
+  background:linear-gradient(180deg, #9fcaff, #8a6a4a 22%, #4a3a4a 60%, #3a2c3e);
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+.plinko-stage{ position:relative; width:calc(300px * var(--s)); height:calc(200px * var(--s)); margin:calc(8px * var(--s)) auto 0; }
+.plinko-canvas{ position:absolute; inset:0; width:100%; height:100%; }
+/* the slots sit where the pegs' gaps lead (a slot every 300/9 px, 0.9 of it wide), flat at the bottom */
+.plinko-slots{
+  position:absolute; left:0; right:0; bottom:0; height:calc(17.4px * var(--s));
+  display:flex; justify-content:center; gap:calc(3.333px * var(--s)); direction:ltr;
+}
+.plinko-slot{
+  width:calc(30px * var(--s)); flex-shrink:0; overflow:hidden; white-space:nowrap;
+  display:flex; align-items:center; justify-content:center;
+  border-radius:calc(5px * var(--s)) calc(5px * var(--s)) 0 0;
+  font-family:var(--font-display); font-weight:800; font-size:calc(8px * var(--s)); color:#fff;
+  background:rgba(124,85,230,.35); transition:background .2s, color .2s;
+}
+.plinko-slot.is-gram{ background:rgba(95,200,255,.6); }
+.plinko-slot.is-lit{ background:#ffd76a; color:#1c1430; }
+.plinko-slot.is-gram.is-lit{ background:#9fdcff; }
+.plinko-card .spin-btn{ margin-top:calc(8px * var(--s)); }
 
 /* Tasks Page */
 .task-tabs{ display:flex; gap:calc(6px * var(--s)); overflow-x:auto; overflow-y:visible; margin:0 calc(-3px * var(--s)) calc(14px * var(--s)); padding:calc(3px * var(--s)) calc(3px * var(--s)) calc(5px * var(--s)); }
@@ -1983,7 +2017,7 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 .checkin-icon--link{ background:linear-gradient(145deg, #5ee0a8, #1fa874); }
 .checkin-icon--nextcrypto{ background:linear-gradient(145deg, #3fe0e8, #0e8fb8); }
 .partner-task__btn:disabled:not(.is-claimed){ opacity:.5; }
-/* a used gate (Chest, Spin, Gifts, Dice): a clock and the time left to 00:00 UTC drawn over the button's own label,
+/* a used gate (Chest, Spin, Gifts, Dice, Plinko): a clock and the time left to 00:00 UTC drawn over the button's own label,
    which stays in place but unseen, so the button keeps its size and its label is translated and fitted as before */
 .gate-clock-btn{ position:relative; }
 .gate-clock-btn.is-clock{ -webkit-text-fill-color:transparent; }
@@ -3053,6 +3087,8 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
 #chest-help-tooltip::after{ left:auto; right:calc(10px * var(--s)); transform:none; }
 #dice-help-tooltip{ left:auto; right:0; transform:translateY(calc(-6px * var(--s))); }
 #dice-help-tooltip::after{ left:auto; right:calc(10px * var(--s)); transform:none; }
+#plinko-help-tooltip{ left:auto; right:0; transform:translateY(calc(-6px * var(--s))); }
+#plinko-help-tooltip::after{ left:auto; right:calc(10px * var(--s)); transform:none; }
 .pet-card{ perspective:calc(600px * var(--s)); }
 .pet-card__art-wrap{ transition:transform .3s ease; will-change:transform; }
 
@@ -4446,6 +4482,32 @@ body.reduce-motion .firefly{
           <span class="dice-result" id="dice-result" style="display:none;"><span id="dice-result-text"></span><img draggable="false" id="dice-result-icon" src="/Pet%20Coin.webp" alt=""></span>
         </div>
         <button class="spin-btn ad-gate" id="btn-dice-roll" onclick="onDiceRollClick()">Roll (1)</button>
+      </div>
+
+      <!-- Plinko -->
+      <div class="card plinko-card">
+        <span class="chest-card__help" style="cursor:pointer;" onclick="togglePriceTooltip('plinko-help-tooltip')">?
+          <span class="price-tooltip price-tooltip--wide" id="plinko-help-tooltip">
+            You get 1 free try every day, resetting at 00:00 UTC.
+            <span class="prize-tooltip-icons">
+              <img loading="lazy" draggable="false" src="/Pet%20Coin.webp" alt="Coin" style="width:calc(13px * var(--s));height:calc(13px * var(--s));">Coins
+              &amp;
+              <img loading="lazy" draggable="false" src="/Gram_symbol.png" alt="Gram" style="width:calc(11px * var(--s));height:calc(11px * var(--s));">Gram
+            </span>
+          </span>
+        </span>
+        <div class="dice-card__title" data-no-i18n>Plinko</div>
+        <div class="plinko-stage">
+          <canvas class="plinko-canvas" id="plinko-canvas"></canvas>
+          <div class="plinko-slots" id="plinko-slots">
+            <span class="plinko-slot">Coins</span><span class="plinko-slot">Coins</span><span class="plinko-slot">Coins</span><span class="plinko-slot is-gram" data-no-i18n>Gram</span><span class="plinko-slot is-gram" data-no-i18n>Gram</span><span class="plinko-slot">Coins</span><span class="plinko-slot">Coins</span><span class="plinko-slot">Coins</span>
+          </div>
+        </div>
+        <div class="dice-line">
+          <span class="dice-caption" id="plinko-caption">Drop the ball. Where it lands is your prize.</span>
+          <span class="dice-result" id="plinko-result" style="display:none;"><span id="plinko-result-text"></span><img draggable="false" id="plinko-result-icon" src="/Pet%20Coin.webp" alt=""></span>
+        </div>
+        <button class="spin-btn ad-gate" id="btn-plinko" onclick="onPlinkoClick()">Drop (1)</button>
       </div>
 
       <!-- Quick Actions -->
@@ -6156,6 +6218,10 @@ function fetchUserData(){
       claimed_today: data.user.dice_claimed_today,
       next_reset_utc: data.user.dice_next_reset_utc
     });
+    applyPlinkoState({
+      claimed_today: data.user.plinko_claimed_today,
+      next_reset_utc: data.user.plinko_next_reset_utc
+    });
     applyDepositBonus(data.user.deposit_bonus);
     applyComboState({
       solved_today: data.user.combo_solved_today,
@@ -6729,7 +6795,7 @@ function showStorageUpgradeToast(level, hours){
   celebrateCannons();
 }
 
-// Used gates (Chest, Spin, Gifts, Dice): the button shows a clock and the time left to 00:00 UTC, on the server's
+// Used gates (Chest, Spin, Gifts, Dice, Plinko): the button shows a clock and the time left to 00:00 UTC, on the server's
 // clock, so it reads the same for everyone; one shared timer runs while any gate shows it. At 00:00 the app reloads
 // the user (the Daily Rewards timer does it, this only if that one has not) and the buttons come back
 var GATE_CLOCK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 7v5l3.2 2"/></svg>';
@@ -7054,6 +7120,203 @@ function runDiceRollRequest(initData){
     hideAdLoadingOverlay();
   });
 }
+
+// Plinko: one drop a day after an ad (like the Dice). The server picks the prize as the Dice does (Coins or Gram at
+// even odds, 1 to 6 x the Dice amounts) and the slot it lands in (Gram: one of the 2 middle slots, Coins: one of the
+// other 6); the app drops the ball there along a random path through the pegs, in PLINKO_DROP_MS (always, like the
+// other gates)
+var PLINKO_ROWS = 7;
+var PLINKO_DROP_MS = 5000;
+var plinkoState = { claimedToday: false, nextResetUtc: null };
+var plinkoBusy = false;
+var plinkoBoard = null;
+// the board in CSS pixels: row r has r + 3 pegs; a ball resting on peg (r, k + 1) after k steps right falls, after
+// the last row, into slot k
+function plinkoGeometry(W, H){
+  var gap = W / 9, top = H * 0.1, rowH = (H * 0.72) / PLINKO_ROWS;
+  return {
+    W: W, H: H, gap: gap, top: top, rowH: rowH,
+    peg: function(row, i){ return [W / 2 + (i - (row + 2) / 2) * gap, top + (row + 1) * rowH]; },
+    slotX: function(k){ return W / 2 + (k - 3.5) * gap; },
+    restY: top + (PLINKO_ROWS + 1) * rowH - 10
+  };
+}
+function plinkoSetup(){
+  var canvas = document.getElementById('plinko-canvas');
+  if (!canvas) return null;
+  var rect = canvas.getBoundingClientRect();
+  if (!rect.width || !rect.height) return plinkoBoard;
+  var ratio = Math.min(window.devicePixelRatio || 1, 3);
+  var ctx = canvas.getContext('2d');
+  canvas.width = Math.round(rect.width * ratio);
+  canvas.height = Math.round(rect.height * ratio);
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  var g = plinkoGeometry(rect.width, rect.height);
+  var old = plinkoBoard;
+  plinkoBoard = { ctx: ctx, g: g, ball: [rect.width / 2, 16 * rect.height / 200], hit: -1 };
+  // a ball already landed stays in its slot when the board is drawn again (a resize)
+  if (old && old.landed !== undefined){ plinkoBoard.landed = old.landed; plinkoBoard.ball = [g.slotX(old.landed), g.restY]; }
+  plinkoDraw();
+  return plinkoBoard;
+}
+function plinkoDraw(){
+  var b = plinkoBoard;
+  if (!b) return;
+  var x = b.ctx, g = b.g;
+  x.clearRect(0, 0, g.W, g.H);
+  var pegR = 3 * g.W / 300;
+  for (var row = 0; row < PLINKO_ROWS; row++){
+    for (var i = 0; i <= row + 2; i++){
+      var p = g.peg(row, i), lit = b.hit === row * 10 + i;
+      x.beginPath(); x.arc(p[0], p[1], pegR, 0, Math.PI * 2);
+      x.fillStyle = lit ? '#ffd76a' : 'rgba(220,210,255,.75)';
+      if (lit){ x.save(); x.shadowColor = '#ffd76a'; x.shadowBlur = 8; x.fill(); x.restore(); } else x.fill();
+    }
+  }
+  // the ball: a glossy violet pearl with a soft halo and a highlight
+  var cx = b.ball[0], cy = b.ball[1], R = 7 * g.W / 300;
+  var halo = x.createRadialGradient(cx, cy, R * 0.6, cx, cy, R * 2.1);
+  halo.addColorStop(0, 'rgba(190,160,255,.45)'); halo.addColorStop(1, 'rgba(190,160,255,0)');
+  x.fillStyle = halo; x.beginPath(); x.arc(cx, cy, R * 2.1, 0, Math.PI * 2); x.fill();
+  var body = x.createRadialGradient(cx - R * 0.35, cy - R * 0.4, R * 0.1, cx, cy, R);
+  body.addColorStop(0, '#ffffff'); body.addColorStop(0.25, '#ece4ff'); body.addColorStop(0.6, '#a98bff'); body.addColorStop(1, '#5b34c9');
+  x.save(); x.shadowColor = 'rgba(0,0,0,.45)'; x.shadowBlur = 4; x.shadowOffsetY = 1.5;
+  x.fillStyle = body; x.beginPath(); x.arc(cx, cy, R, 0, Math.PI * 2); x.fill(); x.restore();
+  x.strokeStyle = 'rgba(255,255,255,.55)'; x.lineWidth = 0.7; x.beginPath(); x.arc(cx, cy, R - 0.35, 0, Math.PI * 2); x.stroke();
+  x.fillStyle = 'rgba(255,255,255,.95)'; x.beginPath(); x.ellipse(cx - R * 0.35, cy - R * 0.42, R * 0.3, R * 0.18, -0.6, 0, Math.PI * 2); x.fill();
+}
+function plinkoLightSlot(k){
+  document.querySelectorAll('#plinko-slots .plinko-slot').forEach(function(el, i){ el.classList.toggle('is-lit', i === k); });
+}
+// a random path with exactly `slot` steps right, then the ball hops from peg to peg (a small arc each time) and drops
+// into the slot; the steps share PLINKO_DROP_MS
+function playPlinkoDrop(slot, done){
+  var b = plinkoSetup();
+  if (!b){ done(); return; }
+  plinkoLightSlot(-1);
+  delete b.landed;
+  var steps = [];
+  for (var i = 0; i < PLINKO_ROWS; i++) steps.push(i < slot ? 1 : 0);
+  for (var j = steps.length - 1; j > 0; j--){ var r = Math.floor(Math.random() * (j + 1)); var t = steps[j]; steps[j] = steps[r]; steps[r] = t; }
+  var g = b.g, points = [[g.W / 2, b.ball[1]]], hits = [], rights = 0, lift = 9 * g.W / 300;
+  for (var row = 0; row < PLINKO_ROWS; row++){
+    var p = g.peg(row, rights + 1);
+    points.push([p[0], p[1] - lift]); hits.push(row * 10 + rights + 1);
+    rights += steps[row];
+  }
+  points.push([g.slotX(slot), g.restY]);
+  var legs = points.length - 1, legMs = PLINKO_DROP_MS / legs, start = performance.now();
+  function frame(now){
+    var cur = plinkoBoard;
+    if (!cur) return;
+    var t = Math.min(1, (now - start) / PLINKO_DROP_MS);
+    var leg = Math.min(legs - 1, Math.floor((now - start) / legMs));
+    var f = Math.min(1, (now - start - leg * legMs) / legMs);
+    var a = points[leg], c = points[leg + 1];
+    cur.ball = [a[0] + (c[0] - a[0]) * f, a[1] + (c[1] - a[1]) * f - Math.sin(f * Math.PI) * 10 * cur.g.W / 300];
+    cur.hit = leg > 0 && leg <= PLINKO_ROWS ? hits[leg - 1] : -1;
+    plinkoDraw();
+    if (t < 1){ requestAnimationFrame(frame); return; }
+    cur.ball = [c[0], c[1]]; cur.hit = -1; cur.landed = slot;
+    plinkoDraw();
+    plinkoLightSlot(slot);
+    done();
+  }
+  requestAnimationFrame(frame);
+}
+function renderPlinkoButton(){
+  var btn = document.getElementById('btn-plinko');
+  if (!btn) return;
+  delete btn.dataset.origHtml;
+  if (plinkoState.claimedToday) setGateClockLabel(btn, 'Drop (0)');
+  else { btn.classList.remove('is-clock'); btn.textContent = 'Drop (1)'; }
+  btn.classList.toggle('is-claimed', plinkoState.claimedToday);
+  btn.disabled = plinkoState.claimedToday;
+}
+function applyPlinkoState(data){
+  plinkoState.claimedToday = !!data.claimed_today;
+  plinkoState.nextResetUtc = data.next_reset_utc || null;
+  renderPlinkoButton();
+  if (!plinkoBoard) plinkoSetup();
+}
+function onPlinkoClick(){
+  if (plinkoBusy) return;
+  if (plinkoState.claimedToday){
+    showComeBackTomorrowToast();
+    return;
+  }
+  var initData = getTelegramInitData();
+  if (!initData){
+    alert(t('Open this app from Telegram to drop the ball.'));
+    return;
+  }
+  plinkoBusy = true;
+  setButtonBusy(document.getElementById('btn-plinko'), true);
+  runAdGate(function(){ runPlinkoRequest(initData); }, function(){
+    plinkoBusy = false;
+    var btn = document.getElementById('btn-plinko');
+    setButtonBusy(btn, false);
+    if (btn) btn.disabled = false;
+  });
+}
+function showPlinkoResult(data){
+  var isGram = data.prize_type === 'gram';
+  var caption = document.getElementById('plinko-caption');
+  var result = document.getElementById('plinko-result');
+  var text = document.getElementById('plinko-result-text');
+  var icon = document.getElementById('plinko-result-icon');
+  if (!result || !text) return;
+  text.textContent = '+' + data.prize_amount + (isGram ? ' Gram' : ' Coins');
+  if (icon) icon.src = isGram ? PRIZE_ICON_URLS.gram : PRIZE_ICON_URLS.coins;
+  result.classList.toggle('is-gram', isGram);
+  if (caption) caption.style.display = 'none';
+  result.style.display = '';
+}
+function runPlinkoRequest(initData){
+  var btn = document.getElementById('btn-plinko');
+  fetch('/api/plinko/claim', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: initData })
+  })
+  .then(function(res){ return res.json().then(function(data){ return { status: res.status, data: data }; }); })
+  .then(function(result){
+    var data = result.data;
+    if (data.error){
+      if (data.error === 'already_claimed_today'){
+        applyPlinkoState({ claimed_today: true, next_reset_utc: data.next_reset_utc });
+      } else {
+        console.error('plinko claim error:', data.error);
+        setButtonBusy(btn, false);
+        if (btn) btn.disabled = false;
+      }
+      return;
+    }
+    playPlinkoDrop(data.slot, function(){
+      updateBalanceDisplay({ coins: data.coins, gram: data.gram , locked_coins: data.locked_coins });
+      applyPlinkoState({ claimed_today: true, next_reset_utc: data.next_reset_utc });
+      showPlinkoResult(data);
+      showPrizeToast(data.prize_type, data.prize_amount);
+      celebrateReward(data.prize_type);
+    });
+  })
+  .catch(function(err){
+    console.error('plinko request failed:', err);
+    setButtonBusy(btn, false);
+    if (btn) btn.disabled = false;
+  })
+  .finally(function(){
+    plinkoBusy = false;
+    hideAdLoadingOverlay();
+  });
+}
+// the board is drawn once the canvas has a size (the Earn page may open later) and again whenever its size changes
+(function(){
+  var canvas = document.getElementById('plinko-canvas');
+  if (!canvas) return;
+  if (window.ResizeObserver) new ResizeObserver(function(){ plinkoSetup(); }).observe(canvas);
+  else window.addEventListener('resize', function(){ plinkoSetup(); });
+})();
 
 // Pick 1 Of The 3 Gifts
 var giftPickState = { claimedToday: false, nextResetUtc: null };
