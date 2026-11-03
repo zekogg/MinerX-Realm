@@ -1525,10 +1525,15 @@ async function handleWithdrawRequest(request, env) {
   }
   const now = Date.now();
   const cooldownCutoff = now - WITHDRAW_COOLDOWN_MS;
+  // the fee is WITHDRAW_FEE_RATE of the amount asked for (in 1/10000 Gram: exact); what is sent is the rest, cut to
+  // 2 decimals. The balance is charged only what is sent plus the fee: the cut-off part (under 0.01) stays in it.
+  // e.g. 0.1 asked: fee 0.005, sent 0.09, charged 0.095, 0.005 stays
   const feeBasisPoints = Math.round(WITHDRAW_FEE_RATE * 10000);
   const netUnits = Math.floor(amountUnits * (10000 - feeBasisPoints) / 10000);
   const netGram = netUnits / 100;
-  const feeGram = (amountUnits - netUnits) / 100;
+  const feeUnits = Math.ceil(amountUnits * feeBasisPoints / 100); // 1/10000 Gram
+  const feeGram = feeUnits / 10000;
+  const chargeGram = (netUnits * 100 + feeUnits) / 10000;
   const reserveStmt = env.DB.prepare(
     `UPDATE users SET gram = gram - ?, last_withdraw_request_at = ?
      WHERE telegram_id = ? AND gram >= ? AND banned_at IS NULL
@@ -1536,14 +1541,14 @@ async function handleWithdrawRequest(request, env) {
        AND (CASE WHEN ads_today_date = date('now') THEN ads_today ELSE 0 END) >= ?
        AND active_referrals_count >= ?
      RETURNING gram`
-  ).bind(amountGram, now, telegramId, amountGram, cooldownCutoff, WITHDRAW_DAILY_ADS, WITHDRAW_ACTIVE_REFERRALS);
+  ).bind(chargeGram, now, telegramId, chargeGram, cooldownCutoff, WITHDRAW_DAILY_ADS, WITHDRAW_ACTIVE_REFERRALS);
   // changes() is the row count of reserveStmt just before it in the batch, so a refused request records nothing
   const insertStmt = env.DB.prepare(
     `INSERT INTO withdrawals
        (telegram_id, raw_username, first_name, amount_gram, fee_gram, net_gram, address, status, created_at)
      SELECT ?, ?, ?, ?, ?, ?, ?, 'pending', ?
      WHERE changes() = 1`
-  ).bind(telegramId, rawUsername, firstName, amountGram, feeGram, netGram, address, now);
+  ).bind(telegramId, rawUsername, firstName, chargeGram, feeGram, netGram, address, now);
   let batchResults;
   try {
     batchResults = await env.DB.batch([reserveStmt, insertStmt]);
@@ -1566,7 +1571,7 @@ async function handleWithdrawRequest(request, env) {
         next_allowed_at: user.last_withdraw_request_at + WITHDRAW_COOLDOWN_MS
       }, 400);
     }
-    if (!user || !(user.gram >= amountGram)) {
+    if (!user || !(user.gram >= chargeGram)) {
       return jsonResponse({ error: "insufficient_funds" }, 400);
     }
     // enough Gram: the requirements are what is missing (shown in the To Withdraw window)
@@ -1586,7 +1591,7 @@ async function handleWithdrawRequest(request, env) {
     console.error("withdraw request row not written after reserve; refunding");
     await env.DB.prepare(
       "UPDATE users SET gram = gram + ?, last_withdraw_request_at = NULL WHERE telegram_id = ? AND last_withdraw_request_at = ?"
-    ).bind(amountGram, telegramId, now).run();
+    ).bind(chargeGram, telegramId, now).run();
     return jsonResponse({ error: "server_error" }, 500);
   }
   const withdrawalId = insertResult.meta.last_row_id;
