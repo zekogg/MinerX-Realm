@@ -3062,6 +3062,10 @@ img[alt="Penguin"].mystery-box__pick-art{ transform:scale(1.45); }
   top:auto; bottom:100%;
   border-top:none; border-bottom:calc(4px * var(--s)) solid rgba(227,165,66,.55);
 }
+/* Gram (silver), next to the gold Coins one */
+.price-tooltip--silver{ color:#eef2f8; border-color:rgba(206,214,226,.62); background:rgba(14,16,22,.92); }
+.price-tooltip--silver::after{ border-top-color:rgba(206,214,226,.62); }
+.price-tooltip--silver.price-tooltip--below::after{ border-bottom-color:rgba(206,214,226,.62); }
 .help-tooltip-anchor{ position:relative; display:inline-flex; }
 .prize-tooltip-icons{ display:flex; align-items:center; justify-content:center; gap:calc(4px * var(--s)); margin-top:calc(4px * var(--s)); font-weight:700; }
 #spin-help-tooltip{ left:auto; right:0; transform:translateY(calc(-6px * var(--s))); }
@@ -4208,7 +4212,7 @@ body.reduce-motion .firefly{
         <div class="topbar-badge__icon-wrap">
           <img draggable="false" src="/Gram_symbol.png" alt="Gram" class="icon-gram" style="width:calc(24px * var(--s));height:calc(24px * var(--s));">
         </div>
-        <span class="topbar-badge__num" id="display-gram-topbar">0.00</span>
+        <span class="topbar-badge__num" style="position:relative; cursor:pointer;" onclick="togglePriceTooltip('topbar-gram-exact-tooltip')"><span id="display-gram-topbar">0.00</span><span class="price-tooltip price-tooltip--below price-tooltip--silver" id="topbar-gram-exact-tooltip">0.0000 Gram</span></span>
       </div>
       <div class="lang-selector" onclick="i18nToggleMenu(event)" data-no-i18n>
         <span class="lang-selector__flag">🇬🇧</span>
@@ -6130,6 +6134,8 @@ function updateBalanceDisplay(u){
   if (elTopbarCoinsTooltip) elTopbarCoinsTooltip.textContent = coinsWhole + ' Coins';
   var elTopbarGram = document.getElementById('display-gram-topbar');
   if (elTopbarGram) elTopbarGram.textContent = gramText;
+  var elTopbarGramTooltip = document.getElementById('topbar-gram-exact-tooltip');
+  if (elTopbarGramTooltip) elTopbarGramTooltip.textContent = formatGram(u.gram, 4) + ' Gram';
   var elGramEquiv = document.getElementById('display-gram-equiv-topbar');
   if (elGramEquiv){
     var gramEquiv = Number(u.coins) * EXCHANGE_RATE_COIN_TO_GRAM;
