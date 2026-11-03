@@ -7205,24 +7205,43 @@ function playPlinkoDrop(slot, done){
     rights += steps[row];
   }
   points.push([g.slotX(slot), g.restY]);
-  var legs = points.length - 1, legMs = PLINKO_DROP_MS / legs, start = performance.now();
-  function frame(now){
+  var legs = points.length - 1, legMs = PLINKO_DROP_MS / legs, start = null, finished = false;
+  // the end, once: the ball in its slot, the slot lit, then the result
+  function finish(){
+    if (finished) return;
+    finished = true;
     var cur = plinkoBoard;
-    if (!cur) return;
-    var t = Math.min(1, (now - start) / PLINKO_DROP_MS);
-    var leg = Math.min(legs - 1, Math.floor((now - start) / legMs));
-    var f = Math.min(1, (now - start - leg * legMs) / legMs);
-    var a = points[leg], c = points[leg + 1];
-    cur.ball = [a[0] + (c[0] - a[0]) * f, a[1] + (c[1] - a[1]) * f - Math.sin(f * Math.PI) * 10 * cur.g.W / 300];
-    cur.hit = leg > 0 && leg <= PLINKO_ROWS ? hits[leg - 1] : -1;
-    plinkoDraw();
-    if (t < 1){ requestAnimationFrame(frame); return; }
-    cur.ball = [c[0], c[1]]; cur.hit = -1; cur.landed = slot;
-    plinkoDraw();
+    if (cur){
+      cur.ball = [cur.g.slotX(slot), cur.g.restY]; cur.hit = -1; cur.landed = slot;
+      plinkoDraw();
+    }
     plinkoLightSlot(slot);
     done();
   }
+  function frame(now){
+    if (finished) return;
+    try{
+      var cur = plinkoBoard;
+      if (!cur){ finish(); return; }
+      // the time is counted from the first frame (after an ad the first frame's time can be a little before the call)
+      if (start === null) start = now;
+      var elapsed = Math.max(0, now - start);
+      if (elapsed >= PLINKO_DROP_MS){ finish(); return; }
+      var leg = Math.min(legs - 1, Math.floor(elapsed / legMs));
+      var f = Math.min(1, (elapsed - leg * legMs) / legMs);
+      var a = points[leg], c = points[leg + 1];
+      cur.ball = [a[0] + (c[0] - a[0]) * f, a[1] + (c[1] - a[1]) * f - Math.sin(f * Math.PI) * 10 * cur.g.W / 300];
+      cur.hit = leg > 0 && leg <= PLINKO_ROWS ? hits[leg - 1] : -1;
+      plinkoDraw();
+      requestAnimationFrame(frame);
+    } catch (e){
+      console.error('plinko drop failed:', e);
+      finish();
+    }
+  }
   requestAnimationFrame(frame);
+  // frames may stop (the app in the background): the result still shows after the drop time
+  setTimeout(finish, PLINKO_DROP_MS + 1500);
 }
 function renderPlinkoButton(){
   var btn = document.getElementById('btn-plinko');
