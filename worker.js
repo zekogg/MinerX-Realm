@@ -1647,7 +1647,7 @@ async function handleWithdrawRequest(request, env) {
   // no answer in time may mean it was sent, so it is not sent again (no second copy of the same request)
   const adminPayload = {
     chat_id: ADMIN_TELEGRAM_ID,
-    text: buildAdminWithdrawText("pending", withdrawalId, withdrawArgs),
+    text: buildAdminWithdrawText("pending", withdrawalId, { ...withdrawArgs, info: await withdrawAdminInfo(env, telegramId) }),
     parse_mode: "HTML",
     reply_markup: withdrawAdminKeyboard({ id: withdrawalId, net_gram: netGram, auto_send: null })
   };
@@ -3238,6 +3238,52 @@ function isoWeekKeyUTC(at = Date.now()) {
   const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
   return d.getUTCFullYear() + "-W" + String(weekNo).padStart(2, "0");
 }
+// "DD-MM-YYYY HH:MM" in UTC (the admin panel's date, with the time)
+function formatDateTimeUTC(ms) {
+  const d = new Date(ms);
+  return `${formatDateDDMMYYYY(ms)} ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
+}
+// Lines on the admin's copy of a pending withdraw request, from what the database already holds: when the account
+// registered and its lifetime ads; its friends (active / invited) and the last active one (registered, ads); who
+// invited it and how many other accounts share its device (the admin panel's Linked Accounts). One batch of small
+// reads; null when it can't be read (the request is shown without them)
+async function withdrawAdminInfo(env, telegramId) {
+  try {
+    const [userRes, friendRes, linkedRes] = await env.DB.batch([
+      env.DB.prepare(
+        "SELECT created_at, lifetime_ads_watched, invites_count, active_referrals_count, referred_by FROM users WHERE telegram_id = ?"
+      ).bind(telegramId),
+      env.DB.prepare(
+        `SELECT r.referred_id, f.created_at, f.lifetime_ads_watched
+         FROM referrals r LEFT JOIN users f ON f.telegram_id = r.referred_id
+         WHERE r.referrer_id = ? AND r.is_active = 1
+         ORDER BY r.invited_at DESC LIMIT 1`
+      ).bind(telegramId),
+      env.DB.prepare(
+        `SELECT COUNT(*) AS n FROM users
+         WHERE device_id = (SELECT device_id FROM users WHERE telegram_id = ?) AND telegram_id <> ?`
+      ).bind(telegramId, telegramId)
+    ]);
+    const u = userRes.results && userRes.results[0];
+    if (!u) return null;
+    const when = (ms) => (ms ? formatDateTimeUTC(ms) : "unknown");
+    const invites = u.invites_count || 0, active = u.active_referrals_count || 0;
+    const friend = friendRes.results && friendRes.results[0];
+    let friends = invites || active ? `👥 Friends: ${active} active / ${Math.max(invites, active)}` : "👥 Friends: 0";
+    if (friend) {
+      friends += ` · Last: <code>${friend.referred_id}</code> · ${when(friend.created_at)} · 📺 ${friend.lifetime_ads_watched || 0}`;
+    }
+    const linked = (linkedRes.results && linkedRes.results[0] && linkedRes.results[0].n) || 0;
+    return (
+      `🕒 Registered: ${when(u.created_at)} · 📺 Ads: ${u.lifetime_ads_watched || 0}\n` +
+      `${friends}\n` +
+      `🔗 Invited by: ${u.referred_by ? `<code>${u.referred_by}</code>` : "none"} · 📱 Linked Accounts: ${linked}`
+    );
+  } catch (e) {
+    console.error("withdraw admin info failed:", e?.message || e);
+    return null;
+  }
+}
 function formatDateDDMMYYYY(ms) {
   const d = new Date(ms);
   const dd = String(d.getUTCDate()).padStart(2, "0");
@@ -3541,6 +3587,8 @@ function buildAdminWithdrawText(status, withdrawalId, w) {
     `🆔 <code>${w.telegramId}</code>\n` +
     `💵 Amount: ${formatWithdrawGram(w.netGram)} Gram\n\n` +
     `📍 Address:\n<code>${escapeHtml(w.address)}</code>` +
+    // while pending: who the account is (withdrawAdminInfo), already HTML
+    (w.info ? `\n\n${w.info}` : "") +
     (w.txHash ? `\n🔗 TxID:\n${txLinkHtml(w.txHash)}` : "") +
     // after a send by the Accept button: the bot wallet's balance (read before sending, minus the amount; the network
     // fee is not taken off, so it is about), in Gram with 2 decimals, rounded down
@@ -3820,11 +3868,13 @@ function withdrawAdminKeyboard(row) {
     ? { inline_keyboard: [[{ text: "✅ Accept", callback_data: `wd_ac_${row.id}` }, reject]] }
     : { inline_keyboard: [[reject]] };
 }
-// Puts the admin's copy in the given state (note: an HTML line above the footer); keyboard null removes the buttons
+// Puts the admin's copy in the given state (note: an HTML line above the footer); keyboard null removes the buttons.
+// A pending copy shows the account's lines again (withdrawAdminInfo), read fresh
 async function editWithdrawAdminCopy(env, messageId, status, row, note, keyboard) {
   if (!messageId) return null;
+  const info = status === "pending" ? await withdrawAdminInfo(env, row.telegram_id) : null;
   const payload = {
-    text: buildAdminWithdrawText(status, row.id, { ...withdrawRowArgs(row), reason: row.reason || null, note }),
+    text: buildAdminWithdrawText(status, row.id, { ...withdrawRowArgs(row), reason: row.reason || null, note, info }),
     parse_mode: "HTML",
     link_preview_options: { is_disabled: true }
   };
