@@ -28,7 +28,7 @@ const SPIN_SEGMENTS = [
 
 // Lucky Dice config: one roll a day after an ad (like the Chest). The dice shows 1-6 (all equally likely) and the prize
 // is, at even odds, the dots x DICE_COINS_PER_DOT Coins or the dots x DICE_GRAM_PER_DOT Gram
-const DICE_COINS_PER_DOT = 12;
+const DICE_COINS_PER_DOT = 10;
 const DICE_GRAM_PER_DOT = 0.0001;
 
 // Exchange config
