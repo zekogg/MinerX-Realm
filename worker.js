@@ -2039,7 +2039,7 @@ async function handleAdminUserFind(request, env) {
   if (!Number.isInteger(targetId)) return jsonResponse({ error: "invalid_target_id" }, 400);
   const [user, depositResult, withdrawResult, referralAds] = await Promise.all([
     env.DB.prepare(
-      "SELECT telegram_id, username, coins, gram, total_speed, invites_count, active_referrals_count, referral_deposit_commission_total, lifetime_ads_watched, created_at, device_id, banned_at, locked_coins FROM users WHERE telegram_id = ?"
+      "SELECT telegram_id, username, coins, gram, total_speed, invites_count, active_referrals_count, referral_deposit_commission_total, lifetime_ads_watched, created_at, device_id, banned_at, locked_coins, referred_by FROM users WHERE telegram_id = ?"
     ).bind(targetId).first(),
     env.DB.prepare(
       "SELECT COALESCE(SUM(amount_gram), 0) AS total FROM deposits WHERE telegram_id = ? AND status = 'confirmed'"
@@ -2079,6 +2079,7 @@ async function handleAdminUserFind(request, env) {
     referral_ads_inactive: referralAds.inactive_ads || 0,
     referral_commission_total: user.referral_deposit_commission_total || 0,
     registered_date: user.created_at ? formatDateDDMMYYYY(user.created_at) : "—",
+    invited_by: user.referred_by || null,
     ads_watched: user.lifetime_ads_watched || 0,
     total_deposit_gram: depositResult.total || 0,
     total_withdraw_gram: withdrawResult.total || 0,
