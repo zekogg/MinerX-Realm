@@ -65,7 +65,13 @@ function adminFindUser(){
     adminRenderTotalCoins();
     document.getElementById('ap-find-gram').value = Number(data.gram).toFixed(3);
     document.getElementById('ap-find-registered').textContent = data.registered_date;
-    document.getElementById('ap-find-invited-by').textContent = data.invited_by ? String(Number(data.invited_by)) : 'None';
+    // tapping the inviter's ID opens that account in Find User
+    var invitedByEl = document.getElementById('ap-find-invited-by');
+    var inviterId = Number(data.invited_by) || 0;
+    invitedByEl.textContent = inviterId ? String(inviterId) : 'None';
+    invitedByEl.style.cursor = inviterId ? 'pointer' : '';
+    invitedByEl.style.textDecoration = inviterId ? 'underline' : '';
+    invitedByEl.onclick = inviterId ? function(){ idInput.value = inviterId; adminFindUser(); } : null;
     document.getElementById('ap-find-ads').textContent = Number(data.ads_watched || 0).toLocaleString('en-US');
     document.getElementById('ap-find-invites').textContent = data.invites;
     document.getElementById('ap-find-active-invites').textContent = data.active_invites;
